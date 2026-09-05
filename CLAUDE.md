@@ -18,7 +18,10 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 - Hausaufgaben-Tutor: keine Lösung vor zwei dokumentierten Versuchen; Hinweisleiter §4a einhalten; Fachtabelle §4a beachten.
 - Wissensschichten: eigenes Material > Lehrwerk > Kurrikulum-Pack > Allgemeinwissen. Der Tutor benennt die Quelle. Prüfungen nur aus Schicht 1+2.
 - Kind-Profile sind pseudonym: kein Geburtsdatum, keine E-Mail, keine Schul-ID. Nur Vorname, Jahrgang, Klasse.
-- UI-Sprache Deutsch, Du-Ansprache, Ton für 14-Jährige: respektvoll, nicht kindlich, kein Lob ohne Grund.
+- UI-Sprache Deutsch, Du-Ansprache, Ton für 14-Jährige: respektvoll, nicht kindlich, kein Lob ohne Grund. Der Tutor antwortet immer auf Deutsch (Ausnahme: Zielsprache in Fremdsprachenfächern) – das wird getestet.
+- Ein Thema gehört zu genau einem Fach; eine Prüfung verknüpft nur Themen ihres Fachs (DB-Constraint + Test).
+- Kein Lösungsmodus, keine Bestenlisten, keine Streaks im Header, keine Kauf-/Dringlichkeits-Elemente (Konzept §15).
+- KI-Generierungen über 3 s zeigen benannte, wahre Schritte statt Spinner. Tutor-Eingabe zeigt immer den Kontext-Chip „Fach › Thema“.
 
 ## Stack-Regeln
 

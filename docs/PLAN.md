@@ -16,33 +16,36 @@ Status: `todo` · `doing` · `done` · `blocked`. Ein Ticket = maximal eine Clau
 
 ## Meilenstein 1 – Kalender + Vokabeln (Woche 2–3)
 
-| ID   | Ticket                                                                                                      | Konzept       | Status | Notizen                      |
-| ---- | ----------------------------------------------------------------------------------------------------------- | ------------- | ------ | ---------------------------- |
-| K-01 | CalendarEvent-Schema + manuelle Eingabe (Formular, Liste 4 Wochen, Bearbeiten, Absagen, Historie)           | §6 M7, §7c/7d | todo   |                              |
-| K-02 | **[opusplan]** Import-Pipeline planen: Zod-Schema für Klausurplan-Import, Review-Screen, Re-Import-Matching | §6 M7 7a/7b   | todo   | Fixture: docs/fixtures       |
-| K-03 | Bild-Import Klausurplan (Vision → Structured Output → Review → Speichern), Gruppenfilter, Blocker-Typen     | §6 M7         | todo   | Test gegen Fixture           |
-| K-04 | Datei-Import CSV/XLSX (SchulDock-Export) + ICS                                                              | §6 M7         | todo   |                              |
-| V-01 | Vokabel-Schema: Lehrwerk, Unit, Set, VocabItem (beide Richtungen), FSRS-State via ts-fsrs                   | §6 M4         | todo   |                              |
-| V-02 | Vokabel-Session: Stapel Sitzt/Fast/Nochmal, Modi MC + Tippen, Antwortzeit, Tippfehlertoleranz               | §6 M4         | todo   | Unit-Tests für Session-Queue |
-| V-03 | Foto-Import Vokabelseite (Vision → Review-Screen mit Duplikaten → Set)                                      | §6 M4         | todo   |                              |
-| V-04 | Modi: Fällig heute (setübergreifend), Prüfungsmodus (Sets der nächsten Arbeit), Schwachstellen              | §6 M4         | todo   |                              |
-| H-01 | Heute-Screen: fällige Karten, nächste Prüfung mit Countdown, Kamera-Button                                  | §5            | todo   |                              |
-| D-01 | Vercel-Deploy, Domain, erste Nutzung mit Tochter, Feedback-Runde                                            | –             | todo   |                              |
+| ID   | Ticket                                                                                                                                                                         | Konzept       | Status | Notizen                                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | ------ | ------------------------------------------- |
+| K-01 | CalendarEvent-Schema + manuelle Eingabe (Formular, Liste 4 Wochen, Bearbeiten, Absagen, Historie)                                                                              | §6 M7, §7c/7d | todo   |                                             |
+| K-02 | **[opusplan]** Import-Pipeline planen: Zod-Schema für Klausurplan-Import, Review-Screen, Re-Import-Matching                                                                    | §6 M7 7a/7b   | todo   | Fixture: docs/fixtures                      |
+| K-03 | Bild-Import Klausurplan (Vision → Structured Output → Review → Speichern), Gruppenfilter, Blocker-Typen                                                                        | §6 M7         | todo   | Test gegen Fixture                          |
+| K-04 | Datei-Import CSV/XLSX (SchulDock-Export) + ICS                                                                                                                                 | §6 M7         | todo   |                                             |
+| V-01 | Vokabel-Schema: Lehrwerk, Unit, Set, VocabItem (beide Richtungen), FSRS-State via ts-fsrs                                                                                      | §6 M4         | todo   |                                             |
+| V-02 | Vokabel-Session: Stapel Sitzt/Fast/Nochmal, Modi MC + Tippen, Antwortzeit, Tippfehlertoleranz                                                                                  | §6 M4         | todo   | Unit-Tests für Session-Queue                |
+| V-03 | Foto-Import Vokabelseite (Vision → Review-Screen mit Duplikaten → Set)                                                                                                         | §6 M4         | todo   |                                             |
+| V-04 | Modi: Fällig heute (setübergreifend), Prüfungsmodus (Sets der nächsten Arbeit), Schwachstellen                                                                                 | §6 M4         | todo   |                                             |
+| H-01 | Heute-Screen: fällige Karten, nächste Prüfung mit Countdown, Kamera-Button                                                                                                     | §5            | todo   |                                             |
+| P-01 | Prüfungsvorbereitungs-Seite: Event + Themen (nur gleiches Fach!) + Zielnote + Fortschritt (Sicherheit vs. Ziel) + verknüpfte Vokabelsets; Ladezustände mit benannten Schritten | §15, §6 M7    | todo   | Constraint + Test: Thema.fach == Event.fach |
+| D-01 | Vercel-Deploy, Domain, erste Nutzung mit Tochter, Feedback-Runde                                                                                                               | –             | todo   |                                             |
 
 ## Meilenstein 2 – Material + Tutor (V2 im Konzept)
 
-| ID   | Ticket                                                                                                | Konzept | Status |
-| ---- | ----------------------------------------------------------------------------------------------------- | ------- | ------ |
-| M-01 | Material-Upload zu Thema (Foto/PDF/Buchangabe/Link/Notiz), Storage-Pfade pro Familie, signierte URLs  | §10     | todo   |
-| M-02 | Vision-Extraktion + Lernziel-Zuordnung                                                                | §6 M2   | todo   |
-| M-03 | Karten-Schema + FSRS-Session (generisch, nicht nur Vokabeln)                                          | §6 M3   | todo   |
-| M-04 | Karten-Generierung aus Material                                                                       | §6 M2   | todo   |
-| T-01 | **[opusplan]** Tutor-Architektur: Kontextpaket pro Thema, Schichten, Prompt Caching, Einstiegs-Router | §4, §10 | todo   |
-| T-02 | Einstieg Verstehen (Text, Erklär-es-anders, Verständnischeck)                                         | §4      | todo   |
-| T-03 | Einstieg Hausaufgabe (Foto → Aufgabenliste → Hinweisleiter → Lösung nach 2 Versuchen)                 | §4a     | todo   |
-| T-04 | Einstieg Vorschau                                                                                     | §4      | todo   |
-| T-05 | Kurrikulum-Pack `de-hh-gym-2023` importieren (manuell geladene PDFs → JSON)                           | §7      | todo   |
-| S-03 | Content-Security-Policy, Rate Limits auf KI-Endpunkten                                                | §11     | todo   |
+| ID    | Ticket                                                                                                            | Konzept | Status |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | ------- | ------ |
+| M-01  | Material-Upload zu Thema (Foto/PDF/Buchangabe/Link/Notiz), Storage-Pfade pro Familie, signierte URLs              | §10     | todo   |
+| M-02  | Vision-Extraktion + Lernziel-Zuordnung                                                                            | §6 M2   | todo   |
+| M-03  | Karten-Schema + FSRS-Session (generisch, nicht nur Vokabeln)                                                      | §6 M3   | todo   |
+| M-04  | Karten-Generierung aus Material                                                                                   | §6 M2   | todo   |
+| T-01  | **[opusplan]** Tutor-Architektur: Kontextpaket pro Thema, Schichten, Prompt Caching, Einstiegs-Router             | §4, §10 | todo   |
+| T-02  | Einstieg Verstehen (Text, Erklär-es-anders, Verständnischeck, Anschlussfragen-Chips, Kontext-Chip Fach › Thema)   | §4, §15 | todo   |
+| T-02a | Sprachwächter: Systemprompt-Sprache + Unit-Test, dass Tutor-Antworten deutsch sind (Ausnahme Fremdsprachenfächer) | §15     | todo   |
+| T-02b | Spracheingabe (Web Speech API) im Tutor mit sichtbarem Zustand „tutr hört zu“                                     | §15     | todo   |
+| T-03  | Einstieg Hausaufgabe (Foto → Aufgabenliste → Hinweisleiter → Lösung nach 2 Versuchen)                             | §4a     | todo   |
+| T-04  | Einstieg Vorschau: Selbsteinschätzung (5 Stufen) → Hook-Szenario → Landkarte → Vorwissens-Check                   | §4, §15 | todo   |
+| T-05  | Kurrikulum-Pack `de-hh-gym-2023` importieren (manuell geladene PDFs → JSON)                                       | §7      | todo   |
+| S-03  | Content-Security-Policy, Rate Limits auf KI-Endpunkten                                                            | §11     | todo   |
 
 ## Meilenstein 3 – Prüfen + Lernplan (V3) · Meilenstein 4 – Audio/Visuals/Eltern (V4)
 

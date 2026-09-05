@@ -13,6 +13,7 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 - CI (lint, typecheck, tests, build, e2e) und Security-Pipeline (gitleaks, npm audit, CodeQL), Dependabot
 - Security-Header, Zod-validierte Umgebungsvariablen
 - Docs: Konzept v2, Backlog, ADR 0001/0002, SECURITY.md, SETUP.md
+- Konzept §15: Ergänzungen aus Astra-Walkthrough (Selbsteinschätzung, Hook-Szenario, Zielnote, Prüfungsvorbereitungs-Seite, Anschlussfragen, Spracheingabe in V2); Tickets P-01, T-02a/b
 
 ### Changed
 
