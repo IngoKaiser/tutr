@@ -19,7 +19,7 @@ Zielgruppe: du, einmalig auf deinem Mac/PC. Dauer ca. 45 Minuten inkl. GitHub- u
    ```bash
    ./scripts/bootstrap.sh
    ```
-   Installiert Abhängigkeiten aus dem Lockfile, aktiviert Git-Hooks, lädt Chromium für Playwright, führt `npm run check` aus. Endet mit ✔.
+   Installiert Abhängigkeiten aus dem Lockfile, aktiviert Git-Hooks, lädt Chromium + WebKit für Playwright (WebKit deckt iOS-Safari ab, das Ziel-Umfeld), führt `npm run check` aus. Endet mit ✔.
 4. **Einmal starten**
    ```bash
    SKIP_ENV_VALIDATION=1 npm run dev   # http://localhost:3000 zeigt „tutr"

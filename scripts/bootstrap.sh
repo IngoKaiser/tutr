@@ -9,8 +9,8 @@ npm ci
 echo "▶ Git-Hooks"
 npm run prepare
 
-echo "▶ Playwright-Browser (nur Chromium)"
-npx playwright install chromium
+echo "▶ Playwright-Browser (Chromium + WebKit)"
+npx playwright install chromium webkit
 
 echo "▶ Qualitätscheck"
 npm run check
