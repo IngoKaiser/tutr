@@ -10,7 +10,7 @@
 - [ ] RLS für neue/geänderte Tabellen
 - [ ] Keine `any`, keine Lint-Umgehungen
 - [ ] Deutsche, verständliche Fehlermeldungen
-- [ ] docs/PLAN.md aktualisiert, ADR falls Entscheidung
+- [ ] docs/PLAN.md und CHANGELOG.md aktualisiert, ADR falls Entscheidung
 
 ## Sicherheits-Check
 

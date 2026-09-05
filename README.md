@@ -4,6 +4,8 @@ Lern-PWA für Schülerinnen und Schüler: Prüfungskalender, Vokabeln und Karten
 
 ## Start
 
+Ausführliche Anleitung: `docs/SETUP.md`.
+
 ```bash
 git clone <repo> && cd tutr
 nvm use                      # Node 22

@@ -39,7 +39,7 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 3. Tests gehören zum Feature: Unit (Vitest) für Logik, Integration für Server Actions, E2E (Playwright) für den Nutzerpfad. Ein Feature ohne Test ist nicht fertig.
 4. Vor jedem Commit: `npm run check` (lint + typecheck + unit tests) muss grün sein. Hooks erzwingen das.
 5. Commits nach Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`), klein und thematisch.
-6. Nach dem Feature: `docs/PLAN.md` aktualisieren (Status, offene Punkte). Kein Statusbericht im Chat, wenn er im Plan steht.
+6. Nach dem Feature: `docs/PLAN.md` (Status, offene Punkte) und `CHANGELOG.md` unter Unreleased aktualisieren. Kein Statusbericht im Chat, wenn er im Plan steht.
 
 ## Definition of Done
 
@@ -48,7 +48,7 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 - [ ] RLS für neue/geänderte Tabellen
 - [ ] Keine neuen Lint-Warnungen, keine `any`
 - [ ] Nutzerfreundliche Fehlermeldungen auf Deutsch
-- [ ] `docs/PLAN.md` aktualisiert; ADR, falls eine Entscheidung gefallen ist
+- [ ] `docs/PLAN.md` und `CHANGELOG.md` (Unreleased) aktualisiert; ADR, falls eine Entscheidung gefallen ist
 
 ## Befehle
 
