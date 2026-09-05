@@ -1,0 +1,6 @@
+# Conventional Commits: type(scope)?: subject
+msg="$(head -n1 "$1")"
+if ! echo "$msg" | grep -Eq '^(feat|fix|chore|docs|test|refactor|perf|ci|build|style)(\([a-z0-9-]+\))?!?: .{3,}'; then
+  echo "✖ Commit-Nachricht muss Conventional Commits folgen, z. B. 'feat(kalender): Bild-Import mit Review'"
+  exit 1
+fi

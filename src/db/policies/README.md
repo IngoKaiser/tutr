@@ -1,0 +1,1 @@
+-- RLS-Policies je Tabelle. Jede Tabelle in src/db/schema braucht hier eine Datei. Eltern-Rolle: nie tutor_sessions.

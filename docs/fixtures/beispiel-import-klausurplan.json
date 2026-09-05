@@ -1,0 +1,184 @@
+{
+  "_kommentar": "So sollte der Bild-Import (Claude Vision, Structured Output) den SchulDock-Klausurplan vom 02.09.2026 liefern. Zeilen anderer Klassen sind bereits per Gruppenfilter (eigene Klasse: 8.5) markiert. Dient als Test-Fixture für den Review-Screen.",
+  "quelle": {
+    "typ": "bild",
+    "ref": "Klausurplan_s5849.schuldock.de_02.09.2026",
+    "importiertAm": "2026-09-05",
+    "eigeneGruppen": ["8.5", "8.5 Eng", "8.5 Mat"]
+  },
+  "events": [
+    {
+      "typ": "klassenarbeit",
+      "fach": "Französisch",
+      "titel": "Jg. 8 Frz. Arbeit",
+      "datum": "2026-09-25",
+      "start": "09:50",
+      "ende": "11:20",
+      "gruppen": ["8.1", "8.2", "8.3", "8.4", "8.5"],
+      "themen": [],
+      "relevant": true,
+      "hinweis": "Jahrgangsarbeit"
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Englisch",
+      "titel": "Englischarbeit Nr.1",
+      "datum": "2026-09-30",
+      "start": "09:50",
+      "ende": "11:20",
+      "gruppen": ["8.5", "8.5 Eng"],
+      "themen": [],
+      "relevant": true
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Deutsch",
+      "titel": "Jg. 8 Deutscharbeit",
+      "datum": "2026-10-01",
+      "start": "08:00",
+      "ende": "09:30",
+      "gruppen": ["8.3", "8.4", "8.5"],
+      "themen": [],
+      "relevant": true
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Mathematik",
+      "titel": "Mathearbeit 8.5",
+      "datum": "2026-10-09",
+      "start": "08:00",
+      "ende": "09:30",
+      "gruppen": ["8.5", "8.5 Mat"],
+      "themen": [],
+      "relevant": true,
+      "anzeigename": "Mathe Nr. 1"
+    },
+    {
+      "typ": "projekt",
+      "titel": "Projektwoche",
+      "datum": "2026-10-12",
+      "gruppen": [],
+      "relevant": true,
+      "blocker": true
+    },
+    {
+      "typ": "ferien",
+      "titel": "Herbstferien",
+      "datum": "2026-10-19",
+      "gruppen": [],
+      "relevant": true,
+      "blocker": true,
+      "hinweis": "Enddatum fehlt in der Quelle – nachtragen"
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Biologie",
+      "titel": "Biologie 8.5",
+      "datum": "2026-11-04",
+      "start": "11:40",
+      "ende": "13:10",
+      "gruppen": ["8.5"],
+      "themen": [],
+      "relevant": true
+    },
+    {
+      "typ": "fahrt",
+      "titel": "Musikfahrt",
+      "datum": "2026-11-09",
+      "gruppen": [],
+      "relevant": true,
+      "blocker": true,
+      "hinweis": "Dauer unklar"
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Chemie",
+      "titel": "Chemie",
+      "datum": "2026-11-16",
+      "start": "09:50",
+      "ende": "11:20",
+      "gruppen": ["8.5"],
+      "themen": [],
+      "relevant": true
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Deutsch",
+      "titel": "8.5 Deutsch (Erörterung)",
+      "datum": "2026-12-01",
+      "start": "11:40",
+      "ende": "13:10",
+      "gruppen": ["8.5"],
+      "themen": ["Erörterung"],
+      "relevant": true
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Musik",
+      "titel": "Musikarbeit 8.5",
+      "datum": "2026-12-08",
+      "start": "08:00",
+      "ende": "09:30",
+      "gruppen": ["8.5"],
+      "themen": [],
+      "relevant": true
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Mathematik",
+      "titel": "Mathearbeit 8.5",
+      "datum": "2026-12-11",
+      "start": "08:00",
+      "ende": "09:30",
+      "gruppen": ["8.5", "8.5 Mat"],
+      "themen": [],
+      "relevant": true,
+      "anzeigename": "Mathe Nr. 2"
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Englisch",
+      "titel": "Englischarbeit Nr.2",
+      "datum": "2026-12-16",
+      "start": "09:50",
+      "ende": "11:20",
+      "gruppen": ["8.5", "8.5 Eng"],
+      "themen": [],
+      "relevant": true
+    },
+    {
+      "typ": "ferien",
+      "titel": "Weihnachtsferien",
+      "datum": "2026-12-21",
+      "gruppen": [],
+      "relevant": true,
+      "blocker": true,
+      "hinweis": "Enddatum fehlt in der Quelle – nachtragen"
+    },
+    {
+      "typ": "klassenarbeit",
+      "fach": "Deutsch",
+      "titel": "8.5. Deutscharbeit (kurz)",
+      "datum": "2027-01-12",
+      "start": "11:40",
+      "ende": "12:25",
+      "gruppen": ["8.5"],
+      "themen": [],
+      "relevant": true,
+      "hinweis": "45 Min – vermutlich Test statt Klassenarbeit"
+    },
+    {
+      "typ": "sonstiges",
+      "titel": "Tag der offenen Tür CvO",
+      "datum": "2027-01-21",
+      "gruppen": [],
+      "relevant": false,
+      "hinweis": "Schulveranstaltung, kein Lernbezug"
+    }
+  ],
+  "reviewHinweise": [
+    "Ballung: 4 Arbeiten zwischen 25.09. und 09.10. – Lernplan sollte jetzt starten.",
+    "Ballung: 4 Arbeiten zwischen 01.12. und 16.12. vor den Weihnachtsferien.",
+    "Ferien und Fahrten haben in der Quelle nur ein Startdatum – Enddaten manuell ergänzen oder aus Hamburger Ferienkalender ziehen."
+  ]
+}
