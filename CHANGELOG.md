@@ -17,6 +17,19 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- Playwright-Setup deckt jetzt WebKit (iOS-Safari) ab, nicht nur Chromium – CI und `scripts/bootstrap.sh`
+- GitHub Actions auf aktuelle Majors gehoben (`checkout`/`setup-node`/`upload-artifact` v7, `codeql-action` v4), weg von Node-20-Runnern
+- `gitleaks-action` v2 → v3
+
 ### Fixed
 
+- CI-Job `e2e` schlug fehl, weil das `mobile`-Playwright-Projekt (iPhone 14 → WebKit) ohne installierten WebKit lief
+- CI-Job `secrets` schlug beim ersten Push fehl (gitleaks-action v2, fehlerhafte Commit-Range)
+- `.env.example` fehlte im Repo, obwohl `bootstrap.sh`/`SETUP.md` sie voraussetzen (+ `.gitignore`-Ausnahme)
+- `.gitignore` ignoriert jetzt Playwright-Artefakte (`test-results/`, `playwright-report/` u. a.)
+- `.prettierignore`: kaputte erste Zeile `-e .next` → `.next`
+
 ### Security
+
+- `browserslist` per `overrides` auf 4.28.9 gehoben (2× High, GHSA-c83g-rgw3-j3cx / GHSA-73wf-gq98-2v4g); `@serwist/next` pinnt die verwundbare 4.28.6 fest
+- GitHub-Repo auf public umgestellt; Secret Scanning + Push Protection und Branch-Ruleset für `main` aktiviert
