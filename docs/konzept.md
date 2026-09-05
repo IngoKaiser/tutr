@@ -352,3 +352,46 @@ Prüfungen nur aus 1+2 (3 für Niveau). Vorschau ohne Schicht 1 sagt das und wir
 3. Zeitbudget pro Tag, das der Lernplan annehmen darf – 20 Minuten? 45?
 4. Soll sie die Fordern-Angebote sehen, oder erst nach einer Testphase?
 5. Elternansicht: nur Termine und Mastery, oder auch Noten und Lernplan-Einhaltung?
+
+---
+
+## 15. Ergänzungen aus dem Astra-AI-Walkthrough (5. 9. 2026)
+
+Quelle: 13 Screens der Astra-App (Home, Fachwahl, Prüfungsvorbereitung, Kalender, Menü, Optionen, Einstiegslektion, Ladezustand, Themenansicht). Bewertung nach: übernehmen · anpassen · bewusst nicht.
+
+### Übernehmen
+| Muster bei Astra | Umsetzung in tutr | Wo |
+|---|---|---|
+| **Fach-Chip am Eingabefeld** („Mathematik ⌄" direkt über dem Chat) | Der Tutor-Eingabebereich zeigt immer den aktiven Kontext als Chip: *Fach › Thema*. Antippen wechselt. Kein Kontextwechsel im Fließtext. | §4, §5 Tutor |
+| **Selbsteinschätzung beim Themenstart** („Wie vertraut bist du mit diesem Thema?" – 5 Stufen: neu · gehört · Grundlagen · verstehe gut · sicher) | Erster Schritt der **Vorschau** und beim ersten Öffnen eines Themas. Setzt Startniveau und wählt die Tiefe der Vorwissens-Fragen. Wird als Metakognitions-Wert gespeichert und später gegen die tatsächliche Mastery gespiegelt („du hattest dich auf ‚sicher' eingeschätzt – die Karten sagen 60 %"). | §3, §4 Einstieg 1 |
+| **Einführungslektion mit Alltags-Szenario** (Bushaltestelle zwischen zwei Dörfern → Mittelsenkrechte) | Jede Vorschau beginnt mit einem **Hook**: ein konkretes Problem aus dem Alltag, das der Begriff löst. Danach erst Begriff, Beispiel, Kernbegriffe. | §4 Einstieg 1 |
+| **Transparenter Ladezustand** („Deine Lektion wird erstellt… Materialien gelesen · Wissensstand geprüft · Schwierigkeit gewählt") | Alle KI-Generierungen > 3 s zeigen benannte Schritte statt Spinner. Schritte müssen wahr sein (kein Theater): *Material gelesen · Lernziele zugeordnet · Niveau gewählt · Aufgaben erstellt*. | §5 UI-Regel |
+| **Zielnote pro Prüfung** mit Fortschrittsbalken und Markierung | `CalendarEvent.zielnote` (optional). Die Prüfungsvorbereitungs-Seite zeigt *Sicherheit* der verknüpften Lernziele gegen die Zielnote. Fordern-Angebote knüpfen daran an. | §6 M7, §8 |
+| **Prüfungsvorbereitung als eigene Seite** („in 25 Tagen · 0 von 2 Themen", Tabs Lernpfad / Materialien, Themen mit Fortschrittsringen) | Neue Ansicht **Prüfungsvorbereitung** = Kalender-Event + verknüpfte Themen + Lernplan-Slots + Material + Vokabelsets + Probeprüfung. Das ist die Seite, die man in den zwei Wochen vor der Arbeit täglich öffnet. | §5, §6 M7 |
+| **Chatverlauf mit Titeln pro Fach** | Tutor-Sessions bekommen automatisch einen Titel und sind nach Fach/Thema filterbar; Wiedereinstieg in eine alte Session möglich. | §4, §8 TutorSession |
+| **Vorgeschlagene Anschlussfragen** nach jeder Tutor-Antwort | Zwei bis drei Chips („Zeig mir ein Beispiel", „Warum ist das so?", „Erklär es anders"). Senkt die Hürde für 14-Jährige, nachzufragen. Abschaltbar. | §4 |
+| **Sprechen als erstklassiger Eingabeweg** („Tutor hört zu" mit sichtbarem Zustand) | Spracheingabe (Web Speech API) zieht von V4 in **V2** vor – sie ist billig und senkt die Tipp-Hürde beim Erklären. Sprach*ausgabe* bleibt V4. | §12 Roadmap |
+| **Mathe-Tastatur** für Symbole/Gleichungen | Kleine Symbolleiste (Bruch, Potenz, Wurzel, ≤ ≥ ≠, π) über der Tastatur, KaTeX-Vorschau. | V3 |
+
+### Anpassen
+| Muster | Warum nicht 1:1 | tutr |
+|---|---|---|
+| **„Meine Schule"-Community** (Prüfungsvorbereitungen anderer Schüler derselben Schule beitreten) | Fremdinhalte ohne Qualitätskontrolle, Datenschutz, Moderation | Später (V4): **Vorbereitung per Link teilen** – read-only, ohne Chats, für eine Freundin aus der Klasse. Kein Feed, keine Suche. |
+| **Zeichnen** (Skizze als Eingabe) | Nützlich für Geometrie, aber Aufwand | V3, nach Mathe-Tastatur; Foto vom Papier deckt 80 % ab. |
+| **Streak/Flamme im Header** | Setzt Druck, bestraft Pausen | Streak nur im Wochenrückblick, nie im Header (§6 M8). |
+
+### Bewusst nicht
+- **Lösungsmodus-Schalter** („Erhalte schnell vollständige Lösungen"): Das ist genau das, was tutr nicht anbietet. Die Zwei-Versuche-Regel (§4a) ist die Produktentscheidung.
+- **Mini-Games mit Bestenlisten** (Rate die Gleichung, Nonogramm): Ablenkung ohne Bezug zum Stoff. Fordern läuft über Transfer und Niveau, nicht über Spiele.
+- **Kaufen-Button, Rabatt-Countdown, Angebots-Banner:** kein Verkauf, keine Dringlichkeit im Kopf einer Schülerin.
+- **Stimmungsabfrage:** kein Gesundheits-/Stimmungsdatum erheben. Wenn überhaupt: „Wie viel Zeit hast du heute?" für den Lernplan.
+
+### Zwei beobachtete Fehler, die tutr per Test ausschließt
+1. **Sprachrutscher:** Der Astra-Tutor begrüßte auf Englisch („Hey Frida! Cool that you're here… English or…") in einer deutschen Mathe-Lektion. → Systemprompt fixiert die Sprache; ein Unit-Test prüft Tutor-Antworten auf deutsche Sprache (Ausnahme: Fremdsprachenfächer, dort ist die Zielsprache erlaubt).
+2. **Thema ohne Fachbindung:** Eine „Englisch"-Prüfungsvorbereitung enthielt Mathe-Themen (Mittelsenkrechte, Winkelbeziehungen). → In tutr hängt jedes Thema an einem Fach (§8), und eine Prüfung kann nur Themen ihres Fachs verknüpfen. Constraint in DB und Test.
+
+### Änderungen an anderen Abschnitten
+- §4 Einstieg 1 (Vorschau): Reihenfolge jetzt *Selbsteinschätzung → Hook-Szenario → Landkarte → Vorwissens-Check → Kernbegriffe → was in Arbeiten drankommt*.
+- §5: Bereich „Prüfungen" bekommt die Unterseite **Prüfungsvorbereitung** (siehe oben); Tutor-Eingabe zeigt den Kontext-Chip.
+- §8: `CalendarEvent.zielnote?`, `Thema.selbsteinschaetzung?`, `TutorSession.titel`.
+- §12: Spracheingabe (STT) in V2; Mathe-Tastatur und Zeichnen in V3; Link-Teilen in V4.
