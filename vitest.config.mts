@@ -16,5 +16,5 @@ export default defineConfig({
       include: ["src/lib/**", "src/ai/**", "src/db/**"],
     },
   },
-  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+  resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
 });
