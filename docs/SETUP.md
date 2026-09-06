@@ -42,7 +42,7 @@ Zielgruppe: du, einmalig auf deinem Mac/PC. Dauer ca. 45 Minuten inkl. GitHub- u
 
 ## Teil C – Dienste und Schlüssel (15 Min)
 
-8. **Supabase**: supabase.com → New project → Region **Frankfurt (eu-central-1)**. Unter Project Settings → API: URL, `anon` Key, `service_role` Key. Unter Database → Connection string (URI, Transaction Mode für Serverless).
+8. **Supabase**: supabase.com → New project → Region **Frankfurt (eu-central-1)**. Unter Project Settings → API: „Project URL". Unter Project Settings → API Keys das neue Key-System nutzen: **Publishable key** (`sb_publishable_…`) und **Secret key** (`sb_secret_…`). Unter „Connect" → Transaction pooler den Connection string (für Serverless). Siehe ADR 0003.
 9. **Anthropic**: console.anthropic.com → API Keys → neuen Key für „tutr".
 10. **.env.local**
     ```bash
@@ -77,7 +77,7 @@ Zielgruppe: du, einmalig auf deinem Mac/PC. Dauer ca. 45 Minuten inkl. GitHub- u
     /model opusplan
     /plan-session Datenmodell
     ```
-    Claude liest §8–§10 des Konzepts, schreibt `docs/adr/0003-datenmodell.md` als Entwurf und schneidet Tickets. **Kein Code.**
+    Claude liest §8–§10 des Konzepts, schreibt `docs/adr/0004-datenmodell.md` als Entwurf und schneidet Tickets. **Kein Code.**
 16. ADR lesen. Prüfen: Hängen Karten/Vokabeln an LearningObjective und nicht an SchoolYear? Ist `tutor_sessions` für Eltern per RLS gesperrt? Gibt es Niveaustufen am Lernziel? Korrekturen im Chat, dann „ADR freigegeben".
 17. ```
     /feature F-03

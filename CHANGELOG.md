@@ -12,11 +12,15 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 - Git-Hooks (lint-staged, typecheck + Tests, Conventional Commits)
 - CI (lint, typecheck, tests, build, e2e) und Security-Pipeline (gitleaks, npm audit, CodeQL), Dependabot
 - Security-Header, Zod-validierte Umgebungsvariablen
-- Docs: Konzept v2, Backlog, ADR 0001/0002, SECURITY.md, SETUP.md
+- Docs: Konzept v2, Backlog, ADR 0001/0002/0003, SECURITY.md, SETUP.md
 - Konzept §15: Ergänzungen aus Astra-Walkthrough (Selbsteinschätzung, Hook-Szenario, Zielnote, Prüfungsvorbereitungs-Seite, Anschlussfragen, Spracheingabe in V2); Tickets P-01, T-02a/b
 
 ### Changed
 
+- Supabase auf das neue API-Key-System umgestellt (ADR 0003): `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` → `SUPABASE_SECRET_KEY`; betrifft `src/lib/env.ts`, `.env.example`, `docs/SETUP.md`
+- Datenmodell-ADR verschiebt sich auf 0004 (F-03), da 0003 nun die API-Keys dokumentiert
+- `tsconfig.json` schließt iCloud-Sync-Dubletten (`* 2.ts` u. ä.) vom Typecheck aus, damit `npm run check` lokal im iCloud-Ordner grün bleibt
+- Dependabot-Major-PRs (eslint 10, TypeScript 7, @types/node 26) geschlossen; als Ticket F-08 vertagt
 - Playwright-Setup deckt jetzt WebKit (iOS-Safari) ab, nicht nur Chromium – CI und `scripts/bootstrap.sh`
 - GitHub Actions auf aktuelle Majors gehoben (`checkout`/`setup-node`/`upload-artifact` v7, `codeql-action` v4), weg von Node-20-Runnern
 - `gitleaks-action` v2 → v3
