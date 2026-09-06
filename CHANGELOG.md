@@ -6,6 +6,8 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- ADR 0004 (F-03): Datenmodell und RLS-Strategie – Actor-Kontext über eigene DB-Rolle `tutr_app` statt `auth.uid()` (Kind hat keinen Auth-Account, ADR 0002), `family_id` per zusammengesetztem Fremdschlüssel, Fachbindung als DB-Constraint (§15), Join-Tabellen statt ID-Arrays, Eltern-Sicht über getrennte Zusammenfassungstabellen, RLS-Metatest. Am Projekt gemessen: PG 17.6, `SET LOCAL ROLE` und Custom-GUCs über den Transaction Pooler bestätigt
+- Tickets F-04a–f (Schema in Sessions geschnitten) und L-01 (Lehrwerk pro Fach erfassen)
 - Supabase-Anbindung (F-02): Projekt in Frankfurt (`eu-central-1`), Browser- und Server-Client (`src/lib/supabase/`), Drizzle-Verbindung über postgres.js (`src/db/index.ts`, `prepare:false` für den Transaction Pooler), `drizzle.config.ts`, `dbEnv()` in `src/lib/env.ts`, Verbindungstest `npm run db:check` (grün)
 - Projektgerüst: Next.js 16, TypeScript strict, Tailwind 4
 - CLAUDE.md mit Domänen-, Stack- und Prozessregeln; Slash-Commands und Subagenten unter `.claude/`
