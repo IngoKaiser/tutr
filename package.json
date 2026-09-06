@@ -64,6 +64,9 @@
   "engines": {
     "node": ">=22"
   },
+  "overrides": {
+    "browserslist": "4.28.9"
+  },
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix --max-warnings=0",
