@@ -6,6 +6,10 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- `src/db/index.ts` baut die Verbindung erst beim ersten Zugriff auf (`getSql()` / `getDb()` statt Modul-Konstanten). Vorher scheiterte jeder Import einer Datei, die davon abhängt, ohne gesetzte `DATABASE_URL` – in CI, im Build und in Tests, die die Datenbank nicht anfassen
+- RLS-Fundament (F-04a): Laufzeit-Rolle `tutr_app` (NOBYPASSRLS) und Helper `app.family_id()` / `app.student_id()` / `app.actor_role()` in `src/db/policies/0000-setup.sql`; `withActor()` in `src/db/actor.ts` setzt Rolle und Request-Kontext per `SET LOCAL`; Runner `scripts/db-apply-sql.mts` (`npm run db:policies`, in `db:migrate` verdrahtet); Test-Datenbank-Anbindung mit Wächter gegen Läufe auf dem Produktivprojekt; Tests für Fail-closed, Familientrennung und Transaktionsende; RLS-Metatest über alle Tabellen in `public`; CI-Job für die DB-Tests; `npm run db:doctor` prüft Rolle, Port, `sslmode` und Passwort einer Umgebung, ohne Geheimnisse auszugeben
+- ADR 0004 (F-03): Datenmodell und RLS-Strategie – Actor-Kontext über eigene DB-Rolle `tutr_app` statt `auth.uid()` (Kind hat keinen Auth-Account, ADR 0002), `family_id` per zusammengesetztem Fremdschlüssel, Fachbindung als DB-Constraint (§15), Join-Tabellen statt ID-Arrays, Eltern-Sicht über getrennte Zusammenfassungstabellen, RLS-Metatest. Am Projekt gemessen: PG 17.6, `SET LOCAL ROLE` und Custom-GUCs über den Transaction Pooler bestätigt
+- Tickets F-04a–f (Schema in Sessions geschnitten) und L-01 (Lehrwerk pro Fach erfassen)
 - Supabase-Anbindung (F-02): Projekt in Frankfurt (`eu-central-1`), Browser- und Server-Client (`src/lib/supabase/`), Drizzle-Verbindung über postgres.js (`src/db/index.ts`, `prepare:false` für den Transaction Pooler), `drizzle.config.ts`, `dbEnv()` in `src/lib/env.ts`, Verbindungstest `npm run db:check` (grün)
 - Projektgerüst: Next.js 16, TypeScript strict, Tailwind 4
 - CLAUDE.md mit Domänen-, Stack- und Prozessregeln; Slash-Commands und Subagenten unter `.claude/`
