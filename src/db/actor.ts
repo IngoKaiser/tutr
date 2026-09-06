@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 
-import { db } from "./index";
+import { getDb } from "./index";
 
 /**
  * Wer stellt die Anfrage. Eltern sehen die ganze Familie, ein Kind nur sich
@@ -11,7 +11,7 @@ export type Actor =
   | { role: "parent"; familyId: string; userId: string }
   | { role: "student"; familyId: string; studentId: string };
 
-type Database = typeof db;
+type Database = ReturnType<typeof getDb>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
@@ -46,5 +46,5 @@ export async function runWithActor<T>(
 
 /** Der Normalfall: Actor-Kontext auf der Laufzeitverbindung. */
 export async function withActor<T>(actor: Actor, fn: (tx: Transaction) => Promise<T>): Promise<T> {
-  return runWithActor(db, actor, fn);
+  return runWithActor(getDb(), actor, fn);
 }

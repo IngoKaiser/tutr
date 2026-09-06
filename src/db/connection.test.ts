@@ -10,7 +10,8 @@ import { expect, test } from "vitest";
 const enabled = process.env.RUN_DB_TESTS === "1" && Boolean(process.env.DATABASE_URL);
 
 test.skipIf(!enabled)("verbindet sich mit der Supabase-Datenbank (SELECT 1)", async () => {
-  const { sql } = await import("./index");
+  const { getSql } = await import("./index");
+  const sql = getSql();
   try {
     const rows = await sql<{ ok: number }[]>`select 1 as ok`;
     expect(rows[0]?.ok).toBe(1);
