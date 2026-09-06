@@ -4,16 +4,16 @@ Status: `todo` · `doing` · `done` · `blocked`. Ein Ticket = maximal eine Clau
 
 ## Meilenstein 0 – Fundament (Woche 1)
 
-| ID   | Ticket                                                                                                                                        | Konzept     | Status | Notizen                                    |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------ |
-| F-01 | Repo-Setup prüfen: `npm run check` grün, Hooks aktiv, CI grün auf GitHub                                                                      | –           | done   | `scripts/bootstrap.sh`                     |
-| F-08 | Dev-Tooling: eslint 10 / TypeScript 7 / @types/node 26 evaluieren (Major-Bumps, Dependabot-PRs #4–#6 geschlossen)                             | –           | todo   | einzeln, Flat-Config + tsc-Breaking prüfen |
-| F-02 | Supabase-Projekt (EU/Frankfurt) anlegen, `.env.local`, Verbindung testen                                                                      | §11         | todo   | manuell + Claude Code für Client-Setup     |
-| F-03 | **[opusplan]** ADR 0004: Datenmodell + RLS-Strategie; Drizzle-Schema für Family, User, Student, SchoolYear, Subject, Thema, LearningObjective | §8, §9, §10 | todo   | `/plan-session Datenmodell`                |
-| F-04 | Schema umsetzen, Migration, RLS-Policies, Seed-Skript mit Fake-Daten                                                                          | §8          | todo   | Tests: Policies per pg-Test                |
-| F-05 | Auth Eltern: Magic Link (Supabase Auth), Session-Handling, geschützte Routen                                                                  | §11 Auth    | todo   | E2E: Login-Flow                            |
-| F-06 | Auth Kind: Einladungslink (signierter Token, 24 h), Profilwahl, Passkey-Registrierung (WebAuthn), PIN-Fallback, 90-Tage-Session               | §11 Auth    | todo   | ADR 0002                                   |
-| F-07 | App-Shell: 5 Bereiche (Heute, Fächer, Üben, Prüfungen, Tutor), Mobile-Navigation, PWA-Manifest, Serwist                                       | §5, §11     | todo   | Lighthouse PWA-Check                       |
+| ID   | Ticket                                                                                                                                        | Konzept     | Status | Notizen                                                                             |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ----------------------------------------------------------------------------------- |
+| F-01 | Repo-Setup prüfen: `npm run check` grün, Hooks aktiv, CI grün auf GitHub                                                                      | –           | done   | `scripts/bootstrap.sh`                                                              |
+| F-08 | Dev-Tooling: eslint 10 / TypeScript 7 / @types/node 26 evaluieren (Major-Bumps, Dependabot-PRs #4–#6 geschlossen)                             | –           | todo   | einzeln, Flat-Config + tsc-Breaking prüfen                                          |
+| F-02 | Supabase-Projekt (EU/Frankfurt) anlegen, `.env.local`, Verbindung testen                                                                      | §11         | doing  | Clients + Drizzle da; `npm run db:check` grün ausstehend (`.env.local` im Worktree) |
+| F-03 | **[opusplan]** ADR 0004: Datenmodell + RLS-Strategie; Drizzle-Schema für Family, User, Student, SchoolYear, Subject, Thema, LearningObjective | §8, §9, §10 | todo   | `/plan-session Datenmodell`                                                         |
+| F-04 | Schema umsetzen, Migration, RLS-Policies, Seed-Skript mit Fake-Daten                                                                          | §8          | todo   | Tests: Policies per pg-Test                                                         |
+| F-05 | Auth Eltern: Magic Link (Supabase Auth), Session-Handling, geschützte Routen                                                                  | §11 Auth    | todo   | E2E: Login-Flow                                                                     |
+| F-06 | Auth Kind: Einladungslink (signierter Token, 24 h), Profilwahl, Passkey-Registrierung (WebAuthn), PIN-Fallback, 90-Tage-Session               | §11 Auth    | todo   | ADR 0002                                                                            |
+| F-07 | App-Shell: 5 Bereiche (Heute, Fächer, Üben, Prüfungen, Tutor), Mobile-Navigation, PWA-Manifest, Serwist                                       | §5, §11     | todo   | Lighthouse PWA-Check                                                                |
 
 ## Meilenstein 1 – Kalender + Vokabeln (Woche 2–3)
 
