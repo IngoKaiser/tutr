@@ -1,3 +1,4 @@
+import { AnmeldeFehler } from "./anmelde-fehler";
 import { AnmeldeFormular } from "./anmelde-formular";
 
 export const metadata = { title: "Anmelden · tutr" };
@@ -16,6 +17,8 @@ export default function AnmeldenPage() {
           Für Eltern. Du bekommst einen Link per E-Mail — kein Passwort, nichts zu merken.
         </p>
       </div>
+
+      <AnmeldeFehler />
 
       <AnmeldeFormular />
 

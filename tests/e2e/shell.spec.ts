@@ -88,3 +88,20 @@ test("Anmeldung weist eine unvollständige Adresse zurück", async ({ page }) =>
   // Browser-Validierung greift vor dem Absenden – das Formular bleibt stehen.
   await expect(page.getByRole("button", { name: "Anmeldelink schicken" })).toBeVisible();
 });
+
+test("Ein abgelaufener Anmeldelink erklärt sich, statt wortlos zurückzuwerfen", async ({
+  page,
+}) => {
+  // Genau die URL, die Supabase erzeugt: Der Grund steht im Hash-Fragment und
+  // erreicht den Server nie – die Seite muss ihn clientseitig auslesen.
+  await page.goto("/anmelden?fehler=kein-code#error=access_denied&error_code=otp_expired");
+
+  // Nexts Routen-Ansage trägt ebenfalls role="alert" – auf den Text eingrenzen.
+  const hinweis = page.getByRole("alert").filter({ hasText: "Link" });
+  await expect(hinweis).toBeVisible();
+  await expect(hinweis).toContainText(/nicht mehr gültig/);
+  await expect(hinweis).toContainText(/vorab öffnet/);
+
+  // Der Fehler verschwindet aus der Adresszeile, damit Neuladen ihn nicht wiederholt.
+  await expect(page).toHaveURL(/\/anmelden$/);
+});
