@@ -109,6 +109,34 @@ create or replace function app.parent_may_link(p_student uuid, p_parent uuid) re
     )
   $$;
 
+-- Kandidaten für den Elternbeitritt (F-06b, ADR 0006 D8).
+--
+-- Meldet sich ein Elternteil zum ersten Mal an, existiert noch kein
+-- `parent_account` – und ohne den liefert RLS auf `student` nichts, also
+-- lässt sich nicht herausfinden, welche Kinder die bestätigte Adresse
+-- eingetragen haben. Dieselbe Klasse Henne-Ei-Problem wie bei den
+-- Anmeldeschleusen, hier aber zum *Finden* von Kandidaten statt zum
+-- Bestätigen einer bekannten Verknüpfung.
+--
+-- Bewusst eng: nur die drei Spalten, die die Beitritts-Oberfläche braucht,
+-- keine sensiblen Daten. Vertrauensgrenze ist der Aufrufer – die Anwendung
+-- ruft diese Funktion ausschließlich mit der von Supabase serverseitig
+-- bestätigten E-Mail auf (`supabase.auth.getUser()`), nie mit einer vom
+-- Client gelieferten. Kein Fremdschlüssel auf `auth.users`, aus demselben
+-- Grund wie bei `parent_account.auth_user_id`: Migrationen und Tests sollen
+-- ohne Supabase-Auth-Fixtures auskommen.
+create or replace function app.students_by_parent_email(p_email text)
+  returns table (id uuid, first_name text, grade_level int)
+  language sql stable security definer
+  set search_path = public, pg_temp
+  as $$
+    select s.id, s.first_name, s.grade_level
+    from student s
+    where s.parent_email is not null
+      and lower(s.parent_email) = lower(p_email)
+    order by s.first_name
+  $$;
+
 -- 3. Rechte. Tabellen gehören weiterhin dem Migrations-Nutzer; tutr_app darf
 --    Daten lesen und schreiben, aber nichts anlegen oder ändern.
 do $$

@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 
 import type { Actor } from "@/db/actor";
-import { SEED_IDS } from "@/db/seed-ids";
+import { SEED_IDS, SEED_PARENT_EMAIL } from "@/db/seed-ids";
+import type { ParentLogin } from "@/lib/auth/onboarding";
 
 import { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
@@ -38,6 +39,26 @@ export function e2eActor(): Actor | null {
   return role === "parent"
     ? { role: "parent", parentId: SEED_IDS.parentOne, studentId: SEED_IDS.studentOne }
     : { role: "student", studentId: SEED_IDS.studentOne };
+}
+
+/**
+ * Das Gegenstück zu `e2eActor()` für die Eltern-Rolle: die Kindliste, die
+ * `loginStatus()` sonst über `joinOrLogin()` aus der Datenbank läse. Ohne
+ * das bliebe `login` in jedem Playwright-Lauf `null` – der Kind-Umschalter
+ * und die Einstellungsseite (F-06b) brauchen ihn aber, um zu prüfen, was
+ * bei mehr als einem Kind passiert. Spiegelt exakt, was `npm run db:seed`
+ * anlegt (Mia und Ben, ein gemeinsames Elternkonto).
+ */
+export function e2eLogin(): ParentLogin | null {
+  if (!e2eActor()) return null;
+  return {
+    parentId: SEED_IDS.parentOne,
+    email: SEED_PARENT_EMAIL,
+    students: [
+      { id: SEED_IDS.siblingOne, firstName: "Ben" },
+      { id: SEED_IDS.studentOne, firstName: "Mia" },
+    ],
+  };
 }
 
 /** Ist der Ansichts-Umschalter verfügbar? */

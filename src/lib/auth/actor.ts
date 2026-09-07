@@ -2,11 +2,12 @@ import { cookies } from "next/headers";
 
 import type { Actor } from "@/db/actor";
 import { actorFromSession, SESSION_COOKIE } from "@/lib/auth/student-session";
-import { e2eActor, activeView, switcherAvailable } from "@/lib/dev-actor";
+import { e2eActor, e2eLogin, activeView, switcherAvailable } from "@/lib/dev-actor";
+import { selectedStudentId } from "@/lib/student-switch";
 import { supabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
-import { parentActor, parentLogin } from "./onboarding";
+import { joinOrLogin, parentActor, type ParentLogin } from "./onboarding";
 
 /**
  * Der Actor für die laufende Anfrage.
@@ -14,7 +15,7 @@ import { parentActor, parentLogin } from "./onboarding";
  * Reihenfolge:
  * 1. Test-Umgehung (nur Playwright, nur außerhalb der Produktion)
  * 2. Kind-Session aus dem Passkey-Cookie (F-06)
- * 3. Echte Supabase-Session → Elternteil, mit einem seiner Kinder
+ * 3. Echte Supabase-Session → Elternteil, mit einem gewählten Kind (F-06b)
  * 4. Ansichts-Umschalter: Das Elternteil kann dasselbe Kind in dessen eigener
  *    Sicht ansehen
  *
@@ -26,7 +27,8 @@ import { parentActor, parentLogin } from "./onboarding";
  * Ein Elternteil **ohne** verknüpftes Kind bekommt `null` als Actor, aber
  * seine Adresse zurück: Es ist angemeldet, hat nur nichts zu sehen. Genau
  * diesen Zustand zeigt die Oberfläche als leeren Zustand an, statt – wie vor
- * ADR 0006 – ein leeres Konto anzulegen.
+ * ADR 0006 – ein leeres Konto anzulegen. Passt die Adresse zu keinem Kind
+ * (`joinOrLogin()` findet nichts zum Beitreten), ist es derselbe Zustand.
  */
 export async function currentActor(): Promise<Actor | null> {
   return (await loginStatus()).actor;
@@ -40,6 +42,8 @@ export type LoginStatus = {
   view: "parent" | "student";
   /** Angemeldetes Elternteil ohne verknüpftes Kind – der leere Zustand. */
   parentWithoutStudent: boolean;
+  /** Verknüpfte Kinder, für den Kind-Umschalter (F-06b). Nur bei Eltern gefüllt. */
+  login: ParentLogin | null;
 };
 
 const EMPTY: LoginStatus = {
@@ -48,12 +52,24 @@ const EMPTY: LoginStatus = {
   switcher: false,
   view: "parent",
   parentWithoutStudent: false,
+  login: null,
 };
 
 export async function loginStatus(): Promise<LoginStatus> {
   const testActor = e2eActor();
   if (testActor) {
-    return { ...EMPTY, actor: testActor, view: testActor.role };
+    const testLogin = e2eLogin();
+    // Der Kind-Umschalter (F-06b) muss auch unter dem Test-Bypass wirken,
+    // sonst zeigte /einstellungen dort immer dasselbe Kind, egal was das
+    // Cookie sagt – genau der Fehler, den der Playwright-Lauf hier gefunden
+    // hat. Nur für die Eltern-Rolle: Als Kind gibt es nichts zu wechseln.
+    const studentId =
+      testActor.role === "parent" && testLogin
+        ? await selectedStudentId(testLogin.students)
+        : testActor.studentId;
+    const actor: Actor =
+      testActor.role === "parent" && studentId ? { ...testActor, studentId } : testActor;
+    return { ...EMPTY, actor, view: testActor.role, login: testLogin };
   }
 
   const cookieStore = await cookies();
@@ -73,25 +89,29 @@ export async function loginStatus(): Promise<LoginStatus> {
 
   if (!user?.email) return EMPTY;
 
-  const login = await parentLogin(user.id);
-  if (!login) return EMPTY;
-
-  const student = login.students[0];
-  if (!student) {
-    return { ...EMPTY, email: login.email, parentWithoutStudent: true };
+  const login = await joinOrLogin(user.id, user.email);
+  if (!login) {
+    // Angemeldet, aber weder ein bestehendes Konto noch ein Kind mit dieser
+    // Adresse gefunden. Derselbe leere Zustand wie ein Konto ohne Kinder.
+    return { ...EMPTY, email: user.email, parentWithoutStudent: true };
   }
 
-  // Solange es keine Kindauswahl gibt (F-06b), ist es das erste Kind.
-  const parent = parentActor(login, student.id);
+  const studentId = await selectedStudentId(login.students);
+  if (!studentId) {
+    return { ...EMPTY, email: login.email, login, parentWithoutStudent: true };
+  }
+
+  const parent = parentActor(login, studentId);
   if (!parent) return EMPTY;
 
   if (switcherAvailable() && (await activeView()) === "student") {
     return {
       ...EMPTY,
-      actor: { role: "student", studentId: student.id },
+      actor: { role: "student", studentId },
       email: login.email,
       switcher: true,
       view: "student",
+      login,
     };
   }
 
@@ -101,5 +121,6 @@ export async function loginStatus(): Promise<LoginStatus> {
     email: login.email,
     switcher: switcherAvailable(),
     view: "parent",
+    login,
   };
 }
