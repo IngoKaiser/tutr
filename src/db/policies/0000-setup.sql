@@ -8,15 +8,24 @@
 do $$
 declare
   pw text := current_setting('tutr.bootstrap_password', true);
+  rotieren boolean := coalesce(current_setting('tutr.rotate_password', true), 'off') = 'on';
+  vorhanden boolean := exists (select 1 from pg_roles where rolname = 'tutr_app');
 begin
-  if pw is null or pw = '' then
+  if (not vorhanden or rotieren) and (pw is null or pw = '') then
     raise exception 'tutr.bootstrap_password ist leer – TUTR_APP_DB_PASSWORD fehlt in der .env-Datei';
   end if;
 
-  if exists (select 1 from pg_roles where rolname = 'tutr_app') then
+  if not vorhanden then
+    execute format('create role tutr_app with login nobypassrls password %L', pw);
+  elsif rotieren then
     execute format('alter role tutr_app with login nobypassrls password %L', pw);
   else
-    execute format('create role tutr_app with login nobypassrls password %L', pw);
+    -- Attribute sicherstellen, das Passwort aber NICHT neu setzen: nach einem
+    -- `alter role ... password` weist der Pooler die nächste Anmeldung
+    -- gelegentlich mit 28P01 ab, obwohl das Passwort stimmt. Da dieses Skript
+    -- vor jedem Testlauf läuft, wäre das eine dauerhafte Flakiness-Quelle.
+    -- Zum Rotieren: `npm run db:migrate -- --rotate-password`.
+    alter role tutr_app with login nobypassrls;
   end if;
 end
 $$;
