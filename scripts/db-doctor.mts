@@ -59,9 +59,11 @@ if (!runtime) {
     if (url.password === "TUTR_APP_DB_PASSWORD" || url.password.startsWith("<")) {
       melde("der Platzhalter aus .env.example steht noch im String");
     } else if (password && url.password !== password) {
+      // Bewusst ohne Längenangabe: auch die Länge eines Geheimnisses ist eine
+      // Information, und die Ausgabe dieses Skripts soll teilbar bleiben.
       melde(
-        `Passwort weicht von TUTR_APP_DB_PASSWORD ab (${url.password.length} vs. ${password.length} Zeichen) – ` +
-          "das Projektpasswort gehört in MIGRATION_DATABASE_URL, nicht hierhin",
+        "Passwort stimmt nicht mit TUTR_APP_DB_PASSWORD überein – das Supabase-Projektpasswort " +
+          "gehört in MIGRATION_DATABASE_URL, nicht hierhin",
       );
     }
   }
