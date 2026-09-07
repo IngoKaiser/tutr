@@ -5,9 +5,9 @@ import { sql } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 
 import { withActor, withCredentialId, type Actor } from "@/db/actor";
-import { challengeCookieName, challengeMaxAge, pruefeChallenge } from "@/lib/auth/challenge";
-import { anmeldeOptionen, pruefeAnmeldung } from "@/lib/auth/passkey";
-import { SESSION_COOKIE, sessionAnlegen, sessionCookieOptionen } from "@/lib/auth/student-session";
+import { challengeCookieName, challengeMaxAge, verifyChallenge } from "@/lib/auth/challenge";
+import { authenticationOptions, verifyAuthentication } from "@/lib/auth/passkey";
+import { createSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth/student-session";
 
 /**
  * Anmeldung des Kindes mit einem Passkey (F-06, ADR 0005).
@@ -15,17 +15,17 @@ import { SESSION_COOKIE, sessionAnlegen, sessionCookieOptionen } from "@/lib/aut
  * Ohne Kennung: Der Browser fragt selbst, welcher Passkey gemeint ist, und
  * liefert dessen ID zurück. Damit schlagen wir das Kind nach – über den engen
  * Weg `withCredentialId`, der genau diese eine Zeile freigibt und sonst
- * nichts (`src/db/policies/0050-student-auth.sql`).
+ * nichts (`src/db/policies/0020-student-auth.sql`).
  */
 
-export type PasskeyStart = { zustand: "bereit"; optionen: unknown } | { zustand: "fehler" };
-export type PasskeyErgebnis = { zustand: "fertig" } | { zustand: "fehler"; meldung: string };
+export type LoginStart = { status: "ready"; options: unknown } | { status: "error" };
+export type LoginResult = { status: "done" } | { status: "error"; message: string };
 
-export async function anmeldungStarten(): Promise<PasskeyStart> {
-  const { optionen, cookie } = await anmeldeOptionen();
+export async function startLogin(): Promise<LoginStart> {
+  const { options, cookie } = await authenticationOptions();
 
-  const kekse = await cookies();
-  kekse.set(challengeCookieName, cookie, {
+  const cookieStore = await cookies();
+  cookieStore.set(challengeCookieName, cookie, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -33,63 +33,61 @@ export async function anmeldungStarten(): Promise<PasskeyStart> {
     maxAge: challengeMaxAge,
   });
 
-  return { zustand: "bereit", optionen };
+  return { status: "ready", options };
 }
 
-type PasskeyZeile = {
+type PasskeyRow = {
   student_id: string;
   public_key: string;
   counter: string;
   transports: string[] | null;
 };
 
-export async function anmeldungAbschliessen(
-  antwort: AuthenticationResponseJSON,
-): Promise<PasskeyErgebnis> {
-  const kekse = await cookies();
-  const gemerkt = pruefeChallenge("anmelden", kekse.get(challengeCookieName)?.value);
-  if (!gemerkt) {
-    return { zustand: "fehler", meldung: "Das hat zu lange gedauert. Versuch es noch einmal." };
+export async function completeLogin(response: AuthenticationResponseJSON): Promise<LoginResult> {
+  const cookieStore = await cookies();
+  const remembered = verifyChallenge("login", cookieStore.get(challengeCookieName)?.value);
+  if (!remembered) {
+    return { status: "error", message: "Das hat zu lange gedauert. Versuch es noch einmal." };
   }
 
-  const zeilen = await withCredentialId(antwort.id, (tx) =>
-    tx.execute<PasskeyZeile>(
+  const rows = await withCredentialId(response.id, (tx) =>
+    tx.execute<PasskeyRow>(
       sql`select student_id, public_key, counter, transports from student_credential`,
     ),
   );
-  const zeile = zeilen[0];
-  if (!zeile) {
+  const row = rows[0];
+  if (!row) {
     return {
-      zustand: "fehler",
-      meldung: "Dieser Passkey gehört zu keinem Profil. Leg dir eines an.",
+      status: "error",
+      message: "Dieser Passkey gehört zu keinem Profil. Leg dir eines an.",
     };
   }
 
-  const geprueft = await pruefeAnmeldung(antwort, gemerkt.challenge, {
-    credentialId: antwort.id,
-    publicKey: zeile.public_key,
+  const verified = await verifyAuthentication(response, remembered.challenge, {
+    credentialId: response.id,
+    publicKey: row.public_key,
     // `bigint` kommt als Zeichenkette aus dem Treiber zurück.
-    counter: Number(zeile.counter),
-    transports: zeile.transports,
+    counter: Number(row.counter),
+    transports: row.transports,
   });
-  if (!geprueft) {
-    return { zustand: "fehler", meldung: "Der Passkey ließ sich nicht bestätigen." };
+  if (!verified) {
+    return { status: "error", message: "Der Passkey ließ sich nicht bestätigen." };
   }
-  kekse.delete(challengeCookieName);
+  cookieStore.delete(challengeCookieName);
 
-  const actor: Actor = { role: "student", studentId: zeile.student_id };
+  const actor: Actor = { role: "student", studentId: row.student_id };
 
   await withActor(actor, (tx) =>
     tx.execute(
       sql`update student_credential
-          set counter = ${geprueft.neuerZaehler}, last_used_at = now()
-          where credential_id = ${antwort.id}`,
+          set counter = ${verified.newCounter}, last_used_at = now()
+          where credential_id = ${response.id}`,
     ),
   );
 
-  const kopf = await headers();
-  const token = await sessionAnlegen(actor, kopf.get("user-agent"));
-  kekse.set(SESSION_COOKIE, token, sessionCookieOptionen());
+  const headerList = await headers();
+  const token = await createSession(actor, headerList.get("user-agent"));
+  cookieStore.set(SESSION_COOKIE, token, sessionCookieOptions());
 
-  return { zustand: "fertig" };
+  return { status: "done" };
 }

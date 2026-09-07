@@ -2,11 +2,11 @@
 
 import { cookies, headers } from "next/headers";
 
-import { SESSION_COOKIE, sessionAbmelden } from "@/lib/auth/student-session";
+import { revokeSession, SESSION_COOKIE } from "@/lib/auth/student-session";
 import { createClient } from "@/lib/supabase/server";
 
-export type AnmeldeErgebnis =
-  { zustand: "gesendet"; email: string } | { zustand: "fehler"; meldung: string };
+export type MagicLinkResult =
+  { status: "sent"; email: string } | { status: "error"; message: string };
 
 /**
  * Fordert einen Magic Link an.
@@ -15,33 +15,33 @@ export type AnmeldeErgebnis =
  * ohne verifizierte Domain nimmt Resend nur die Adresse des eigenen Kontos an.
  * Ein stilles „Schau in dein Postfach" würde genau diesen Fall verschleiern.
  */
-export async function magicLinkAnfordern(
-  _vorher: AnmeldeErgebnis | null,
+export async function requestMagicLink(
+  _previous: MagicLinkResult | null,
   formData: FormData,
-): Promise<AnmeldeErgebnis> {
+): Promise<MagicLinkResult> {
   const email = String(formData.get("email") ?? "").trim();
 
   if (!email || !email.includes("@")) {
-    return { zustand: "fehler", meldung: "Bitte gib eine gültige E-Mail-Adresse ein." };
+    return { status: "error", message: "Bitte gib eine gültige E-Mail-Adresse ein." };
   }
 
-  const kopf = await headers();
-  const herkunft = kopf.get("origin") ?? "http://localhost:3000";
+  const headerList = await headers();
+  const origin = headerList.get("origin") ?? "http://localhost:3000";
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${herkunft}/auth/callback` },
+    options: { emailRedirectTo: `${origin}/auth/callback` },
   });
 
   if (error) {
     return {
-      zustand: "fehler",
-      meldung: `Der Link konnte nicht verschickt werden: ${error.message}`,
+      status: "error",
+      message: `Der Link konnte nicht verschickt werden: ${error.message}`,
     };
   }
 
-  return { zustand: "gesendet", email };
+  return { status: "sent", email };
 }
 
 /**
@@ -49,13 +49,13 @@ export async function magicLinkAnfordern(
  * Kind-Session tragen, und „Abmelden" muss beide beenden – sonst führt der
  * Knopf sichtbar nichts aus.
  */
-export async function abmelden(): Promise<void> {
-  const kekse = await cookies();
-  const kindToken = kekse.get(SESSION_COOKIE)?.value;
-  if (kindToken) {
+export async function logout(): Promise<void> {
+  const cookieStore = await cookies();
+  const studentToken = cookieStore.get(SESSION_COOKIE)?.value;
+  if (studentToken) {
     // Setzt `revoked_at`, damit die Geräteliste den Vorgang zeigt (F-06b).
-    await sessionAbmelden(kindToken);
-    kekse.delete(SESSION_COOKIE);
+    await revokeSession(studentToken);
+    cookieStore.delete(SESSION_COOKIE);
   }
 
   const supabase = await createClient();

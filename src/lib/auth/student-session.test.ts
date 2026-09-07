@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
 
-import { hashToken, SESSION_TAGE, sessionCookieOptionen } from "./student-session";
+import { hashToken, SESSION_DAYS, sessionCookieOptions } from "./student-session";
 
 /**
  * Die Datenbankwege dieses Moduls deckt `src/db/schema/auth.test.ts` ab.
@@ -22,14 +22,14 @@ describe("Gerätesitzung des Kindes", () => {
   });
 
   test("das Cookie ist httpOnly und same-site", () => {
-    const optionen = sessionCookieOptionen();
-    expect(optionen.httpOnly).toBe(true);
-    expect(optionen.sameSite).toBe("lax");
-    expect(optionen.path).toBe("/");
+    const options = sessionCookieOptions();
+    expect(options.httpOnly).toBe(true);
+    expect(options.sameSite).toBe("lax");
+    expect(options.path).toBe("/");
   });
 
   test("das Fenster ist die in ADR 0005 beschlossene Länge", () => {
-    expect(SESSION_TAGE).toBe(30);
-    expect(sessionCookieOptionen().maxAge).toBe(30 * 24 * 60 * 60);
+    expect(SESSION_DAYS).toBe(30);
+    expect(sessionCookieOptions().maxAge).toBe(30 * 24 * 60 * 60);
   });
 });

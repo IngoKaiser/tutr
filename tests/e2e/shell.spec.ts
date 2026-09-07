@@ -5,24 +5,24 @@ import { expect, test } from "@playwright/test";
  * Prüft die Struktur, nicht die Beispieldaten – die ersetzen K-01/V-01.
  */
 
-const BEREICHE = [
-  { pfad: "/heute", label: "Heute" },
-  { pfad: "/faecher", label: "Fächer" },
-  { pfad: "/ueben", label: "Üben" },
-  { pfad: "/pruefungen", label: "Prüfungen" },
-  { pfad: "/tutor", label: "Tutor" },
+const SECTIONS = [
+  { path: "/heute", label: "Heute" },
+  { path: "/faecher", label: "Fächer" },
+  { path: "/ueben", label: "Üben" },
+  { path: "/pruefungen", label: "Prüfungen" },
+  { path: "/tutor", label: "Tutor" },
 ] as const;
 
-for (const bereich of BEREICHE) {
-  test(`${bereich.label} ist erreichbar und in der Navigation markiert`, async ({ page }) => {
-    await page.goto(bereich.pfad);
+for (const section of SECTIONS) {
+  test(`${section.label} ist erreichbar und in der Navigation markiert`, async ({ page }) => {
+    await page.goto(section.path);
 
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(bereich.label);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(section.label);
 
-    const aktiv = page.getByRole("navigation", { name: "Bereiche" }).getByRole("link", {
-      name: bereich.label,
+    const activeLink = page.getByRole("navigation", { name: "Bereiche" }).getByRole("link", {
+      name: section.label,
     });
-    await expect(aktiv).toHaveAttribute("aria-current", "page");
+    await expect(activeLink).toHaveAttribute("aria-current", "page");
   });
 }
 
@@ -97,10 +97,10 @@ test("Ein abgelaufener Anmeldelink erklärt sich, statt wortlos zurückzuwerfen"
   await page.goto("/anmelden?fehler=kein-code#error=access_denied&error_code=otp_expired");
 
   // Nexts Routen-Ansage trägt ebenfalls role="alert" – auf den Text eingrenzen.
-  const hinweis = page.getByRole("alert").filter({ hasText: "Link" });
-  await expect(hinweis).toBeVisible();
-  await expect(hinweis).toContainText(/nicht mehr gültig/);
-  await expect(hinweis).toContainText(/vorab öffnet/);
+  const notice = page.getByRole("alert").filter({ hasText: "Link" });
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText(/nicht mehr gültig/);
+  await expect(notice).toContainText(/vorab öffnet/);
 
   // Der Fehler verschwindet aus der Adresszeile, damit Neuladen ihn nicht wiederholt.
   await expect(page).toHaveURL(/\/anmelden$/);

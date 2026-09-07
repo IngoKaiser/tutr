@@ -5,11 +5,11 @@ import { cookies, headers } from "next/headers";
 
 import { withActor, type Actor } from "@/db/actor";
 import { student, studentCredential } from "@/db/schema";
-import { challengeCookieName, challengeMaxAge, pruefeChallenge } from "@/lib/auth/challenge";
-import { registrierungsOptionen, pruefeRegistrierung } from "@/lib/auth/passkey";
-import { SESSION_COOKIE, sessionAnlegen, sessionCookieOptionen } from "@/lib/auth/student-session";
-import { einwilligungsmail } from "@/lib/mail/einwilligung";
-import { sendeMail } from "@/lib/mail/resend";
+import { challengeCookieName, challengeMaxAge, verifyChallenge } from "@/lib/auth/challenge";
+import { registrationOptions, verifyRegistration } from "@/lib/auth/passkey";
+import { createSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth/student-session";
+import { consentEmail } from "@/lib/mail/consent";
+import { sendMail } from "@/lib/mail/resend";
 
 /**
  * Selbstanlage des Kind-Profils (F-06, ADR 0005).
@@ -25,54 +25,54 @@ import { sendeMail } from "@/lib/mail/resend";
  * ohne dass eine zweite Schreibpolicy nötig wäre.
  */
 
-export type Profil = {
-  vorname: string;
-  jahrgang: number;
-  elternMail: string;
+export type Profile = {
+  firstName: string;
+  gradeLevel: number;
+  parentEmail: string;
 };
 
-type Gemerkt = Profil & { studentId: string };
+type Remembered = Profile & { studentId: string };
 
-export type StartErgebnis =
-  { zustand: "bereit"; optionen: unknown } | { zustand: "fehler"; meldung: string };
+export type StartResult =
+  { status: "ready"; options: unknown } | { status: "error"; message: string };
 
-export type AbschlussErgebnis = { zustand: "fertig" } | { zustand: "fehler"; meldung: string };
+export type CompletionResult = { status: "done" } | { status: "error"; message: string };
 
-function pruefeProfil(formData: FormData): Profil | string {
-  const vorname = String(formData.get("vorname") ?? "").trim();
-  const jahrgang = Number(formData.get("jahrgang"));
-  const elternMail = String(formData.get("elternMail") ?? "").trim();
+function validateProfile(formData: FormData): Profile | string {
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const gradeLevel = Number(formData.get("gradeLevel"));
+  const parentEmail = String(formData.get("parentEmail") ?? "").trim();
 
-  if (vorname.length < 2) return "Bitte trag deinen Vornamen ein.";
-  if (vorname.length > 40) return "Der Vorname ist zu lang.";
-  if (!Number.isInteger(jahrgang) || jahrgang < 1 || jahrgang > 13) {
+  if (firstName.length < 2) return "Bitte trag deinen Vornamen ein.";
+  if (firstName.length > 40) return "Der Vorname ist zu lang.";
+  if (!Number.isInteger(gradeLevel) || gradeLevel < 1 || gradeLevel > 13) {
     return "Bitte wähl deinen Jahrgang.";
   }
-  if (!elternMail.includes("@") || elternMail.length < 5) {
+  if (!parentEmail.includes("@") || parentEmail.length < 5) {
     return "Bitte trag die E-Mail-Adresse deiner Eltern ein.";
   }
 
-  return { vorname, jahrgang, elternMail };
+  return { firstName, gradeLevel, parentEmail };
 }
 
 /** Schritt 1: Profil prüfen, IDs erzeugen, Passkey-Optionen ausliefern. */
-export async function registrierungStarten(
-  _vorher: StartErgebnis | null,
+export async function startRegistration(
+  _previous: StartResult | null,
   formData: FormData,
-): Promise<StartErgebnis> {
-  const profil = pruefeProfil(formData);
-  if (typeof profil === "string") return { zustand: "fehler", meldung: profil };
+): Promise<StartResult> {
+  const profile = validateProfile(formData);
+  if (typeof profile === "string") return { status: "error", message: profile };
 
-  const gemerkt: Gemerkt = { ...profil, studentId: crypto.randomUUID() };
+  const remembered: Remembered = { ...profile, studentId: crypto.randomUUID() };
 
-  const { optionen, cookie } = await registrierungsOptionen(
-    gemerkt.studentId,
-    gemerkt.vorname,
-    gemerkt,
+  const { options, cookie } = await registrationOptions(
+    remembered.studentId,
+    remembered.firstName,
+    remembered,
   );
 
-  const kekse = await cookies();
-  kekse.set(challengeCookieName, cookie, {
+  const cookieStore = await cookies();
+  cookieStore.set(challengeCookieName, cookie, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -80,44 +80,47 @@ export async function registrierungStarten(
     maxAge: challengeMaxAge,
   });
 
-  return { zustand: "bereit", optionen };
+  return { status: "ready", options };
 }
 
-/** Schritt 2: Antwort des Geräts prüfen, Mail schicken, Familie anlegen. */
-export async function registrierungAbschliessen(
-  antwort: RegistrationResponseJSON,
-): Promise<AbschlussErgebnis> {
-  const kekse = await cookies();
-  const gemerkt = pruefeChallenge<Gemerkt>("registrieren", kekse.get(challengeCookieName)?.value);
+/** Schritt 2: Antwort des Geräts prüfen, Mail schicken, Kind anlegen. */
+export async function completeRegistration(
+  response: RegistrationResponseJSON,
+): Promise<CompletionResult> {
+  const cookieStore = await cookies();
+  const remembered = verifyChallenge<Remembered>(
+    "register",
+    cookieStore.get(challengeCookieName)?.value,
+  );
 
-  if (!gemerkt) {
+  if (!remembered) {
     return {
-      zustand: "fehler",
-      meldung: "Das hat zu lange gedauert. Fang bitte noch einmal von vorn an.",
+      status: "error",
+      message: "Das hat zu lange gedauert. Fang bitte noch einmal von vorn an.",
     };
   }
 
-  const passkey = await pruefeRegistrierung(antwort, gemerkt.challenge);
+  const passkey = await verifyRegistration(response, remembered.challenge);
   if (!passkey) {
-    return { zustand: "fehler", meldung: "Der Passkey ließ sich nicht bestätigen." };
+    return { status: "error", message: "Der Passkey ließ sich nicht bestätigen." };
   }
-  kekse.delete(challengeCookieName);
+  cookieStore.delete(challengeCookieName);
 
-  const kopf = await headers();
-  const herkunft = kopf.get("origin") ?? "http://localhost:3000";
-  const mail = await sendeMail({
-    an: gemerkt.elternMail,
-    ...einwilligungsmail({ vorname: gemerkt.vorname, herkunft }),
+  const headerList = await headers();
+  const origin = headerList.get("origin") ?? "http://localhost:3000";
+  const mailResult = await sendMail({
+    to: remembered.parentEmail,
+    ...consentEmail({ firstName: remembered.firstName, origin }),
   });
   // Ein Ausfall beim Versand hält niemanden auf – das ist der Punkt von
   // ADR 0005. Festgehalten wird der Versand hier bewusst nicht: Die
   // Einwilligung entsteht erst mit der Verknüpfung (`parent_student.consent_at`,
   // ADR 0006 D1), und die legt das Elternteil an, nicht das Kind.
-  if (mail.zustand === "fehler") {
-    console.warn("Einwilligungsmail nicht zugestellt:", mail.meldung);
+  if (mailResult.status === "error") {
+    console.warn("Einwilligungsmail nicht zugestellt:", mailResult.message);
   }
 
-  const actor: Actor = { role: "student", studentId: gemerkt.studentId };
+  const actor: Actor = { role: "student", studentId: remembered.studentId };
 
   // Über den Query-Builder statt über rohes SQL: `transports` ist ein
   // text[]-Feld, und eine JS-Liste in einem sql``-Literal wird von Drizzle zur
@@ -127,19 +130,19 @@ export async function registrierungAbschliessen(
   // nicht mehr, das Kind selbst ist der Mandant.
   await withActor(actor, async (tx) => {
     await tx.insert(student).values({
-      id: gemerkt.studentId,
-      firstName: gemerkt.vorname,
-      gradeLevel: gemerkt.jahrgang,
+      id: remembered.studentId,
+      firstName: remembered.firstName,
+      gradeLevel: remembered.gradeLevel,
       // Die Adresse ist der Wiederherstellungsanker und die Bedingung, unter
       // der sich später ein Elternkonto verknüpfen darf (`app.parent_may_link`).
-      parentEmail: gemerkt.elternMail,
+      parentEmail: remembered.parentEmail,
       // Die Klasse wird hier bewusst nicht gefragt. Ihr einziger Verbraucher
       // ist der Gruppenfilter beim Klausurplan-Import (K-03), und die
       // maßgebliche Kopie steht auf `school_year` – hier wäre sie nur ein
       // Startwert. Der erste Bildschirm bleibt dafür um ein Feld kürzer.
     });
     await tx.insert(studentCredential).values({
-      studentId: gemerkt.studentId,
+      studentId: remembered.studentId,
       credentialId: passkey.credentialId,
       publicKey: passkey.publicKey,
       counter: passkey.counter,
@@ -147,8 +150,8 @@ export async function registrierungAbschliessen(
     });
   });
 
-  const token = await sessionAnlegen(actor, kopf.get("user-agent"));
-  kekse.set(SESSION_COOKIE, token, sessionCookieOptionen());
+  const token = await createSession(actor, headerList.get("user-agent"));
+  cookieStore.set(SESSION_COOKIE, token, sessionCookieOptions());
 
-  return { zustand: "fertig" };
+  return { status: "done" };
 }

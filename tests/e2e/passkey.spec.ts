@@ -18,10 +18,10 @@ import { expect, test } from "@playwright/test";
  *    F-10 schließt.
  */
 
-const MIT_DB = process.env.RUN_DB_TESTS === "1";
+const WITH_DB = process.env.RUN_DB_TESTS === "1";
 
 test.describe("Passkey-Zeremonie", () => {
-  test.skip(!MIT_DB, "Braucht eine Datenbank – mit RUN_DB_TESTS=1 ausführen.");
+  test.skip(!WITH_DB, "Braucht eine Datenbank – mit RUN_DB_TESTS=1 ausführen.");
 
   test("anlegen und danach ohne Kennung wiederkommen", async ({ page, browserName }) => {
     test.skip(browserName !== "chromium", "Virtuelle Authenticators nur über CDP.");
@@ -42,33 +42,34 @@ test.describe("Passkey-Zeremonie", () => {
       },
     });
 
-    const vorname = `Testkind${Date.now().toString().slice(-6)}`;
+    const firstName = `Testkind${Date.now().toString().slice(-6)}`;
 
     await page.goto("/registrieren");
-    await page.getByLabel("Vorname").fill(vorname);
+    await page.getByLabel("Vorname").fill(firstName);
     await page.getByLabel("Jahrgang").selectOption("8");
     await page.getByLabel("E-Mail deiner Eltern").fill("eltern@example.org");
     await page.getByRole("button", { name: "Profil anlegen" }).click();
 
     await expect(page).toHaveURL(/\/heute$/, { timeout: 20_000 });
 
-    const nachAnlage = await sessionCookie(page);
-    expect(nachAnlage).toBeTruthy();
+    const afterRegistration = await sessionCookie(page);
+    expect(afterRegistration).toBeTruthy();
 
     // Session wegwerfen, Passkey behalten – der Fall „lange nicht benutzt".
-    await page.context().clearCookies({ name: "tutr_kind" });
+    // Der Cookie-Name folgt SESSION_COOKIE aus student-session.ts.
+    await page.context().clearCookies({ name: "tutr_student" });
     await page.goto("/anmelden");
 
     await page.getByRole("button", { name: /Face ID/i }).click();
     await expect(page).toHaveURL(/\/heute$/, { timeout: 20_000 });
 
-    const nachWiederkehr = await sessionCookie(page);
-    expect(nachWiederkehr).toBeTruthy();
-    expect(nachWiederkehr).not.toBe(nachAnlage);
+    const afterReturn = await sessionCookie(page);
+    expect(afterReturn).toBeTruthy();
+    expect(afterReturn).not.toBe(afterRegistration);
   });
 });
 
 async function sessionCookie(page: import("@playwright/test").Page): Promise<string | undefined> {
-  const kekse = await page.context().cookies();
-  return kekse.find((k) => k.name === "tutr_kind")?.value;
+  const cookies = await page.context().cookies();
+  return cookies.find((c) => c.name === "tutr_student")?.value;
 }

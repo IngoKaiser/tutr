@@ -1,25 +1,25 @@
-import { Block, Hinweis, Lernpfad, Mastery, SeitenKopf } from "@/components/shell/bausteine";
+import { Block, Notice, LearningPath, Mastery, PageHeader } from "@/components/shell/primitives";
 
 export const metadata = { title: "Fächer · tutr" };
 
 /** Konzept §5: Fächer → Thema-Seite ist der Hub. Beispieldaten bis F-04e. */
-export default function FaecherPage() {
+export default function SubjectsPage() {
   return (
     <div className="flex flex-col gap-3">
-      <SeitenKopf titel="Fächer" neben="Jahrgang 8 · 8c" />
+      <PageHeader title="Fächer" trailing="Jahrgang 8 · 8c" />
 
-      <Block titel="Französisch · Les verbes pronominaux" neben="aktiv">
-        <Lernpfad stufe={2} />
-        <Mastery abdeckung={72} sicherheit={58} />
+      <Block title="Französisch · Les verbes pronominaux" trailing="aktiv">
+        <LearningPath stage={2} />
+        <Mastery coverage={72} confidence={58} />
       </Block>
 
-      <Block titel="Mathematik · Quadratische Gleichungen" neben="aktiv">
-        <Lernpfad stufe={2} />
-        <Mastery abdeckung={61} sicherheit={34} />
+      <Block title="Mathematik · Quadratische Gleichungen" trailing="aktiv">
+        <LearningPath stage={2} />
+        <Mastery coverage={61} confidence={34} />
       </Block>
 
-      <Block titel="Weitere Fächer">
-        <Hinweis>Deutsch · Englisch · Biologie · PGW — noch keine aktiven Themen.</Hinweis>
+      <Block title="Weitere Fächer">
+        <Notice>Deutsch · Englisch · Biologie · PGW — noch keine aktiven Themen.</Notice>
       </Block>
     </div>
   );

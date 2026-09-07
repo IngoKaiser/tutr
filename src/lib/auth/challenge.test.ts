@@ -1,14 +1,14 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { neueChallenge, pruefeChallenge } from "./challenge";
+import { createChallenge, verifyChallenge } from "./challenge";
 
 /**
  * Der Zwischenstand liegt in einem signierten Cookie statt in einer Tabelle.
  * Was diese Tests belegen müssen, ist deshalb nicht „das Cookie kommt zurück",
  * sondern: Ein selbst gebasteltes Cookie wird nicht akzeptiert. Besonders die
- * mitgeführten IDs – wer sie wählen könnte, schriebe ein Kind-Profil in eine
- * fremde Familie.
+ * mitgeführten IDs – wer sie wählen könnte, schriebe ein Kind-Profil mit
+ * fremder ID.
  */
 describe("Zwischenstand im signierten Cookie", () => {
   beforeAll(() => {
@@ -16,56 +16,56 @@ describe("Zwischenstand im signierten Cookie", () => {
   });
 
   test("erkennt das eigene Cookie wieder", () => {
-    const { challenge, cookie } = neueChallenge("anmelden");
-    expect(pruefeChallenge("anmelden", cookie)?.challenge).toBe(challenge);
+    const { challenge, cookie } = createChallenge("login");
+    expect(verifyChallenge("login", cookie)?.challenge).toBe(challenge);
   });
 
   test("führt Mitgegebenes unverändert mit", () => {
-    const { cookie } = neueChallenge("registrieren", { familyId: "f-1", vorname: "Mia" });
-    const gelesen = pruefeChallenge<{ familyId: string; vorname: string }>("registrieren", cookie);
-    expect(gelesen).toMatchObject({ familyId: "f-1", vorname: "Mia" });
+    const { cookie } = createChallenge("register", { studentId: "s-1", firstName: "Mia" });
+    const read = verifyChallenge<{ studentId: string; firstName: string }>("register", cookie);
+    expect(read).toMatchObject({ studentId: "s-1", firstName: "Mia" });
   });
 
   test("zwei Aufrufe liefern verschiedene Challenges", () => {
-    expect(neueChallenge("anmelden").challenge).not.toBe(neueChallenge("anmelden").challenge);
+    expect(createChallenge("login").challenge).not.toBe(createChallenge("login").challenge);
   });
 
   test("weist eine veränderte Nutzlast zurück", () => {
-    const { cookie } = neueChallenge("registrieren", { familyId: "meine" });
-    const [nutzlast, signatur] = [
+    const { cookie } = createChallenge("register", { studentId: "meins" });
+    const [payload, signature] = [
       cookie.slice(0, cookie.lastIndexOf(".")),
       cookie.split(".").at(-1),
     ];
 
-    const inhalt = JSON.parse(Buffer.from(nutzlast, "base64url").toString()) as {
-      familyId: string;
+    const content = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
+      studentId: string;
     };
-    inhalt.familyId = "fremde-familie";
-    const manipuliert = Buffer.from(JSON.stringify(inhalt)).toString("base64url");
+    content.studentId = "fremde-id";
+    const tampered = Buffer.from(JSON.stringify(content)).toString("base64url");
 
-    expect(pruefeChallenge("registrieren", `${manipuliert}.${signatur}`)).toBeNull();
+    expect(verifyChallenge("register", `${tampered}.${signature}`)).toBeNull();
   });
 
   test("ein Cookie fürs Registrieren taugt nicht zum Anmelden", () => {
-    const { cookie } = neueChallenge("registrieren");
-    expect(pruefeChallenge("anmelden", cookie)).toBeNull();
+    const { cookie } = createChallenge("register");
+    expect(verifyChallenge("login", cookie)).toBeNull();
   });
 
   test("weist ein abgelaufenes Cookie zurück", () => {
     // Fünf Minuten Lebensdauer sind fest verdrahtet. Ein Cookie mit gültiger
     // Signatur, aber vergangenem Ablauf lässt sich nur von außen nicht bauen –
     // deshalb hier über die Uhr.
-    const echt = Date.now;
-    Date.now = () => echt() - 10 * 60 * 1000;
-    const { cookie } = neueChallenge("anmelden");
-    Date.now = echt;
+    const real = Date.now;
+    Date.now = () => real() - 10 * 60 * 1000;
+    const { cookie } = createChallenge("login");
+    Date.now = real;
 
-    expect(pruefeChallenge("anmelden", cookie)).toBeNull();
+    expect(verifyChallenge("login", cookie)).toBeNull();
   });
 
   test("weist Unsinn zurück, statt zu werfen", () => {
-    for (const wert of [undefined, "", ".", "a.b", "nicht-base64.signatur"]) {
-      expect(pruefeChallenge("anmelden", wert)).toBeNull();
+    for (const value of [undefined, "", ".", "a.b", "nicht-base64.signatur"]) {
+      expect(verifyChallenge("login", value)).toBeNull();
     }
   });
 });

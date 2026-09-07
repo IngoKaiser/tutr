@@ -73,7 +73,7 @@ export function connectAsMigrationRole(): { client: postgres.Sql; close: () => P
  * `cause`-Kette. Policy-Tests prüfen darauf, ob wirklich RLS abgewiesen hat
  * und nicht ein Tippfehler im SQL.
  */
-export function ursachenkette(err: unknown): string {
+export function errorChain(err: unknown): string {
   const teile: string[] = [];
   let aktuell = err as { message?: string; cause?: unknown } | undefined;
   while (aktuell) {

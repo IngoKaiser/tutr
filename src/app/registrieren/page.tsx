@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-import { resendEinschraenkung } from "@/lib/mail/resend";
+import { resendRestriction } from "@/lib/mail/resend";
 
-import { RegistrierFormular } from "./registrier-formular";
+import { RegistrationForm } from "./registration-form";
 
 export const metadata = { title: "Profil anlegen · tutr" };
 
@@ -10,8 +10,8 @@ export const metadata = { title: "Profil anlegen · tutr" };
  * Selbstanlage durch das Kind (ADR 0005). Kein Einladungslink, keine
  * Profilwahl: Wer hier ankommt, legt sich in einem Schritt an.
  */
-export default function RegistrierenPage() {
-  const hinweis = resendEinschraenkung();
+export default function RegisterPage() {
+  const restriction = resendRestriction();
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-5 py-10">
@@ -23,13 +23,13 @@ export default function RegistrierenPage() {
         </p>
       </div>
 
-      {hinweis ? (
+      {restriction ? (
         <p className="border-offen bg-offen-hell text-tinte rounded-[10px] border p-3 text-[0.8125rem] leading-normal">
-          <strong className="text-offen">Nur in der Entwicklung:</strong> {hinweis}
+          <strong className="text-offen">Nur in der Entwicklung:</strong> {restriction}
         </p>
       ) : null}
 
-      <RegistrierFormular />
+      <RegistrationForm />
 
       <p className="text-tinte-leise text-[0.8125rem] leading-normal">
         Du hast schon ein Profil?{" "}

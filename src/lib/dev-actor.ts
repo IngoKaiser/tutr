@@ -24,30 +24,30 @@ export { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
  * eine Anmeldung. Nur die Rolle dahinter ist wählbar.
  */
 
-function nichtProduktion(): boolean {
+function notProduction(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
 /** Nur für Playwright. Umgeht die Anmeldung – deshalb doppelt abgesichert. */
 export function e2eActor(): Actor | null {
-  if (!nichtProduktion()) return null;
+  if (!notProduction()) return null;
 
-  const rolle = process.env.TUTR_E2E_ACTOR;
-  if (rolle !== "parent" && rolle !== "student") return null;
+  const role = process.env.TUTR_E2E_ACTOR;
+  if (role !== "parent" && role !== "student") return null;
 
-  return rolle === "parent"
+  return role === "parent"
     ? { role: "parent", parentId: SEED_IDS.parentOne, studentId: SEED_IDS.studentOne }
     : { role: "student", studentId: SEED_IDS.studentOne };
 }
 
 /** Ist der Ansichts-Umschalter verfügbar? */
-export function umschalterVerfuegbar(): boolean {
-  return nichtProduktion();
+export function switcherAvailable(): boolean {
+  return notProduction();
 }
 
 /** Welche Ansicht ist gewählt? Ohne Cookie: die eigene Rolle, also Eltern. */
-export async function gewaehlteAnsicht(): Promise<DevRole> {
-  if (!umschalterVerfuegbar()) return "parent";
+export async function activeView(): Promise<DevRole> {
+  if (!switcherAvailable()) return "parent";
   const store = await cookies();
   return store.get(DEV_ACTOR_COOKIE)?.value === "student" ? "student" : "parent";
 }

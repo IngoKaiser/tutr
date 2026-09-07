@@ -76,12 +76,11 @@ export async function withActor<T>(actor: Actor, fn: (tx: Transaction) => Promis
  * Sie bleiben ausdrücklich einzeln statt verallgemeinert – drei kurze
  * Policies liest man, eine clevere nicht.
  */
-export type Anmeldeschluessel =
-  "tutr.auth_user_id" | "tutr.credential_id" | "tutr.session_token_hash";
+export type LoginKey = "tutr.auth_user_id" | "tutr.credential_id" | "tutr.session_token_hash";
 
 export async function runWithLoginKey<T>(
   database: Database,
-  variable: Anmeldeschluessel,
+  variable: LoginKey,
   wert: string,
   fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {

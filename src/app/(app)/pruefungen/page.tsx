@@ -1,29 +1,29 @@
-import { Block, Hinweis, Knopf, Mastery, SeitenKopf } from "@/components/shell/bausteine";
+import { Block, Notice, Button, Mastery, PageHeader } from "@/components/shell/primitives";
 
 export const metadata = { title: "Prüfungen · tutr" };
 
 /** Konzept §5 und §6 M7: Kalender, Lernplan, Probeprüfungen, Noten. */
-export default function PruefungenPage() {
+export default function ExamsPage() {
   return (
     <div className="flex flex-col gap-3">
-      <SeitenKopf titel="Prüfungen" neben="nächste 4 Wochen" />
+      <PageHeader title="Prüfungen" trailing="nächste 4 Wochen" />
 
-      <Block titel="Französisch · Klassenarbeit" neben="25.09." betont>
-        <Hinweis>2 von 3 Themen vorbereitet · Zielnote 2</Hinweis>
-        <Mastery abdeckung={72} sicherheit={58} />
-        <Knopf>Vorbereitung öffnen</Knopf>
+      <Block title="Französisch · Klassenarbeit" trailing="25.09." emphasized>
+        <Notice>2 von 3 Themen vorbereitet · Zielnote 2</Notice>
+        <Mastery coverage={72} confidence={58} />
+        <Button>Vorbereitung öffnen</Button>
       </Block>
 
-      <Block titel="Mathematik · Klassenarbeit" neben="09.10.">
-        <Hinweis>Themen noch nicht verknüpft.</Hinweis>
-        <Knopf leise>Themen zuordnen</Knopf>
+      <Block title="Mathematik · Klassenarbeit" trailing="09.10.">
+        <Notice>Themen noch nicht verknüpft.</Notice>
+        <Button quiet>Themen zuordnen</Button>
       </Block>
 
-      <Block titel="Termin eintragen">
-        <Hinweis>
+      <Block title="Termin eintragen">
+        <Notice>
           Klausurplan fotografieren, Datei importieren oder von Hand eintragen — alles landet vorher
           im Review.
-        </Hinweis>
+        </Notice>
       </Block>
     </div>
   );

@@ -17,51 +17,51 @@ import { authEnv } from "@/lib/env";
  *    Anfragen selbst baut, setzt den Cookie-Header frei – und eine selbst
  *    gewählte Challenge macht das Wiedereinspielen einer mitgeschnittenen
  *    Antwort möglich.
- * 2. Im Cookie stehen die IDs, unter denen gleich Familie und Profil
- *    entstehen. Dürfte der Client sie wählen, könnte er ein Kind-Profil in
- *    eine fremde Familie schreiben – die INSERT-Policy prüft nur gegen den
- *    Actor-Kontext, und der käme dann aus seiner Eingabe.
+ * 2. Im Cookie stehen die IDs, unter denen gleich das Profil entsteht.
+ *    Dürfte der Client sie wählen, könnte er ein Kind-Profil mit fremder ID
+ *    schreiben – die INSERT-Policy prüft nur gegen den Actor-Kontext, und der
+ *    käme dann aus seiner Eingabe.
  */
 
 const COOKIE_NAME = "tutr_webauthn";
-const LEBENSDAUER_MS = 5 * 60 * 1000;
+const LIFETIME_MS = 5 * 60 * 1000;
 
-export type ChallengeZweck = "registrieren" | "anmelden";
+export type ChallengePurpose = "register" | "login";
 
 export const challengeCookieName = COOKIE_NAME;
-export const challengeMaxAge = LEBENSDAUER_MS / 1000;
+export const challengeMaxAge = LIFETIME_MS / 1000;
 
-type Inhalt = { challenge: string; ablauf: number };
+type Content = { challenge: string; expiresAt: number };
 
-function signatur(zweck: ChallengeZweck, nutzlast: string): string {
+function sign(purpose: ChallengePurpose, payload: string): string {
   return createHmac("sha256", authEnv().AUTH_COOKIE_SECRET)
-    .update(`${zweck}.${nutzlast}`)
+    .update(`${purpose}.${payload}`)
     .digest("base64url");
 }
 
 /**
- * Erzeugt eine frische Challenge und den Cookie-Wert dazu. `merken` wandert
+ * Erzeugt eine frische Challenge und den Cookie-Wert dazu. `remember` wandert
  * unverändert mit und kommt beim Prüfen zurück.
  */
-export function neueChallenge<T extends object = Record<string, never>>(
-  zweck: ChallengeZweck,
-  merken?: T,
+export function createChallenge<T extends object = Record<string, never>>(
+  purpose: ChallengePurpose,
+  remember?: T,
 ): { challenge: string; bytes: Uint8Array<ArrayBuffer>; cookie: string } {
   // Zwei Darstellungen derselben Zufallszahl, und beide werden gebraucht:
   // `bytes` geht an @simplewebauthn (bekommt es eine Zeichenkette, kodiert es
   // sie ein zweites Mal, und die Prüfung schlägt fehl), `challenge` ist die
   // base64url-Fassung, die der Browser später zurückschickt.
-  const roh = randomBytes(32);
-  const bytes = new Uint8Array(new ArrayBuffer(roh.length));
-  bytes.set(roh);
-  const challenge = roh.toString("base64url");
-  const inhalt: Inhalt & Partial<T> = {
+  const raw = randomBytes(32);
+  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+  bytes.set(raw);
+  const challenge = raw.toString("base64url");
+  const content: Content & Partial<T> = {
     challenge,
-    ablauf: Date.now() + LEBENSDAUER_MS,
-    ...(merken ?? ({} as T)),
+    expiresAt: Date.now() + LIFETIME_MS,
+    ...(remember ?? ({} as T)),
   };
-  const nutzlast = Buffer.from(JSON.stringify(inhalt)).toString("base64url");
-  return { challenge, bytes, cookie: `${nutzlast}.${signatur(zweck, nutzlast)}` };
+  const payload = Buffer.from(JSON.stringify(content)).toString("base64url");
+  return { challenge, bytes, cookie: `${payload}.${sign(purpose, payload)}` };
 }
 
 /**
@@ -69,31 +69,31 @@ export function neueChallenge<T extends object = Record<string, never>>(
  * Zweck passt und noch lebt – sonst `null`. Der Signaturvergleich läuft in
  * konstanter Zeit.
  */
-export function pruefeChallenge<T extends object = Record<string, never>>(
-  zweck: ChallengeZweck,
+export function verifyChallenge<T extends object = Record<string, never>>(
+  purpose: ChallengePurpose,
   cookie: string | undefined,
 ): ({ challenge: string } & T) | null {
   if (!cookie) return null;
 
-  const trenner = cookie.lastIndexOf(".");
-  if (trenner < 1) return null;
-  const nutzlast = cookie.slice(0, trenner);
-  const gelieferteSignatur = cookie.slice(trenner + 1);
+  const separator = cookie.lastIndexOf(".");
+  if (separator < 1) return null;
+  const payload = cookie.slice(0, separator);
+  const providedSignature = cookie.slice(separator + 1);
 
-  const erwartet = Buffer.from(signatur(zweck, nutzlast));
-  const geliefert = Buffer.from(gelieferteSignatur);
-  if (erwartet.length !== geliefert.length) return null;
-  if (!timingSafeEqual(erwartet, geliefert)) return null;
+  const expected = Buffer.from(sign(purpose, payload));
+  const provided = Buffer.from(providedSignature);
+  if (expected.length !== provided.length) return null;
+  if (!timingSafeEqual(expected, provided)) return null;
 
-  let inhalt: (Inhalt & T) | null = null;
+  let content: (Content & T) | null = null;
   try {
-    inhalt = JSON.parse(Buffer.from(nutzlast, "base64url").toString()) as Inhalt & T;
+    content = JSON.parse(Buffer.from(payload, "base64url").toString()) as Content & T;
   } catch {
     return null;
   }
 
-  if (!inhalt?.challenge || typeof inhalt.ablauf !== "number") return null;
-  if (inhalt.ablauf < Date.now()) return null;
+  if (!content?.challenge || typeof content.expiresAt !== "number") return null;
+  if (content.expiresAt < Date.now()) return null;
 
-  return inhalt;
+  return content;
 }

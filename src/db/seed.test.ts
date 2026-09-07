@@ -15,7 +15,7 @@ loadTestEnv();
 
 const mia: Actor = { role: "student", studentId: SEED_IDS.studentOne };
 const lea: Actor = { role: "student", studentId: SEED_IDS.studentTwo };
-const elternMitMia: Actor = {
+const parentWithMia: Actor = {
   role: "parent",
   parentId: SEED_IDS.parentOne,
   studentId: SEED_IDS.studentOne,
@@ -67,28 +67,28 @@ describe.skipIf(!testDbAvailable())("Beispieldaten unter den Policies", () => {
   });
 
   test("Kind sieht nur das eigene Profil", async () => {
-    const kinder = await runWithActor(app.db, mia, (tx) =>
+    const students = await runWithActor(app.db, mia, (tx) =>
       tx.execute<{ first_name: string }>(sql`select first_name from student`),
     );
-    expect(kinder.map((r) => r.first_name)).toEqual(["Mia"]);
+    expect(students.map((r) => r.first_name)).toEqual(["Mia"]);
   });
 
   test("Elternteil sieht das gewählte Kind, nicht das Geschwister daneben", async () => {
-    const kinder = await runWithActor(app.db, elternMitMia, (tx) =>
+    const students = await runWithActor(app.db, parentWithMia, (tx) =>
       tx.execute<{ first_name: string }>(sql`select first_name from student order by first_name`),
     );
-    expect(kinder.map((r) => r.first_name)).toEqual(["Mia"]);
+    expect(students.map((r) => r.first_name)).toEqual(["Mia"]);
   });
 
   test("Beide Kinder hängen an demselben Elternkonto", async () => {
     // Der Fall, an dem das Familienmodell gescheitert ist (ADR 0006), steht
     // jetzt als Normalfall in den Beispieldaten.
-    const zeilen = await admin.client<{ first_name: string }[]>`
+    const rows = await admin.client<{ first_name: string }[]>`
       select s.first_name from parent_student ps
       join student s on s.id = ps.student_id
       where ps.parent_account_id = ${SEED_IDS.parentOne}
       order by s.first_name`;
-    expect(zeilen.map((r) => r.first_name)).toEqual(["Ben", "Mia"]);
+    expect(rows.map((r) => r.first_name)).toEqual(["Ben", "Mia"]);
   });
 
   test("Das unverknüpfte Kind arbeitet ohne Elternkonto", async () => {

@@ -14,7 +14,7 @@ import { useEffect, useSyncExternalStore } from "react";
  * externer Browserzustand, und beim Rendern auf dem Server gibt es sie nicht.
  */
 
-const MELDUNGEN: Record<string, string> = {
+const MESSAGES: Record<string, string> = {
   otp_expired:
     "Dieser Link war nicht mehr gültig. Das passiert, wenn dein Mailprogramm ihn vorab öffnet und dabei verbraucht – fordere einfach einen neuen an.",
   access_denied: "Dieser Link war nicht mehr gültig. Fordere bitte einen neuen an.",
@@ -24,46 +24,47 @@ const MELDUNGEN: Record<string, string> = {
 };
 
 /** Die Adresszeile ändert sich hier nicht mehr – kein Abonnement nötig. */
-function abonniere() {
+function subscribe() {
   return () => {};
 }
 
-function lieszustand() {
+function readLocation() {
   return `${window.location.hash}|${window.location.search}`;
 }
 
-function aufDemServer() {
+function onServer() {
   return "|";
 }
 
-function grundAus(adresse: string): string | null {
-  const [hash, query] = adresse.split("|");
-  const ausHash = new URLSearchParams((hash ?? "").replace(/^#/, ""));
-  const ausQuery = new URLSearchParams(query ?? "");
+function reasonFrom(location: string): string | null {
+  const [hash, query] = location.split("|");
+  const fromHash = new URLSearchParams((hash ?? "").replace(/^#/, ""));
+  const fromQuery = new URLSearchParams(query ?? "");
 
-  const code = ausHash.get("error_code") ?? ausHash.get("error") ?? ausQuery.get("fehler");
+  // `fehler` bleibt deutsch: der Parameter ist Teil der sichtbaren URL.
+  const code = fromHash.get("error_code") ?? fromHash.get("error") ?? fromQuery.get("fehler");
   if (!code) return null;
 
-  return MELDUNGEN[code] ?? "Die Anmeldung hat nicht geklappt. Fordere bitte einen neuen Link an.";
+  return MESSAGES[code] ?? "Die Anmeldung hat nicht geklappt. Fordere bitte einen neuen Link an.";
 }
 
-export function AnmeldeFehler() {
-  const adresse = useSyncExternalStore(abonniere, lieszustand, aufDemServer);
-  const grund = grundAus(adresse);
+export function LoginError() {
+  const location = useSyncExternalStore(subscribe, readLocation, onServer);
+  const reason = reasonFrom(location);
 
   useEffect(() => {
     // Fehler aus der Adresszeile räumen, damit ein Neuladen ihn nicht wiederholt.
-    if (grund) window.history.replaceState(null, "", window.location.pathname);
-  }, [grund]);
+    if (reason) window.history.replaceState(null, "", window.location.pathname);
+  }, [reason]);
 
-  if (!grund) return null;
+  if (!reason) return null;
 
   return (
     <p
       role="alert"
       className="border-offen bg-offen-hell text-tinte rounded-[10px] border px-4 py-3 text-[0.8125rem] leading-normal"
     >
-      {grund}
+      {reason}
     </p>
   );
 }

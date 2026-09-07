@@ -5,11 +5,11 @@ import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/bro
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { EINWILLIGUNGSHINWEIS } from "@/lib/mail/einwilligung";
+import { CONSENT_NOTICE } from "@/lib/mail/consent";
 
-import { registrierungAbschliessen, registrierungStarten } from "./actions";
+import { completeRegistration, startRegistration as startRegistrationAction } from "./actions";
 
-const FELD =
+const FIELD =
   "border-linie-stark bg-flaeche text-tinte placeholder:text-tinte-leise focus-visible:outline-koenigsblau rounded-[9px] border px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1";
 
 /**
@@ -19,28 +19,28 @@ const FELD =
  * seinen eigenen Dialog zeigen (Face ID), und der lässt sich nur aus einem
  * Klick heraus öffnen – nicht aus einem Server-Roundtrip heraus.
  */
-export function RegistrierFormular() {
+export function RegistrationForm() {
   const router = useRouter();
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  async function absenden(formData: FormData) {
-    setFehler(null);
-    setLaeuft(true);
+  async function handleSubmit(formData: FormData) {
+    setError(null);
+    setSubmitting(true);
     try {
-      const start = await registrierungStarten(null, formData);
-      if (start.zustand === "fehler") {
-        setFehler(start.meldung);
+      const start = await startRegistrationAction(null, formData);
+      if (start.status === "error") {
+        setError(start.message);
         return;
       }
 
-      const antwort = await startRegistration({
-        optionsJSON: start.optionen as PublicKeyCredentialCreationOptionsJSON,
+      const response = await startRegistration({
+        optionsJSON: start.options as PublicKeyCredentialCreationOptionsJSON,
       });
 
-      const fertig = await registrierungAbschliessen(antwort);
-      if (fertig.zustand === "fehler") {
-        setFehler(fertig.meldung);
+      const completion = await completeRegistration(response);
+      if (completion.status === "error") {
+        setError(completion.message);
         return;
       }
 
@@ -49,29 +49,29 @@ export function RegistrierFormular() {
       // Abbruch im Face-ID-Dialog ist der häufigste Fall und kein Fehler des
       // Kindes – entsprechend formuliert.
       const name = problem instanceof Error ? problem.name : "";
-      setFehler(
+      setError(
         name === "NotAllowedError"
           ? "Abgebrochen. Tipp noch einmal auf „Profil anlegen“, wenn du so weit bist."
           : "Dein Gerät konnte keinen Passkey anlegen. Probier es in einem anderen Browser.",
       );
     } finally {
-      setLaeuft(false);
+      setSubmitting(false);
     }
   }
 
   return (
-    <form action={absenden} className="flex flex-col gap-3.5">
+    <form action={handleSubmit} className="flex flex-col gap-3.5">
       <label className="flex flex-col gap-1.5">
         <span className="text-[0.8125rem] font-medium">Vorname</span>
-        <input name="vorname" required autoFocus maxLength={40} className={FELD} />
+        <input name="firstName" required autoFocus maxLength={40} className={FIELD} />
       </label>
 
       <label className="flex flex-col gap-1.5">
         <span className="text-[0.8125rem] font-medium">Jahrgang</span>
-        <select name="jahrgang" required defaultValue="8" className={FELD}>
-          {Array.from({ length: 9 }, (_, i) => i + 5).map((jahr) => (
-            <option key={jahr} value={jahr}>
-              {jahr}
+        <select name="gradeLevel" required defaultValue="8" className={FIELD}>
+          {Array.from({ length: 9 }, (_, i) => i + 5).map((year) => (
+            <option key={year} value={year}>
+              {year}
             </option>
           ))}
         </select>
@@ -81,29 +81,27 @@ export function RegistrierFormular() {
         <span className="text-[0.8125rem] font-medium">E-Mail deiner Eltern</span>
         <input
           type="email"
-          name="elternMail"
+          name="parentEmail"
           required
           autoComplete="off"
           placeholder="mama@beispiel.de"
-          className={FELD}
+          className={FIELD}
         />
-        <span className="text-tinte-leise text-[0.75rem] leading-normal">
-          {EINWILLIGUNGSHINWEIS}
-        </span>
+        <span className="text-tinte-leise text-[0.75rem] leading-normal">{CONSENT_NOTICE}</span>
       </label>
 
-      {fehler ? (
+      {error ? (
         <p role="alert" className="text-offen text-[0.8125rem]">
-          {fehler}
+          {error}
         </p>
       ) : null}
 
       <button
         type="submit"
-        disabled={laeuft}
+        disabled={submitting}
         className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau rounded-[9px] px-4 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60"
       >
-        {laeuft ? "Einen Moment …" : "Profil anlegen"}
+        {submitting ? "Einen Moment …" : "Profil anlegen"}
       </button>
     </form>
   );

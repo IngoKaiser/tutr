@@ -17,24 +17,24 @@ import { withActor, withSessionTokenHash, type Actor } from "@/db/actor";
  * sich damit nicht anmelden.
  */
 
-export const SESSION_COOKIE = "tutr_kind";
-export const SESSION_TAGE = 30;
+export const SESSION_COOKIE = "tutr_student";
+export const SESSION_DAYS = 30;
 
-const TAG_MS = 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 /** Erst nach einem Tag erneuern – sonst schriebe jede Seitenansicht in die DB. */
-const ERNEUERN_AB_MS = TAG_MS;
+const RENEW_WITHIN_MS = DAY_MS;
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("base64url");
 }
 
-export function sessionCookieOptionen() {
+export function sessionCookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: SESSION_TAGE * 24 * 60 * 60,
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
   };
 }
 
@@ -42,23 +42,23 @@ export function sessionCookieOptionen() {
  * Legt eine Sitzung an. Der Actor zeigt bereits auf das Kind – aufgerufen wird
  * das erst, nachdem der Passkey geprüft ist.
  */
-export async function sessionAnlegen(actor: Actor, geraet: string | null): Promise<string> {
-  if (actor.role !== "student") throw new Error("sessionAnlegen ist nur für Kind-Actor gedacht.");
+export async function createSession(actor: Actor, device: string | null): Promise<string> {
+  if (actor.role !== "student") throw new Error("createSession ist nur für Kind-Actor gedacht.");
 
   const token = randomBytes(32).toString("base64url");
-  const ablauf = new Date(Date.now() + SESSION_TAGE * TAG_MS);
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * DAY_MS);
 
   await withActor(actor, (tx) =>
     tx.execute(
       sql`insert into student_session (student_id, token_hash, device_label, expires_at)
-          values (${actor.studentId}, ${hashToken(token)}, ${geraet}, ${ablauf.toISOString()})`,
+          values (${actor.studentId}, ${hashToken(token)}, ${device}, ${expiresAt.toISOString()})`,
     ),
   );
 
   return token;
 }
 
-type SessionZeile = {
+type SessionRow = {
   student_id: string;
   expires_at: string;
   revoked_at: string | null;
@@ -71,43 +71,43 @@ type SessionZeile = {
  * neu aufgespannt. Häufiger wäre ein Datenbankschreibzugriff pro Seitenaufruf,
  * ohne dass jemand etwas davon hätte.
  */
-export async function actorAusSession(token: string | undefined): Promise<Actor | null> {
+export async function actorFromSession(token: string | undefined): Promise<Actor | null> {
   if (!token) return null;
 
   const tokenHash = hashToken(token);
-  const zeilen = await withSessionTokenHash(tokenHash, (tx) =>
-    tx.execute<SessionZeile>(sql`select student_id, expires_at, revoked_at from student_session`),
+  const rows = await withSessionTokenHash(tokenHash, (tx) =>
+    tx.execute<SessionRow>(sql`select student_id, expires_at, revoked_at from student_session`),
   );
 
-  const zeile = zeilen[0];
-  if (!zeile || zeile.revoked_at) return null;
+  const row = rows[0];
+  if (!row || row.revoked_at) return null;
 
-  const ablauf = new Date(zeile.expires_at).getTime();
-  if (!Number.isFinite(ablauf) || ablauf <= Date.now()) return null;
+  const expiresAt = new Date(row.expires_at).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
 
-  const actor: Actor = { role: "student", studentId: zeile.student_id };
+  const actor: Actor = { role: "student", studentId: row.student_id };
 
-  if (ablauf - Date.now() < SESSION_TAGE * TAG_MS - ERNEUERN_AB_MS) {
-    await erneuere(actor, tokenHash);
+  if (expiresAt - Date.now() < SESSION_DAYS * DAY_MS - RENEW_WITHIN_MS) {
+    await renew(actor, tokenHash);
   }
 
   return actor;
 }
 
-async function erneuere(actor: Actor, tokenHash: string): Promise<void> {
-  const neuerAblauf = new Date(Date.now() + SESSION_TAGE * TAG_MS);
+async function renew(actor: Actor, tokenHash: string): Promise<void> {
+  const newExpiresAt = new Date(Date.now() + SESSION_DAYS * DAY_MS);
   await withActor(actor, (tx) =>
     tx.execute(
       sql`update student_session
-          set expires_at = ${neuerAblauf.toISOString()}, last_seen_at = now()
+          set expires_at = ${newExpiresAt.toISOString()}, last_seen_at = now()
           where token_hash = ${tokenHash}`,
     ),
   );
 }
 
 /** Abmelden setzt `revoked_at`, damit die Geräteliste den Vorgang zeigt. */
-export async function sessionAbmelden(token: string | undefined): Promise<void> {
-  const actor = await actorAusSession(token);
+export async function revokeSession(token: string | undefined): Promise<void> {
+  const actor = await actorFromSession(token);
   if (!actor || !token) return;
 
   await withActor(actor, (tx) =>

@@ -8,7 +8,7 @@ import {
   connectAsMigrationRole,
   loadTestEnv,
   testDbAvailable,
-  ursachenkette,
+  errorChain,
 } from "../test-db";
 
 /**
@@ -104,31 +104,31 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
   // --- Die Anmeldeschleuse über die Credential-ID --------------------------
 
   test("die Credential-ID gibt genau eine Zeile frei, nicht die Tabelle", async () => {
-    const zeilen = await runWithLoginKey(app.db, "tutr.credential_id", CRED.mia, (tx) =>
+    const rows = await runWithLoginKey(app.db, "tutr.credential_id", CRED.mia, (tx) =>
       // Bewusst ohne where: Die Policy allein muss filtern.
       tx.execute<{ credential_id: string; student_id: string }>(
         sql`select credential_id, student_id from student_credential`,
       ),
     );
-    expect(zeilen).toHaveLength(1);
-    expect(zeilen[0].credential_id).toBe(CRED.mia);
-    expect(zeilen[0].student_id).toBe(S.mia);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].credential_id).toBe(CRED.mia);
+    expect(rows[0].student_id).toBe(S.mia);
   });
 
   test("eine unbekannte Credential-ID liefert nichts", async () => {
-    const zeilen = await runWithLoginKey(app.db, "tutr.credential_id", "gibt-es-nicht", (tx) =>
+    const rows = await runWithLoginKey(app.db, "tutr.credential_id", "gibt-es-nicht", (tx) =>
       tx.execute(sql`select 1 from student_credential`),
     );
-    expect(zeilen).toHaveLength(0);
+    expect(rows).toHaveLength(0);
   });
 
   test("die Schleuse öffnet keine andere Tabelle", async () => {
     const sicht = await runWithLoginKey(app.db, "tutr.credential_id", CRED.mia, async (tx) => ({
-      kinder: await tx.execute(sql`select 1 from student`),
+      students: await tx.execute(sql`select 1 from student`),
       eltern: await tx.execute(sql`select 1 from parent_account`),
       sessions: await tx.execute(sql`select 1 from student_session`),
     }));
-    expect(sicht.kinder).toHaveLength(0);
+    expect(sicht.students).toHaveLength(0);
     expect(sicht.eltern).toHaveLength(0);
     expect(sicht.sessions).toHaveLength(0);
   });
@@ -144,27 +144,27 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
       tx.execute(sql`delete from student_credential`),
     );
 
-    const zeilen = await admin.client<{ public_key: string }[]>`
+    const rows = await admin.client<{ public_key: string }[]>`
       select public_key from student_credential where credential_id = ${CRED.mia}`;
-    expect(zeilen).toHaveLength(1);
-    expect(zeilen[0].public_key).toBe("pk-mia");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].public_key).toBe("pk-mia");
   });
 
   // --- Die Anmeldeschleuse über den Session-Hash ---------------------------
 
   test("der Session-Hash gibt genau eine Zeile frei", async () => {
-    const zeilen = await runWithLoginKey(app.db, "tutr.session_token_hash", HASH.lea, (tx) =>
+    const rows = await runWithLoginKey(app.db, "tutr.session_token_hash", HASH.lea, (tx) =>
       tx.execute<{ student_id: string }>(sql`select student_id from student_session`),
     );
-    expect(zeilen).toHaveLength(1);
-    expect(zeilen[0].student_id).toBe(S.lea);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].student_id).toBe(S.lea);
   });
 
   test("ein unbekannter Session-Hash liefert nichts", async () => {
-    const zeilen = await runWithLoginKey(app.db, "tutr.session_token_hash", "unbekannt", (tx) =>
+    const rows = await runWithLoginKey(app.db, "tutr.session_token_hash", "unbekannt", (tx) =>
       tx.execute(sql`select 1 from student_session`),
     );
-    expect(zeilen).toHaveLength(0);
+    expect(rows).toHaveLength(0);
   });
 
   // --- Entstehung: Profil und Passkey in einer Transaktion -----------------
@@ -181,10 +181,10 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
       );
     });
 
-    const [zeile] = await admin.client<{ first_name: string; parent_email: string }[]>`
+    const [row] = await admin.client<{ first_name: string; parent_email: string }[]>`
       select first_name, parent_email from student where id = ${S.neu}`;
-    expect(zeile.first_name).toBe("Neu");
-    expect(zeile.parent_email).toBe("neu-eltern@example.test");
+    expect(row.first_name).toBe("Neu");
+    expect(row.parent_email).toBe("neu-eltern@example.test");
   });
 
   // --- Sichtbarkeit im Alltag ----------------------------------------------
@@ -206,10 +206,10 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
     await runWithActor(app.db, student(S.mia), (tx) =>
       tx.execute(sql`update student_credential set counter = 7`),
     );
-    const zeilen = await admin.client<{ credential_id: string; counter: string }[]>`
+    const rows = await admin.client<{ credential_id: string; counter: string }[]>`
       select credential_id, counter from student_credential
       where credential_id in (${CRED.mia}, ${CRED.ben}) order by credential_id`;
-    expect(zeilen.map((r) => [r.credential_id, Number(r.counter)])).toEqual([
+    expect(rows.map((r) => [r.credential_id, Number(r.counter)])).toEqual([
       [CRED.ben, 0],
       [CRED.mia, 7],
     ]);
@@ -237,37 +237,37 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
     await runWithActor(app.db, parent(S.ben), (tx) =>
       tx.execute(sql`update student_session set revoked_at = now() where token_hash = ${HASH.ben}`),
     );
-    const [zeile] = await admin.client<{ revoked_at: Date | null }[]>`
+    const [row] = await admin.client<{ revoked_at: Date | null }[]>`
       select revoked_at from student_session where token_hash = ${HASH.ben}`;
-    expect(zeile.revoked_at).not.toBeNull();
+    expect(row.revoked_at).not.toBeNull();
   });
 
   test("ein Elternteil schiebt keine Session zu einem anderen Kind", async () => {
-    const fehler = await runWithActor(app.db, parent(S.mia), (tx) =>
+    const error = await runWithActor(app.db, parent(S.mia), (tx) =>
       tx.execute(
         sql`update student_session set student_id = ${S.ben} where token_hash = ${HASH.mia}`,
       ),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
   test("ein Elternteil legt keinen Passkey an", async () => {
-    const fehler = await runWithActor(app.db, parent(S.mia), (tx) =>
+    const error = await runWithActor(app.db, parent(S.mia), (tx) =>
       tx.execute(
         sql`insert into student_credential (student_id, credential_id, public_key)
             values (${S.mia}, 'cred-von-eltern', 'pk')`,
       ),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
   test("ein Elternteil entfernt einen verlorenen Passkey", async () => {
     await runWithActor(app.db, parent(S.ben), (tx) =>
       tx.execute(sql`delete from student_credential where credential_id = ${CRED.ben}`),
     );
-    const zeilen = await admin.client`
+    const rows = await admin.client`
       select 1 from student_credential where credential_id = ${CRED.ben}`;
-    expect(zeilen).toHaveLength(0);
+    expect(rows).toHaveLength(0);
   });
 
   test("ein unverknüpftes Kind sieht nur sich selbst", async () => {

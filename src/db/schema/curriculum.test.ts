@@ -21,19 +21,19 @@ import { connectAsAppRole, connectAsMigrationRole, loadTestEnv, testDbAvailable 
 loadTestEnv();
 
 const A = {
-  kind: "cccccccc-0000-4000-8000-000000000002",
+  studentId: "cccccccc-0000-4000-8000-000000000002",
   mathe: "cccccccc-0000-4000-8000-000000000003",
   franzoesisch: "cccccccc-0000-4000-8000-000000000004",
   schuljahr: "cccccccc-0000-4000-8000-000000000005",
 };
 const B = {
-  kind: "dddddddd-0000-4000-8000-000000000002",
+  studentId: "dddddddd-0000-4000-8000-000000000002",
   mathe: "dddddddd-0000-4000-8000-000000000003",
   schuljahr: "dddddddd-0000-4000-8000-000000000004",
 };
 
-const kind = (studentId: string): Actor => ({ role: "student", studentId });
-const elternteil = (studentId: string): Actor => ({
+const student = (studentId: string): Actor => ({ role: "student", studentId });
+const parent = (studentId: string): Actor => ({
   role: "parent",
   studentId,
   parentId: "eeeeeeee-0000-4000-8000-000000000001",
@@ -47,82 +47,82 @@ describe.skipIf(!testDbAvailable())(
 
     beforeAll(async () => {
       admin = connectAsMigrationRole();
-      await admin.client`delete from student where id in (${A.kind}, ${B.kind})`;
+      await admin.client`delete from student where id in (${A.studentId}, ${B.studentId})`;
       await admin.client`
       insert into student (id, first_name, grade_level) values
-        (${A.kind}, 'Kind A', 8),
-        (${B.kind}, 'Kind B', 8)`;
+        (${A.studentId}, 'Kind A', 8),
+        (${B.studentId}, 'Kind B', 8)`;
       await admin.client`
       insert into school_year (id, student_id, label, grade_level, start_date, end_date, status)
       values
-        (${A.schuljahr}, ${A.kind}, '2026/27', 8, '2026-08-01', '2027-07-31', 'aktiv'),
-        (${B.schuljahr}, ${B.kind}, '2026/27', 8, '2026-08-01', '2027-07-31', 'aktiv')`;
+        (${A.schuljahr}, ${A.studentId}, '2026/27', 8, '2026-08-01', '2027-07-31', 'aktiv'),
+        (${B.schuljahr}, ${B.studentId}, '2026/27', 8, '2026-08-01', '2027-07-31', 'aktiv')`;
       await admin.client`
       insert into subject (id, student_id, name) values
-        (${A.mathe}, ${A.kind}, 'Mathematik'),
-        (${A.franzoesisch}, ${A.kind}, 'Französisch'),
-        (${B.mathe}, ${B.kind}, 'Mathematik')`;
+        (${A.mathe}, ${A.studentId}, 'Mathematik'),
+        (${A.franzoesisch}, ${A.studentId}, 'Französisch'),
+        (${B.mathe}, ${B.studentId}, 'Mathematik')`;
       app = connectAsAppRole();
     });
 
     afterAll(async () => {
       if (admin) {
-        await admin.client`delete from student where id in (${A.kind}, ${B.kind})`;
+        await admin.client`delete from student where id in (${A.studentId}, ${B.studentId})`;
         await admin.close();
       }
       await app?.close();
     });
 
     test("Fachbindung (§15 Fehler 2): topic mit dem Fach eines fremden Kindes scheitert an der DB", async () => {
-      const fehler = await runWithActor(app.db, kind(A.kind), (tx) =>
+      const error = await runWithActor(app.db, student(A.studentId), (tx) =>
         tx.execute(sql`
         insert into topic (student_id, subject_id, school_year_id, title, status)
-        values (${A.kind}, ${B.mathe}, ${A.schuljahr}, 'Fremdes Fach', 'aktiv')
+        values (${A.studentId}, ${B.mathe}, ${A.schuljahr}, 'Fremdes Fach', 'aktiv')
       `),
       ).catch((err: unknown) => err);
-      expect(fehler).toBeDefined();
+      expect(error).toBeDefined();
     });
 
     test("Ein aktives Schuljahr pro Schüler: zweites 'aktiv' scheitert am partiellen Unique-Index", async () => {
-      const fehler = await runWithActor(app.db, elternteil(A.kind), (tx) =>
+      const error = await runWithActor(app.db, parent(A.studentId), (tx) =>
         tx.execute(sql`
         insert into school_year (student_id, label, grade_level, start_date, end_date, status)
-        values (${A.kind}, 'Zweites aktives Jahr', 9, '2027-08-01', '2028-07-31', 'aktiv')
+        values (${A.studentId}, 'Zweites aktives Jahr', 9, '2027-08-01', '2028-07-31', 'aktiv')
       `),
       ).catch((err: unknown) => err);
-      expect(fehler).toBeDefined();
+      expect(error).toBeDefined();
 
       const rows = await admin.client<{ n: string }[]>`
-      select count(*)::text as n from school_year where student_id = ${A.kind} and status = 'aktiv'`;
+      select count(*)::text as n from school_year where student_id = ${A.studentId} and status = 'aktiv'`;
       expect(rows[0]?.n).toBe("1");
     });
 
     test("Ein zweites 'geplant'-Schuljahr ist erlaubt (Sommer-Assistent, nur 'aktiv' ist begrenzt)", async () => {
-      await runWithActor(app.db, elternteil(A.kind), (tx) =>
+      await runWithActor(app.db, parent(A.studentId), (tx) =>
         tx.execute(sql`
         insert into school_year (student_id, label, grade_level, start_date, end_date, status)
-        values (${A.kind}, '2027/28 (geplant)', 9, '2027-08-01', '2028-07-31', 'geplant')
+        values (${A.studentId}, '2027/28 (geplant)', 9, '2027-08-01', '2028-07-31', 'geplant')
       `),
       );
       const rows = await admin.client<{ n: string }[]>`
-      select count(*)::text as n from school_year where student_id = ${A.kind}`;
+      select count(*)::text as n from school_year where student_id = ${A.studentId}`;
       expect(rows[0]?.n).toBe("2");
     });
 
     test("Elternteil sieht Fächer und Schuljahr, ändert aber kein Thema", async () => {
       const [topicRow] = await admin.client<{ id: string }[]>`
       insert into topic (student_id, subject_id, school_year_id, title, status)
-      values (${A.kind}, ${A.mathe}, ${A.schuljahr}, 'Bruchrechnung', 'aktiv')
+      values (${A.studentId}, ${A.mathe}, ${A.schuljahr}, 'Bruchrechnung', 'aktiv')
       returning id`;
 
-      const sicht = await runWithActor(app.db, elternteil(A.kind), async (tx) => ({
+      const sicht = await runWithActor(app.db, parent(A.studentId), async (tx) => ({
         faecher: await tx.execute<{ name: string }>(sql`select name from subject order by name`),
         themen: await tx.execute<{ title: string }>(sql`select title from topic`),
       }));
       expect(sicht.faecher.map((r) => r.name)).toEqual(["Französisch", "Mathematik"]);
       expect(sicht.themen.map((r) => r.title)).toEqual(["Bruchrechnung"]);
 
-      await runWithActor(app.db, elternteil(A.kind), (tx) =>
+      await runWithActor(app.db, parent(A.studentId), (tx) =>
         tx.execute(sql`update topic set title = 'Umbenannt' where id = ${topicRow!.id}`),
       );
       const [row] = await admin.client<{ title: string }[]>`
@@ -134,22 +134,22 @@ describe.skipIf(!testDbAvailable())(
     });
 
     test("Kind kann eigenes Thema mit Lernziel und Vorläufer anlegen", async () => {
-      const ids = await runWithActor(app.db, kind(A.kind), async (tx) => {
+      const ids = await runWithActor(app.db, student(A.studentId), async (tx) => {
         const [t] = await tx.execute<{ id: string }>(sql`
         insert into topic (student_id, subject_id, school_year_id, title, status)
-        values (${A.kind}, ${A.mathe}, ${A.schuljahr}, 'Quadratische Gleichungen', 'aktiv')
+        values (${A.studentId}, ${A.mathe}, ${A.schuljahr}, 'Quadratische Gleichungen', 'aktiv')
         returning id`);
         const [vorlaeufer] = await tx.execute<{ id: string }>(sql`
         insert into learning_objective (student_id, topic_id, title)
-        values (${A.kind}, ${t!.id}, 'Lineare Gleichungen lösen')
+        values (${A.studentId}, ${t!.id}, 'Lineare Gleichungen lösen')
         returning id`);
         const [ziel] = await tx.execute<{ id: string }>(sql`
         insert into learning_objective (student_id, topic_id, title)
-        values (${A.kind}, ${t!.id}, 'Quadratische Gleichungen lösen')
+        values (${A.studentId}, ${t!.id}, 'Quadratische Gleichungen lösen')
         returning id`);
         await tx.execute(sql`
         insert into objective_prerequisite (student_id, objective_id, prerequisite_objective_id)
-        values (${A.kind}, ${ziel!.id}, ${vorlaeufer!.id})`);
+        values (${A.studentId}, ${ziel!.id}, ${vorlaeufer!.id})`);
         return { topicId: t!.id, vorlaeuferId: vorlaeufer!.id, zielId: ziel!.id };
       });
 
@@ -161,24 +161,24 @@ describe.skipIf(!testDbAvailable())(
     });
 
     test("Ein Lernziel kann nicht sein eigener Vorläufer sein", async () => {
-      const fehler = await runWithActor(app.db, kind(A.kind), async (tx) => {
+      const error = await runWithActor(app.db, student(A.studentId), async (tx) => {
         const [t] = await tx.execute<{ id: string }>(sql`
         insert into topic (student_id, subject_id, school_year_id, title, status)
-        values (${A.kind}, ${A.mathe}, ${A.schuljahr}, 'Selbstbezug-Test', 'aktiv')
+        values (${A.studentId}, ${A.mathe}, ${A.schuljahr}, 'Selbstbezug-Test', 'aktiv')
         returning id`);
         const [ziel] = await tx.execute<{ id: string }>(sql`
         insert into learning_objective (student_id, topic_id, title)
-        values (${A.kind}, ${t!.id}, 'Zirkulär')
+        values (${A.studentId}, ${t!.id}, 'Zirkulär')
         returning id`);
         await tx.execute(sql`
         insert into objective_prerequisite (student_id, objective_id, prerequisite_objective_id)
-        values (${A.kind}, ${ziel!.id}, ${ziel!.id})`);
+        values (${A.studentId}, ${ziel!.id}, ${ziel!.id})`);
       }).catch((err: unknown) => err);
-      expect(fehler).toBeDefined();
+      expect(error).toBeDefined();
     });
 
     test("Ein fremdes Kind sieht weder Fächer noch Schuljahr des anderen", async () => {
-      const rows = await runWithActor(app.db, kind(B.kind), (tx) =>
+      const rows = await runWithActor(app.db, student(B.studentId), (tx) =>
         tx.execute<{ name: string }>(sql`select name from subject`),
       );
       expect(rows.map((r) => r.name)).toEqual(["Mathematik"]);

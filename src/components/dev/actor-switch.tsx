@@ -10,8 +10,8 @@ import type { DevRole } from "@/lib/dev-actor-shared";
  * Produktion gar nicht erst). Steht bis F-05/F-06 stellvertretend für die
  * Anmeldung: Die Shell muss wissen, ob Elternteil oder Kind davorsitzt.
  */
-export function ActorSwitch({ aktuell }: { aktuell: DevRole }) {
-  const [wechselt, starteWechsel] = useTransition();
+export function ActorSwitch({ current }: { current: DevRole }) {
+  const [switching, startSwitch] = useTransition();
 
   return (
     <div className="flex items-center gap-2 text-xs">
@@ -25,11 +25,11 @@ export function ActorSwitch({ aktuell }: { aktuell: DevRole }) {
           <button
             key={r}
             type="button"
-            onClick={() => starteWechsel(() => setDevRole(r))}
-            aria-pressed={aktuell === r}
-            disabled={wechselt}
+            onClick={() => startSwitch(() => setDevRole(r))}
+            aria-pressed={current === r}
+            disabled={switching}
             className={`focus-visible:outline-koenigsblau px-2.5 py-1 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${
-              aktuell === r
+              current === r
                 ? "bg-koenigsblau text-auf-koenigsblau"
                 : "text-tinte-weich hover:text-tinte bg-transparent"
             }`}

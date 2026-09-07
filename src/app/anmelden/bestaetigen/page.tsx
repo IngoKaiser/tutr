@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { anmeldungBestaetigen } from "./actions";
+import { confirmLogin } from "./actions";
 
 export const metadata = { title: "Anmeldung bestätigen · tutr" };
 
@@ -13,14 +13,14 @@ export const metadata = { title: "Anmeldung bestätigen · tutr" };
  * tut beim Laden **nichts**. Eingelöst wird erst beim Drücken des Knopfes,
  * also durch eine abgeschickte Form, die kein Scanner auslöst.
  */
-export default async function BestaetigenPage({
+export default async function ConfirmLoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ token_hash?: string; type?: string; weiter?: string }>;
 }) {
-  const { token_hash: tokenHash, type: typ, weiter } = await searchParams;
+  const { token_hash: tokenHash, type, weiter } = await searchParams;
 
-  if (!tokenHash || !typ) {
+  if (!tokenHash || !type) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-5 px-5 py-10">
         <span className="text-koenigsblau text-xl font-bold tracking-tight">tutr</span>
@@ -48,9 +48,9 @@ export default async function BestaetigenPage({
         </p>
       </div>
 
-      <form action={anmeldungBestaetigen}>
+      <form action={confirmLogin}>
         <input type="hidden" name="token_hash" value={tokenHash} />
-        <input type="hidden" name="type" value={typ} />
+        <input type="hidden" name="type" value={type} />
         <input type="hidden" name="weiter" value={weiter ?? "/heute"} />
         <button
           type="submit"

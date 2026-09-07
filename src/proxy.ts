@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth/student-session";
 import { e2eActor } from "@/lib/dev-actor";
-import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
+import { supabaseConfig } from "@/lib/supabase/config";
 
 /**
  * Heißt in Next 16 `proxy.ts`, nicht mehr `middleware.ts` – die alte
@@ -19,31 +19,31 @@ import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
  * die Datenbank nichts, egal welcher Weg hierher führt.
  */
 export async function proxy(request: NextRequest) {
-  let antwort = NextResponse.next({ request });
+  let response = NextResponse.next({ request });
   // Playwright meldet sich noch nicht echt an (F-10) – bis dahin diese
   // Umgehung, die es außerhalb der Produktion und nur mit gesetzter
   // Umgebungsvariable gibt.
-  if (e2eActor()) return antwort;
+  if (e2eActor()) return response;
 
   // Das Kind meldet sich mit einem Passkey an, nicht über Supabase (F-06).
   // Optimistisch wie der Rest hier: dass das Cookie *gilt*, prüft
-  // `actorAusSession()` – und danach ohnehin RLS.
-  if (request.cookies.has(SESSION_COOKIE)) return antwort;
+  // `actorFromSession()` – und danach ohnehin RLS.
+  if (request.cookies.has(SESSION_COOKIE)) return response;
 
-  const konfiguration = supabaseKonfiguration();
-  const produktiv = process.env.NODE_ENV === "production";
+  const settings = supabaseConfig();
+  const production = process.env.NODE_ENV === "production";
 
-  if (!konfiguration) {
+  if (!settings) {
     // Produktiv ist das eine Fehlkonfiguration: dann lieber die Anmeldung
     // zeigen als stillschweigend durchlassen. Sonst (Tests, lokaler Lauf
     // ohne .env) durchlassen – dort übernimmt der Dev-Actor.
-    if (!produktiv) return antwort;
-    const ziel = request.nextUrl.clone();
-    ziel.pathname = "/anmelden";
-    return NextResponse.redirect(ziel);
+    if (!production) return response;
+    const target = request.nextUrl.clone();
+    target.pathname = "/anmelden";
+    return NextResponse.redirect(target);
   }
 
-  const supabase = createServerClient(konfiguration.url, konfiguration.key, {
+  const supabase = createServerClient(settings.url, settings.key, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -52,9 +52,9 @@ export async function proxy(request: NextRequest) {
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value);
         }
-        antwort = NextResponse.next({ request });
+        response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) {
-          antwort.cookies.set(name, value, options);
+          response.cookies.set(name, value, options);
         }
       },
     },
@@ -67,13 +67,13 @@ export async function proxy(request: NextRequest) {
   // Anmeldung ist die Tür – in jeder Umgebung. Der Ansichts-Umschalter für
   // die Kind-Sicht sitzt dahinter, nicht davor.
   if (!user) {
-    const ziel = request.nextUrl.clone();
-    ziel.pathname = "/anmelden";
-    ziel.searchParams.set("weiter", request.nextUrl.pathname);
-    return NextResponse.redirect(ziel);
+    const target = request.nextUrl.clone();
+    target.pathname = "/anmelden";
+    target.searchParams.set("weiter", request.nextUrl.pathname);
+    return NextResponse.redirect(target);
   }
 
-  return antwort;
+  return response;
 }
 
 export const config = {
