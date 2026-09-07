@@ -50,7 +50,7 @@ describe.skipIf(!testDbAvailable())("RLS: family, parent_user, student", () => {
         (${A.parent}, ${A.family}, gen_random_uuid(), 'Elternteil A'),
         (${B.parent}, ${B.family}, gen_random_uuid(), 'Elternteil B')`;
     await admin.client`
-      insert into student (id, family_id, vorname, jahrgang, klasse) values
+      insert into student (id, family_id, first_name, grade_level, class_name) values
         (${A.kind1}, ${A.family}, 'Kind A1', 8, '8c'),
         (${A.kind2}, ${A.family}, 'Kind A2', 5, '5a'),
         (${B.kind1}, ${B.family}, 'Kind B1', 8, '8c')`;
@@ -81,16 +81,16 @@ describe.skipIf(!testDbAvailable())("RLS: family, parent_user, student", () => {
 
   test("Elternteil sieht beide eigenen Kinder", async () => {
     const kinder = await runWithActor(app.db, elternteil(A.family, A.parent), (tx) =>
-      tx.execute<{ vorname: string }>(sql`select vorname from student order by vorname`),
+      tx.execute<{ first_name: string }>(sql`select first_name from student order by first_name`),
     );
-    expect(kinder.map((r) => r.vorname)).toEqual(["Kind A1", "Kind A2"]);
+    expect(kinder.map((r) => r.first_name)).toEqual(["Kind A1", "Kind A2"]);
   });
 
   test("Kind sieht nur sich selbst – Geschwister bleiben getrennt", async () => {
     const kinder = await runWithActor(app.db, kind(A.family, A.kind1), (tx) =>
-      tx.execute<{ vorname: string }>(sql`select vorname from student order by vorname`),
+      tx.execute<{ first_name: string }>(sql`select first_name from student order by first_name`),
     );
-    expect(kinder.map((r) => r.vorname)).toEqual(["Kind A1"]);
+    expect(kinder.map((r) => r.first_name)).toEqual(["Kind A1"]);
   });
 
   test("Kind sieht Familie und Elternkonto, ändert sie aber nicht", async () => {
@@ -111,17 +111,17 @@ describe.skipIf(!testDbAvailable())("RLS: family, parent_user, student", () => {
 
   test("Kind kann das eigene Profil nicht umschreiben", async () => {
     await runWithActor(app.db, kind(A.family, A.kind1), (tx) =>
-      tx.execute(sql`update student set jahrgang = 13 where id = ${A.kind1}`),
+      tx.execute(sql`update student set grade_level = 13 where id = ${A.kind1}`),
     );
-    const [row] = await admin.client<{ jahrgang: number }[]>`
-      select jahrgang from student where id = ${A.kind1}`;
-    expect(row.jahrgang).toBe(8);
+    const [row] = await admin.client<{ grade_level: number }[]>`
+      select grade_level from student where id = ${A.kind1}`;
+    expect(row.grade_level).toBe(8);
   });
 
   test("Elternteil kann kein Kind in eine fremde Familie legen", async () => {
     const fehler = await runWithActor(app.db, elternteil(A.family, A.parent), (tx) =>
       tx.execute(
-        sql`insert into student (family_id, vorname, jahrgang) values (${B.family}, 'Geklaut', 8)`,
+        sql`insert into student (family_id, first_name, grade_level) values (${B.family}, 'Geklaut', 8)`,
       ),
     ).catch((err: unknown) => err);
 

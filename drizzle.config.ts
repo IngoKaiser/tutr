@@ -13,7 +13,13 @@ if (!url) {
 }
 
 export default defineConfig({
-  schema: "./src/db/schema",
+  // Extglob statt Verzeichnispfad: sonst versucht drizzle-kit auch *.test.ts
+  // als Schema zu laden, sobald die erste Testdatei neben dem Schema liegt.
+  // drizzle-kit unioniert die Treffer mehrerer Muster ohne Ausschluss-Semantik
+  // (prepareFilenames in node_modules/drizzle-kit/bin.cjs) – ein "!"-Präfix im
+  // Array wirkt dort NICHT als Negation, sondern muss als Extglob-Muster selbst
+  // formuliert werden.
+  schema: "./src/db/schema/!(*.test).ts",
   out: "./src/db/migrations",
   dialect: "postgresql",
   dbCredentials: { url },

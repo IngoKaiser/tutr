@@ -1,5 +1,5 @@
 {
-  "id": "4ccb4846-6490-465a-96ce-47730133befd",
+  "id": "f5b2cc00-cb20-4f85-ae1e-a25fb506508b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -140,20 +140,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "vorname": {
-          "name": "vorname",
+        "first_name": {
+          "name": "first_name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "jahrgang": {
-          "name": "jahrgang",
+        "grade_level": {
+          "name": "grade_level",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "klasse": {
-          "name": "klasse",
+        "class_name": {
+          "name": "class_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
