@@ -50,8 +50,8 @@ export async function sessionAnlegen(actor: Actor, geraet: string | null): Promi
 
   await withActor(actor, (tx) =>
     tx.execute(
-      sql`insert into student_session (family_id, student_id, token_hash, device_label, expires_at)
-          values (${actor.familyId}, ${actor.studentId}, ${hashToken(token)}, ${geraet}, ${ablauf.toISOString()})`,
+      sql`insert into student_session (student_id, token_hash, device_label, expires_at)
+          values (${actor.studentId}, ${hashToken(token)}, ${geraet}, ${ablauf.toISOString()})`,
     ),
   );
 
@@ -59,7 +59,6 @@ export async function sessionAnlegen(actor: Actor, geraet: string | null): Promi
 }
 
 type SessionZeile = {
-  family_id: string;
   student_id: string;
   expires_at: string;
   revoked_at: string | null;
@@ -77,9 +76,7 @@ export async function actorAusSession(token: string | undefined): Promise<Actor 
 
   const tokenHash = hashToken(token);
   const zeilen = await withSessionTokenHash(tokenHash, (tx) =>
-    tx.execute<SessionZeile>(
-      sql`select family_id, student_id, expires_at, revoked_at from student_session`,
-    ),
+    tx.execute<SessionZeile>(sql`select student_id, expires_at, revoked_at from student_session`),
   );
 
   const zeile = zeilen[0];
@@ -88,11 +85,7 @@ export async function actorAusSession(token: string | undefined): Promise<Actor 
   const ablauf = new Date(zeile.expires_at).getTime();
   if (!Number.isFinite(ablauf) || ablauf <= Date.now()) return null;
 
-  const actor: Actor = {
-    role: "student",
-    familyId: zeile.family_id,
-    studentId: zeile.student_id,
-  };
+  const actor: Actor = { role: "student", studentId: zeile.student_id };
 
   if (ablauf - Date.now() < SESSION_TAGE * TAG_MS - ERNEUERN_AB_MS) {
     await erneuere(actor, tokenHash);

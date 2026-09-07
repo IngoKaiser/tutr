@@ -6,30 +6,28 @@ import {
   pgEnum,
   pgTable,
   text,
-  timestamp,
   uniqueIndex,
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-import { family, student } from "./family";
+import { timestamps } from "./columns";
+import { student } from "./student";
 
 /**
  * Schuljahr, Fach, Thema (Topic), Lernziel – die zweite Schicht der
  * Kernkette (CLAUDE.md, Konzept §8/§9/§10, ADR 0004 D3/D6).
  *
- * Namensregel (ADR 0004 D8, fix(naming) #14): Bezeichner durchgängig
- * englisch, Domänen-*Werte* (Enum-Werte) deutsche ASCII-Domänensprache.
+ * Mandant ist `student` (ADR 0006 D1): keine `family_id`, und die
+ * zusammengesetzten Fremdschlüssel binden an `(id, student_id)` statt an
+ * `(id, family_id)`. Die Fachbindung aus ADR 0004 D3 bleibt davon unberührt –
+ * sie lief ohnehin schon über `student_id`.
+ *
+ * Namensregel (ADR 0004 D8, geschärft in ADR 0006 D10): Bezeichner
+ * durchgängig englisch, Domänen-*Werte* (Enum-Werte) deutsche
+ * ASCII-Domänensprache.
  */
-
-const zeitstempel = {
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-};
 
 // --- Enums ------------------------------------------------------------
 // Werte deutsch/ASCII (ADR 0004 D8) – App-Sprache ist Deutsch, das betrifft
@@ -77,7 +75,6 @@ export const schoolYear = pgTable(
   "school_year",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     label: text("label").notNull(),
     gradeLevel: integer("grade_level").notNull(),
@@ -89,16 +86,11 @@ export const schoolYear = pgTable(
     startDate: date("start_date").notNull(),
     endDate: date("end_date").notNull(),
     status: schoolYearStatus("status").notNull(),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    foreignKey({
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     unique("school_year_id_student_id_key").on(t.id, t.studentId),
-    unique("school_year_id_family_id_key").on(t.id, t.familyId),
     uniqueIndex("school_year_one_active_per_student")
       .on(t.studentId)
       .where(sql`${t.status} = 'aktiv'`),
@@ -113,19 +105,13 @@ export const subject = pgTable(
   "subject",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     name: text("name").notNull(),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    foreignKey({
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     unique("subject_id_student_id_key").on(t.id, t.studentId),
-    unique("subject_id_family_id_key").on(t.id, t.familyId),
     unique("subject_student_id_name_key").on(t.studentId, t.name),
   ],
 );
@@ -133,16 +119,14 @@ export const subject = pgTable(
 // --- topic (Thema) ----------------------------------------------------
 // Fachbindung als DB-Constraint (§15 Fehler 2, ADR 0004 D3): topic hängt an
 // (subject_id, student_id) – ein topic ohne passendes Fach kann nicht
-// eingefügt werden. Drei Unique-Anker (subject_id/student_id/family_id) auf
-// derselben id, damit spätere Tabellen (learning_objective, K-01
-// calendar_event_topic) direkt gegen die jeweils passende Spalte
-// referenzieren können, ohne Join.
+// eingefügt werden. Zwei Unique-Anker (subject_id/student_id) auf derselben
+// id, damit spätere Tabellen (learning_objective, K-01 calendar_event_topic)
+// direkt gegen die jeweils passende Spalte referenzieren können, ohne Join.
 
 export const topic = pgTable(
   "topic",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     subjectId: uuid("subject_id").notNull(),
     schoolYearId: uuid("school_year_id").notNull(),
@@ -156,14 +140,10 @@ export const topic = pgTable(
     sequence: integer("sequence").notNull().default(0),
     pathwayStage: pathwayStage("pathway_stage").notNull().default("vorschau"),
     selfAssessment: selfAssessmentLevel("self_assessment"),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    foreignKey({
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     foreignKey({
       columns: [t.subjectId, t.studentId],
       foreignColumns: [subject.id, subject.studentId],
@@ -174,7 +154,6 @@ export const topic = pgTable(
     }).onDelete("restrict"),
     unique("topic_id_subject_id_key").on(t.id, t.subjectId),
     unique("topic_id_student_id_key").on(t.id, t.studentId),
-    unique("topic_id_family_id_key").on(t.id, t.familyId),
   ],
 );
 
@@ -189,7 +168,6 @@ export const learningObjective = pgTable(
   "learning_objective",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     topicId: uuid("topic_id").notNull(),
     title: text("title").notNull(),
@@ -198,46 +176,35 @@ export const learningObjective = pgTable(
     descriptionGrundlegend: text("description_grundlegend"),
     descriptionRegel: text("description_regel"),
     descriptionErhoeht: text("description_erhoeht"),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    foreignKey({
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     foreignKey({
       columns: [t.topicId, t.studentId],
       foreignColumns: [topic.id, topic.studentId],
     }).onDelete("restrict"), // Lernhistorie darf nicht mit einem gelöschten Thema verschwinden.
     unique("learning_objective_id_student_id_key").on(t.id, t.studentId),
-    unique("learning_objective_id_family_id_key").on(t.id, t.familyId),
   ],
 );
 
 // --- objective_prerequisite ---------------------------------------------
 // Selbstreferenz (ADR 0004 D5). Vorläufer dürfen laut §3 aus einem anderen
 // Thema/Fach/Schuljahr stammen ("auch aus früheren Schuljahren") – deshalb
-// keine Bindung an dasselbe topic, nur an denselben Schüler/dieselbe Familie.
+// keine Bindung an dasselbe topic, nur an denselben Schüler.
 
 export const objectivePrerequisite = pgTable(
   "objective_prerequisite",
   {
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     objectiveId: uuid("objective_id").notNull(),
     prerequisiteObjectiveId: uuid("prerequisite_objective_id").notNull(),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
     // Expliziter Name: der lange Tabellenname lässt Drizzles Standardname
     // hier die 63-Zeichen-Grenze für Postgres-Identifier überschreiten.
-    foreignKey({
-      name: "objective_prerequisite_student_fk",
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     foreignKey({
       name: "objective_prerequisite_objective_fk",
       columns: [t.objectiveId, t.studentId],

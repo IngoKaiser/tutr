@@ -1,4 +1,6 @@
-export * from "./family";
+export * from "./columns";
+export * from "./student";
+export * from "./parent";
 export * from "./auth";
 export * from "./curriculum";
 export * from "./textbook";

@@ -9,24 +9,15 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { family, student } from "./family";
+import { timestamps } from "./columns";
+import { student } from "./student";
 
 /**
- * Anmeldung des Kindes: Passkey und Session (F-06, ADR 0005).
+ * Anmeldung des Kindes: Passkey und Gerätesitzung (F-06, ADR 0005/0006).
  *
- * Das Kind hat bewusst keine E-Mail und kein Passwort. Der Passkey ist die
- * dauerhafte Anmeldung, die Session nur ein Zwischenspeicher. Beides gehört
- * dem Kind, nicht dem Gerät – deshalb hängen beide Tabellen an `student` und
- * schleppen wie alle anderen `family_id` mit (ADR 0004 D2).
+ * Beides gehört dem Kind, nicht dem Gerät – deshalb hängen beide Tabellen an
+ * `student` und tragen wie alle anderen `student_id` (ADR 0006 D1).
  */
-
-const zeitstempel = {
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-};
 
 /**
  * Ein Passkey. Auffindbar angelegt (`residentKey: "required"`), damit das
@@ -40,7 +31,6 @@ export const studentCredential = pgTable(
   "student_credential",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     // Base64url, wie WebAuthn sie liefert. Global eindeutig, nicht nur je Kind:
     // Beim Anmelden ist das Kind noch unbekannt, gesucht wird allein hierüber.
@@ -53,15 +43,10 @@ export const studentCredential = pgTable(
     /** Für die Geräteliste in der Elternansicht (F-06b). Frei benannt. */
     deviceLabel: text("device_label"),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    foreignKey({
-      name: "student_credential_student_fk",
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     unique("student_credential_credential_id_key").on(t.credentialId),
   ],
 );
@@ -80,7 +65,6 @@ export const studentSession = pgTable(
   "student_session",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     tokenHash: text("token_hash").notNull(),
     deviceLabel: text("device_label"),
@@ -88,15 +72,10 @@ export const studentSession = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** Abmelden setzt diesen Zeitstempel, statt die Zeile zu löschen. */
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    foreignKey({
-      name: "student_session_student_fk",
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     unique("student_session_token_hash_key").on(t.tokenHash),
     index("student_session_student_idx").on(t.studentId),
   ],

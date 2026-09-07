@@ -1,7 +1,14 @@
 # ADR 0004: Datenmodell und RLS-Strategie
 
-Status: **akzeptiert** · Datum: 2026-09-06 · Bezug: docs/konzept.md §8, §9, §10, §11 · Ticket: F-03
+Status: **akzeptiert, teilweise überholt** · Datum: 2026-09-06 · Bezug: docs/konzept.md §8, §9, §10, §11 · Ticket: F-03
 Baut auf: ADR 0001 (Stack), ADR 0002 (Familienmodell), ADR 0003 (API-Keys)
+
+> **Überholt durch [ADR 0006](0006-student-als-mandant.md) (7.9.2026):** Der Mandant ist
+> nicht mehr die Familie, sondern das Kind. **D1** gilt weiter, nur mit `student_id` statt
+> `family_id`; **D2** und **D3** sind auf `student_id` umgestellt; die Matrix in **D4** ist
+> neu geschrieben. **D5–D9 bleiben unverändert gültig** – insbesondere D7 (kuratiert oder
+> eigen braucht zwei Policies) und D8 (Bezeichner englisch, Werte deutsch). Der Text unten
+> steht bewusst so, wie er beschlossen wurde.
 
 ## Kontext
 

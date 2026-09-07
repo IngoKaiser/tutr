@@ -2,7 +2,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { runWithActor, runWithAnmeldeschluessel, type Actor } from "../actor";
+import { runWithActor, runWithLoginKey, type Actor } from "../actor";
 import {
   connectAsAppRole,
   connectAsMigrationRole,
@@ -12,47 +12,40 @@ import {
 } from "../test-db";
 
 /**
- * Policy-Tests für die Anmeldung des Kindes (F-06, ADR 0005).
+ * Policy-Tests für Passkey und Gerätesitzung (F-06, umgestellt in F-11).
  *
  * Drei Dinge muss dieser Aufbau beweisen, sonst trägt er nicht:
- * 1. Die beiden Anmeldewege geben wirklich nur *eine* Zeile frei – sonst wäre
- *    die Umgehung des Actor-Kontexts ein Loch statt einer Schleuse.
- * 2. Ein Kind kann Familie und Profil genau einmal anlegen, und nur die
- *    eigenen – die Entstehung nach ADR 0005 darf kein Einfallstor sein.
- * 3. Geschwister und fremde Familien sehen weder Passkeys noch Sessions.
+ * 1. Die beiden Anmeldeschleusen geben wirklich nur *eine* Zeile frei – sonst
+ *    wäre die Umgehung des Actor-Kontexts ein Loch statt einer Schleuse.
+ * 2. Geschwister sehen weder Passkeys noch Sessions voneinander, obwohl sie
+ *    sich ein Elternkonto teilen.
+ * 3. Ein Elternteil sieht die Geräte des gewählten Kindes – und nur die.
  *
  * Läuft nur bei `npm run db:test` (RUN_DB_TESTS=1).
  */
 loadTestEnv();
 
-const A = {
-  family: "a5000000-0000-4000-8000-000000000001",
-  parent: "a5000000-0000-4000-8000-000000000002",
-  kind1: "a5000000-0000-4000-8000-000000000003",
-  kind2: "a5000000-0000-4000-8000-000000000004",
+const PARENT = {
+  id: "aa500000-0000-4000-8000-000000000001",
+  auth: "aa500000-0000-4000-8000-0000000000a1",
+  mail: "auth-test@example.test",
 };
-const B = {
-  family: "b5000000-0000-4000-8000-000000000001",
-  parent: "b5000000-0000-4000-8000-000000000002",
-  kind1: "b5000000-0000-4000-8000-000000000003",
-};
-/** Die Familie, die im Test durch das Kind selbst entsteht. */
-const C = {
-  family: "c5000000-0000-4000-8000-000000000001",
-  kind: "c5000000-0000-4000-8000-000000000003",
+const S = {
+  mia: "bb500000-0000-4000-8000-000000000001",
+  ben: "bb500000-0000-4000-8000-000000000002",
+  /** Ohne Elternkonto – beweist, dass ein Kind allein funktioniert. */
+  lea: "bb500000-0000-4000-8000-000000000003",
+  /** Entsteht im Test durch Selbstanlage samt Passkey. */
+  neu: "bb500000-0000-4000-8000-00000000000f",
 };
 
-const CRED = { a1: "cred-a1-test", a2: "cred-a2-test", b1: "cred-b1-test" };
-const HASH = { a1: "hash-a1-test", a2: "hash-a2-test", b1: "hash-b1-test" };
+const CRED = { mia: "cred-mia-test", ben: "cred-ben-test", lea: "cred-lea-test" };
+const HASH = { mia: "hash-mia-test", ben: "hash-ben-test", lea: "hash-lea-test" };
 
-const elternteil = (familyId: string, userId: string): Actor => ({
+const student = (studentId: string): Actor => ({ role: "student", studentId });
+const parent = (studentId: string): Actor => ({
   role: "parent",
-  familyId,
-  userId,
-});
-const kind = (familyId: string, studentId: string): Actor => ({
-  role: "student",
-  familyId,
+  parentId: PARENT.id,
   studentId,
 });
 
@@ -61,33 +54,35 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
   let admin: ReturnType<typeof connectAsMigrationRole>;
 
   const aufraeumen = async () => {
-    await admin.client`delete from family where id in (${A.family}, ${B.family}, ${C.family})`;
+    await admin.client`delete from student where id in (${S.mia}, ${S.ben}, ${S.lea}, ${S.neu})`;
+    await admin.client`delete from parent_account where id = ${PARENT.id}`;
   };
 
   beforeAll(async () => {
     admin = connectAsMigrationRole();
     await aufraeumen();
     await admin.client`
-      insert into family (id, name) values (${A.family}, 'Familie A'), (${B.family}, 'Familie B')`;
+      insert into student (id, first_name, grade_level, parent_email) values
+        (${S.mia}, 'Mia', 8, ${PARENT.mail}),
+        (${S.ben}, 'Ben', 5, ${PARENT.mail}),
+        (${S.lea}, 'Lea', 8, 'niemand@example.test')`;
     await admin.client`
-      insert into parent_user (id, family_id, auth_user_id, name) values
-        (${A.parent}, ${A.family}, gen_random_uuid(), 'Elternteil A'),
-        (${B.parent}, ${B.family}, gen_random_uuid(), 'Elternteil B')`;
+      insert into parent_account (id, auth_user_id, email, name)
+      values (${PARENT.id}, ${PARENT.auth}, ${PARENT.mail}, 'Elternteil')`;
     await admin.client`
-      insert into student (id, family_id, first_name, grade_level) values
-        (${A.kind1}, ${A.family}, 'Kind A1', 8),
-        (${A.kind2}, ${A.family}, 'Kind A2', 5),
-        (${B.kind1}, ${B.family}, 'Kind B1', 8)`;
+      insert into parent_student (parent_account_id, student_id, consent_at) values
+        (${PARENT.id}, ${S.mia}, now()),
+        (${PARENT.id}, ${S.ben}, now())`;
     await admin.client`
-      insert into student_credential (family_id, student_id, credential_id, public_key) values
-        (${A.family}, ${A.kind1}, ${CRED.a1}, 'pk-a1'),
-        (${A.family}, ${A.kind2}, ${CRED.a2}, 'pk-a2'),
-        (${B.family}, ${B.kind1}, ${CRED.b1}, 'pk-b1')`;
+      insert into student_credential (student_id, credential_id, public_key) values
+        (${S.mia}, ${CRED.mia}, 'pk-mia'),
+        (${S.ben}, ${CRED.ben}, 'pk-ben'),
+        (${S.lea}, ${CRED.lea}, 'pk-lea')`;
     await admin.client`
-      insert into student_session (family_id, student_id, token_hash, expires_at) values
-        (${A.family}, ${A.kind1}, ${HASH.a1}, now() + interval '30 days'),
-        (${A.family}, ${A.kind2}, ${HASH.a2}, now() + interval '30 days'),
-        (${B.family}, ${B.kind1}, ${HASH.b1}, now() + interval '30 days')`;
+      insert into student_session (student_id, token_hash, expires_at) values
+        (${S.mia}, ${HASH.mia}, now() + interval '30 days'),
+        (${S.ben}, ${HASH.ben}, now() + interval '30 days'),
+        (${S.lea}, ${HASH.lea}, now() + interval '30 days')`;
     app = connectAsAppRole();
   });
 
@@ -106,151 +101,96 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
     }
   });
 
-  // --- Der Anmeldeweg über die Credential-ID -------------------------------
+  // --- Die Anmeldeschleuse über die Credential-ID --------------------------
 
   test("die Credential-ID gibt genau eine Zeile frei, nicht die Tabelle", async () => {
-    const zeilen = await runWithAnmeldeschluessel(
-      app.db,
-      "tutr.credential_id",
-      CRED.a1,
-      (tx) =>
-        tx.execute<{ credential_id: string; student_id: string }>(
-          sql`select credential_id, student_id from student_credential`,
-        ),
+    const zeilen = await runWithLoginKey(app.db, "tutr.credential_id", CRED.mia, (tx) =>
       // Bewusst ohne where: Die Policy allein muss filtern.
+      tx.execute<{ credential_id: string; student_id: string }>(
+        sql`select credential_id, student_id from student_credential`,
+      ),
     );
     expect(zeilen).toHaveLength(1);
-    expect(zeilen[0].credential_id).toBe(CRED.a1);
-    expect(zeilen[0].student_id).toBe(A.kind1);
+    expect(zeilen[0].credential_id).toBe(CRED.mia);
+    expect(zeilen[0].student_id).toBe(S.mia);
   });
 
   test("eine unbekannte Credential-ID liefert nichts", async () => {
-    const zeilen = await runWithAnmeldeschluessel(
-      app.db,
-      "tutr.credential_id",
-      "gibt-es-nicht",
-      (tx) => tx.execute(sql`select 1 from student_credential`),
+    const zeilen = await runWithLoginKey(app.db, "tutr.credential_id", "gibt-es-nicht", (tx) =>
+      tx.execute(sql`select 1 from student_credential`),
     );
     expect(zeilen).toHaveLength(0);
   });
 
-  test("der Anmeldeweg öffnet keine anderen Tabellen", async () => {
-    const sicht = await runWithAnmeldeschluessel(
-      app.db,
-      "tutr.credential_id",
-      CRED.a1,
-      async (tx) => ({
-        familien: await tx.execute(sql`select 1 from family`),
-        kinder: await tx.execute(sql`select 1 from student`),
-        sessions: await tx.execute(sql`select 1 from student_session`),
-      }),
-    );
-    expect(sicht.familien).toHaveLength(0);
+  test("die Schleuse öffnet keine andere Tabelle", async () => {
+    const sicht = await runWithLoginKey(app.db, "tutr.credential_id", CRED.mia, async (tx) => ({
+      kinder: await tx.execute(sql`select 1 from student`),
+      eltern: await tx.execute(sql`select 1 from parent_account`),
+      sessions: await tx.execute(sql`select 1 from student_session`),
+    }));
     expect(sicht.kinder).toHaveLength(0);
+    expect(sicht.eltern).toHaveLength(0);
     expect(sicht.sessions).toHaveLength(0);
   });
 
-  test("der Anmeldeweg schreibt nicht – auch nicht die eine sichtbare Zeile", async () => {
+  test("die Schleuse schreibt nicht – auch nicht die eine sichtbare Zeile", async () => {
     // Kein Fehler, sondern null getroffene Zeilen: Für UPDATE filtert Postgres
     // über die USING-Klauseln der UPDATE-Policies, und es gibt hier keine.
     // Wer nur auf eine Ausnahme testet, übersieht diesen Fall.
-    await runWithAnmeldeschluessel(app.db, "tutr.credential_id", CRED.a1, (tx) =>
+    await runWithLoginKey(app.db, "tutr.credential_id", CRED.mia, (tx) =>
       tx.execute(sql`update student_credential set public_key = 'gekapert'`),
     );
-    await runWithAnmeldeschluessel(app.db, "tutr.credential_id", CRED.a1, (tx) =>
+    await runWithLoginKey(app.db, "tutr.credential_id", CRED.mia, (tx) =>
       tx.execute(sql`delete from student_credential`),
     );
 
     const zeilen = await admin.client<{ public_key: string }[]>`
-      select public_key from student_credential where credential_id = ${CRED.a1}`;
+      select public_key from student_credential where credential_id = ${CRED.mia}`;
     expect(zeilen).toHaveLength(1);
-    expect(zeilen[0].public_key).toBe("pk-a1");
+    expect(zeilen[0].public_key).toBe("pk-mia");
   });
 
-  // --- Der Prüfweg über den Session-Hash -----------------------------------
+  // --- Die Anmeldeschleuse über den Session-Hash ---------------------------
 
   test("der Session-Hash gibt genau eine Zeile frei", async () => {
-    const zeilen = await runWithAnmeldeschluessel(
-      app.db,
-      "tutr.session_token_hash",
-      HASH.b1,
-      (tx) =>
-        tx.execute<{ student_id: string; family_id: string }>(
-          sql`select student_id, family_id from student_session`,
-        ),
+    const zeilen = await runWithLoginKey(app.db, "tutr.session_token_hash", HASH.lea, (tx) =>
+      tx.execute<{ student_id: string }>(sql`select student_id from student_session`),
     );
     expect(zeilen).toHaveLength(1);
-    expect(zeilen[0].student_id).toBe(B.kind1);
-    expect(zeilen[0].family_id).toBe(B.family);
+    expect(zeilen[0].student_id).toBe(S.lea);
   });
 
   test("ein unbekannter Session-Hash liefert nichts", async () => {
-    const zeilen = await runWithAnmeldeschluessel(
-      app.db,
-      "tutr.session_token_hash",
-      "unbekannt",
-      (tx) => tx.execute(sql`select 1 from student_session`),
+    const zeilen = await runWithLoginKey(app.db, "tutr.session_token_hash", "unbekannt", (tx) =>
+      tx.execute(sql`select 1 from student_session`),
     );
     expect(zeilen).toHaveLength(0);
   });
 
-  // --- Entstehung: das Kind legt Familie und Profil an ----------------------
+  // --- Entstehung: Profil und Passkey in einer Transaktion -----------------
 
-  test("ein Kind legt Familie, Profil und Passkey in einer Transaktion an", async () => {
-    await runWithActor(app.db, kind(C.family, C.kind), async (tx) => {
+  test("ein Kind legt Profil und Passkey in einer Transaktion an", async () => {
+    await runWithActor(app.db, student(S.neu), async (tx) => {
       await tx.execute(
-        sql`insert into family (id, name, parent_email) values (${C.family}, 'Familie C', 'eltern@example.org')`,
+        sql`insert into student (id, first_name, grade_level, parent_email)
+            values (${S.neu}, 'Neu', 8, 'neu-eltern@example.test')`,
       );
       await tx.execute(
-        sql`insert into student (id, family_id, first_name, grade_level, class_name)
-            values (${C.kind}, ${C.family}, 'Kind C', 8, '8c')`,
-      );
-      await tx.execute(
-        sql`insert into student_credential (family_id, student_id, credential_id, public_key)
-            values (${C.family}, ${C.kind}, 'cred-c-test', 'pk-c')`,
+        sql`insert into student_credential (student_id, credential_id, public_key)
+            values (${S.neu}, 'cred-neu-test', 'pk-neu')`,
       );
     });
 
-    const [zeile] = await admin.client<{ name: string; parent_email: string }[]>`
-      select name, parent_email from family where id = ${C.family}`;
-    expect(zeile.name).toBe("Familie C");
-    expect(zeile.parent_email).toBe("eltern@example.org");
-  });
-
-  test("dieselbe Familie entsteht kein zweites Mal", async () => {
-    const fehler = await runWithActor(app.db, kind(C.family, C.kind), (tx) =>
-      tx.execute(sql`insert into family (id, name) values (${C.family}, 'Zweitversuch')`),
-    ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/duplicate key|family_pkey/i);
-  });
-
-  test("ein Kind legt kein zweites Profil in der eigenen Familie an", async () => {
-    const fehler = await runWithActor(app.db, kind(C.family, C.kind), (tx) =>
-      tx.execute(
-        sql`insert into student (family_id, first_name, grade_level)
-            values (${C.family}, 'Untergeschoben', 8)`,
-      ),
-    ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
-  });
-
-  test("niemand legt eine Familie an, auf die der eigene Kontext nicht zeigt", async () => {
-    // Dass ein Actor „seine" Familie anlegen darf, ist Absicht – so entstehen
-    // sowohl das Elternkonto (F-05) als auch die Kind-Registrierung (F-06).
-    // Die Grenze ist die ID: Sie muss die des eigenen Kontexts sein.
-    const fremd = "c5000000-0000-4000-8000-0000000000ee";
-    for (const actor of [kind(C.family, C.kind), elternteil(A.family, A.parent)]) {
-      const fehler = await runWithActor(app.db, actor, (tx) =>
-        tx.execute(sql`insert into family (id, name) values (${fremd}, 'Nicht meine')`),
-      ).catch((err: unknown) => err);
-      expect(ursachenkette(fehler), actor.role).toMatch(/row-level security/i);
-    }
+    const [zeile] = await admin.client<{ first_name: string; parent_email: string }[]>`
+      select first_name, parent_email from student where id = ${S.neu}`;
+    expect(zeile.first_name).toBe("Neu");
+    expect(zeile.parent_email).toBe("neu-eltern@example.test");
   });
 
   // --- Sichtbarkeit im Alltag ----------------------------------------------
 
   test("ein Kind sieht nur eigene Passkeys und Sessions – Geschwister nicht", async () => {
-    const sicht = await runWithActor(app.db, kind(A.family, A.kind1), async (tx) => ({
+    const sicht = await runWithActor(app.db, student(S.mia), async (tx) => ({
       passkeys: await tx.execute<{ credential_id: string }>(
         sql`select credential_id from student_credential`,
       ),
@@ -258,25 +198,30 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
         sql`select token_hash from student_session`,
       ),
     }));
-    expect(sicht.passkeys.map((r) => r.credential_id)).toEqual([CRED.a1]);
-    expect(sicht.sessions.map((r) => r.token_hash)).toEqual([HASH.a1]);
+    expect(sicht.passkeys.map((r) => r.credential_id)).toEqual([CRED.mia]);
+    expect(sicht.sessions.map((r) => r.token_hash)).toEqual([HASH.mia]);
   });
 
   test("ein Kind schreibt seinen Zähler fort, den des Geschwisters nicht", async () => {
-    await runWithActor(app.db, kind(A.family, A.kind1), (tx) =>
+    await runWithActor(app.db, student(S.mia), (tx) =>
       tx.execute(sql`update student_credential set counter = 7`),
     );
     const zeilen = await admin.client<{ credential_id: string; counter: string }[]>`
       select credential_id, counter from student_credential
-      where credential_id in (${CRED.a1}, ${CRED.a2}) order by credential_id`;
+      where credential_id in (${CRED.mia}, ${CRED.ben}) order by credential_id`;
     expect(zeilen.map((r) => [r.credential_id, Number(r.counter)])).toEqual([
-      [CRED.a1, 7],
-      [CRED.a2, 0],
+      [CRED.ben, 0],
+      [CRED.mia, 7],
     ]);
   });
 
-  test("ein Elternteil sieht die Geräte der Familie, aber keine fremden", async () => {
-    const sicht = await runWithActor(app.db, elternteil(A.family, A.parent), async (tx) => ({
+  /**
+   * Der Kern von ADR 0006: Ein Elternteil ist mit beiden Kindern verknüpft,
+   * sieht aber immer nur das gewählte. Vorher hätte es die ganze Familie
+   * gesehen, weil die Policy `family_id` verglich.
+   */
+  test("ein Elternteil sieht die Geräte des gewählten Kindes, nicht die des Geschwisters", async () => {
+    const sicht = await runWithActor(app.db, parent(S.mia), async (tx) => ({
       passkeys: await tx.execute<{ credential_id: string }>(
         sql`select credential_id from student_credential order by credential_id`,
       ),
@@ -284,58 +229,51 @@ describe.skipIf(!testDbAvailable())("RLS: Passkey und Session des Kindes", () =>
         sql`select token_hash from student_session order by token_hash`,
       ),
     }));
-    expect(sicht.passkeys.map((r) => r.credential_id)).toEqual([CRED.a1, CRED.a2]);
-    expect(sicht.sessions.map((r) => r.token_hash)).toEqual([HASH.a1, HASH.a2]);
+    expect(sicht.passkeys.map((r) => r.credential_id)).toEqual([CRED.mia]);
+    expect(sicht.sessions.map((r) => r.token_hash)).toEqual([HASH.mia]);
   });
 
   test("ein Elternteil meldet ein Gerät ab, statt die Zeile zu löschen", async () => {
-    await runWithActor(app.db, elternteil(A.family, A.parent), (tx) =>
-      tx.execute(sql`update student_session set revoked_at = now() where token_hash = ${HASH.a2}`),
+    await runWithActor(app.db, parent(S.ben), (tx) =>
+      tx.execute(sql`update student_session set revoked_at = now() where token_hash = ${HASH.ben}`),
     );
     const [zeile] = await admin.client<{ revoked_at: Date | null }[]>`
-      select revoked_at from student_session where token_hash = ${HASH.a2}`;
+      select revoked_at from student_session where token_hash = ${HASH.ben}`;
     expect(zeile.revoked_at).not.toBeNull();
   });
 
-  test("ein Elternteil schiebt keine Session in eine fremde Familie", async () => {
-    const fehler = await runWithActor(app.db, elternteil(A.family, A.parent), (tx) =>
+  test("ein Elternteil schiebt keine Session zu einem anderen Kind", async () => {
+    const fehler = await runWithActor(app.db, parent(S.mia), (tx) =>
       tx.execute(
-        sql`update student_session set family_id = ${B.family}, student_id = ${B.kind1}
-            where token_hash = ${HASH.a1}`,
+        sql`update student_session set student_id = ${S.ben} where token_hash = ${HASH.mia}`,
       ),
     ).catch((err: unknown) => err);
     expect(ursachenkette(fehler)).toMatch(/row-level security/i);
   });
 
   test("ein Elternteil legt keinen Passkey an", async () => {
-    const fehler = await runWithActor(app.db, elternteil(A.family, A.parent), (tx) =>
+    const fehler = await runWithActor(app.db, parent(S.mia), (tx) =>
       tx.execute(
-        sql`insert into student_credential (family_id, student_id, credential_id, public_key)
-            values (${A.family}, ${A.kind1}, 'cred-von-eltern', 'pk')`,
+        sql`insert into student_credential (student_id, credential_id, public_key)
+            values (${S.mia}, 'cred-von-eltern', 'pk')`,
       ),
     ).catch((err: unknown) => err);
     expect(ursachenkette(fehler)).toMatch(/row-level security/i);
   });
 
   test("ein Elternteil entfernt einen verlorenen Passkey", async () => {
-    await runWithActor(app.db, elternteil(A.family, A.parent), (tx) =>
-      tx.execute(sql`delete from student_credential where credential_id = ${CRED.a2}`),
+    await runWithActor(app.db, parent(S.ben), (tx) =>
+      tx.execute(sql`delete from student_credential where credential_id = ${CRED.ben}`),
     );
     const zeilen = await admin.client`
-      select 1 from student_credential where credential_id = ${CRED.a2}`;
+      select 1 from student_credential where credential_id = ${CRED.ben}`;
     expect(zeilen).toHaveLength(0);
   });
 
-  test("eine fremde Familie sieht weder Passkeys noch Sessions", async () => {
-    const sicht = await runWithActor(app.db, elternteil(B.family, B.parent), async (tx) => ({
-      passkeys: await tx.execute<{ credential_id: string }>(
-        sql`select credential_id from student_credential`,
-      ),
-      sessions: await tx.execute<{ token_hash: string }>(
-        sql`select token_hash from student_session`,
-      ),
-    }));
-    expect(sicht.passkeys.map((r) => r.credential_id)).toEqual([CRED.b1]);
-    expect(sicht.sessions.map((r) => r.token_hash)).toEqual([HASH.b1]);
+  test("ein unverknüpftes Kind sieht nur sich selbst", async () => {
+    const sicht = await runWithActor(app.db, student(S.lea), (tx) =>
+      tx.execute<{ credential_id: string }>(sql`select credential_id from student_credential`),
+    );
+    expect(sicht.map((r) => r.credential_id)).toEqual([CRED.lea]);
   });
 });

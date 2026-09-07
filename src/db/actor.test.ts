@@ -12,46 +12,47 @@ import {
 } from "./test-db";
 
 /**
- * Beweist die Kernaussage von ADR 0004 D1 an einer echten Datenbank:
- * ohne Actor-Kontext sieht die Laufzeitrolle nichts, mit Kontext genau ihre Familie.
+ * Beweist die Kernaussage von ADR 0004 D1 an einer echten Datenbank: ohne
+ * Actor-Kontext sieht die Laufzeitrolle nichts, mit Kontext genau ihren
+ * Mandanten. Seit ADR 0006 ist der Mandant das Kind, nicht die Familie.
  * Läuft nur bei `npm run db:test` (RUN_DB_TESTS=1).
  */
 loadTestEnv();
 
-const FAMILIE_A = "11111111-1111-1111-1111-111111111111";
-const FAMILIE_B = "22222222-2222-2222-2222-222222222222";
+const STUDENT_A = "11111111-1111-1111-1111-111111111111";
+const STUDENT_B = "22222222-2222-2222-2222-222222222222";
 
 describe.skipIf(!testDbAvailable())("withActor / RLS-Fundament", () => {
   let app: ReturnType<typeof connectAsAppRole>;
   let admin: ReturnType<typeof connectAsMigrationRole>;
 
-  const parent = (familyId: string): Actor => ({
+  const parent = (studentId: string): Actor => ({
     role: "parent",
-    familyId,
-    userId: "33333333-3333-3333-3333-333333333333",
+    studentId,
+    parentId: "33333333-3333-3333-3333-333333333333",
   });
 
   beforeAll(async () => {
     admin = connectAsMigrationRole();
-    // Wegwerf-Tabelle nach demselben Muster wie alle späteren: family_id + Policy.
+    // Wegwerf-Tabelle nach demselben Muster wie alle echten: student_id + Policy.
     await admin.client.unsafe(`
       set client_min_messages = warning;
       drop table if exists rls_probe;
       create table rls_probe (
         id uuid primary key default gen_random_uuid(),
-        family_id uuid not null,
+        student_id uuid not null,
         notiz text not null
       );
       alter table rls_probe enable row level security;
       grant select, insert, update, delete on rls_probe to tutr_app;
-      drop policy if exists rls_probe_family on rls_probe;
-      create policy rls_probe_family on rls_probe
+      drop policy if exists rls_probe_student on rls_probe;
+      create policy rls_probe_student on rls_probe
         for all to tutr_app
-        using (family_id = app.family_id())
-        with check (family_id = app.family_id());
-      insert into rls_probe (family_id, notiz) values
-        ('${FAMILIE_A}', 'gehört Familie A'),
-        ('${FAMILIE_B}', 'gehört Familie B');
+        using (student_id = app.student_id())
+        with check (student_id = app.student_id());
+      insert into rls_probe (student_id, notiz) values
+        ('${STUDENT_A}', 'gehört Kind A'),
+        ('${STUDENT_B}', 'gehört Kind B');
     `);
     app = connectAsAppRole();
   });
@@ -75,24 +76,36 @@ describe.skipIf(!testDbAvailable())("withActor / RLS-Fundament", () => {
     expect(rows).toHaveLength(0);
   });
 
-  test("mit Actor-Kontext nur die eigene Familie", async () => {
-    const rows = await runWithActor(app.db, parent(FAMILIE_A), (tx) =>
+  test("mit Actor-Kontext nur der eigene Mandant", async () => {
+    const rows = await runWithActor(app.db, parent(STUDENT_A), (tx) =>
       tx.execute<{ notiz: string }>(sql`select notiz from rls_probe`),
     );
-    expect(rows.map((r) => r.notiz)).toEqual(["gehört Familie A"]);
+    expect(rows.map((r) => r.notiz)).toEqual(["gehört Kind A"]);
+  });
+
+  /**
+   * Die Vereinfachung aus ADR 0006 D2, als Test: Beide Rollen sehen über
+   * dieselbe Spalte dieselbe Zeile. Vorher unterschieden sie sich darin,
+   * *welche* Spalte sie vergleichen – die Quelle der meisten Sonderfälle.
+   */
+  test("Kind und Elternteil vergleichen dieselbe Spalte", async () => {
+    const alsKind = await runWithActor(app.db, { role: "student", studentId: STUDENT_A }, (tx) =>
+      tx.execute<{ notiz: string }>(sql`select notiz from rls_probe`),
+    );
+    expect(alsKind.map((r) => r.notiz)).toEqual(["gehört Kind A"]);
   });
 
   test("der Kontext endet mit der Transaktion", async () => {
-    await runWithActor(app.db, parent(FAMILIE_A), async (tx) => {
+    await runWithActor(app.db, parent(STUDENT_A), async (tx) => {
       await tx.execute(sql`select 1`);
     });
     const rows = await app.db.execute<{ notiz: string }>(sql`select notiz from rls_probe`);
     expect(rows).toHaveLength(0);
   });
 
-  test("Schreiben in eine fremde Familie schlägt fehl", async () => {
-    const fehler = await runWithActor(app.db, parent(FAMILIE_A), (tx) =>
-      tx.execute(sql`insert into rls_probe (family_id, notiz) values (${FAMILIE_B}, 'geklaut')`),
+  test("Schreiben auf einen fremden Mandanten schlägt fehl", async () => {
+    const fehler = await runWithActor(app.db, parent(STUDENT_A), (tx) =>
+      tx.execute(sql`insert into rls_probe (student_id, notiz) values (${STUDENT_B}, 'geklaut')`),
     ).catch((err: unknown) => err);
 
     expect(ursachenkette(fehler)).toMatch(/row-level security/i);
