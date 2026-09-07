@@ -105,3 +105,22 @@ test("Ein abgelaufener Anmeldelink erklärt sich, statt wortlos zurückzuwerfen"
   // Der Fehler verschwindet aus der Adresszeile, damit Neuladen ihn nicht wiederholt.
   await expect(page).toHaveURL(/\/anmelden$/);
 });
+
+test("Die Bestätigungsseite löst den Token beim Laden nicht ein", async ({ page }) => {
+  const link = "/anmelden/bestaetigen?token_hash=beispiel-token&type=magiclink";
+
+  // Zweimal laden – ein Vorab-Öffner im Mailprogramm täte genau das. Danach
+  // muss der Knopf immer noch da sein: Nichts wurde verbraucht.
+  await page.goto(link);
+  await expect(page.getByRole("button", { name: "Anmeldung abschließen" })).toBeVisible();
+
+  await page.goto(link);
+  await expect(page.getByRole("button", { name: "Anmeldung abschließen" })).toBeVisible();
+  await expect(page).toHaveURL(/bestaetigen/);
+});
+
+test("Ein unvollständiger Bestätigungslink erklärt sich", async ({ page }) => {
+  await page.goto("/anmelden/bestaetigen");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("unvollständig");
+  await expect(page.getByRole("link", { name: "Zur Anmeldung" })).toBeVisible();
+});
