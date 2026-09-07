@@ -9,9 +9,9 @@
  * können. Wie sie damit umgehen, hängt von der Umgebung ab und steht an der
  * jeweiligen Aufrufstelle – nicht hier.
  */
-export type SupabaseKonfiguration = { url: string; key: string };
+export type SupabaseConfig = { url: string; key: string };
 
-export function supabaseKonfiguration(): SupabaseKonfiguration | null {
+export function supabaseConfig(): SupabaseConfig | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   return url && key ? { url, key } : null;

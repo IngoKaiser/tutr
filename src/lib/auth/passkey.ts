@@ -10,7 +10,7 @@ import {
 } from "@simplewebauthn/server";
 import { headers } from "next/headers";
 
-import { neueChallenge } from "./challenge";
+import { createChallenge } from "./challenge";
 
 /**
  * Die beiden WebAuthn-Zeremonien (F-06, ADR 0005).
@@ -35,10 +35,11 @@ export const RP_NAME = "tutr";
  * kommt hinter Vercel vom Edge-Netz, nicht vom Client.
  */
 export async function relyingParty(): Promise<{ rpID: string; origin: string }> {
-  const kopf = await headers();
-  const host = kopf.get("host") ?? "localhost:3000";
-  const schema = kopf.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return { rpID: host.split(":")[0], origin: `${schema}://${host}` };
+  const headerList = await headers();
+  const host = headerList.get("host") ?? "localhost:3000";
+  const protocol =
+    headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return { rpID: host.split(":")[0], origin: `${protocol}://${host}` };
 }
 
 /**
@@ -50,36 +51,36 @@ export async function relyingParty(): Promise<{ rpID: string; origin: string }> 
  */
 function userHandle(studentId: string): Uint8Array<ArrayBuffer> {
   const bytes = Buffer.from(studentId.replaceAll("-", ""), "hex");
-  const ziel = new Uint8Array(new ArrayBuffer(bytes.length));
-  ziel.set(bytes);
-  return ziel;
+  const target = new Uint8Array(new ArrayBuffer(bytes.length));
+  target.set(bytes);
+  return target;
 }
 
-function alsBytes(base64url: string): Uint8Array<ArrayBuffer> {
+function toBytes(base64url: string): Uint8Array<ArrayBuffer> {
   const bytes = Buffer.from(base64url, "base64url");
-  const ziel = new Uint8Array(new ArrayBuffer(bytes.length));
-  ziel.set(bytes);
-  return ziel;
+  const target = new Uint8Array(new ArrayBuffer(bytes.length));
+  target.set(bytes);
+  return target;
 }
 
 /**
- * `merken` wandert signiert im Cookie mit – dort stehen die IDs, unter denen
- * gleich Familie und Profil entstehen. Sie dürfen nicht über den Client
- * laufen, siehe `challenge.ts`.
+ * `remember` wandert signiert im Cookie mit – dort stehen die IDs, unter
+ * denen gleich das Profil entsteht. Sie dürfen nicht über den Client laufen,
+ * siehe `challenge.ts`.
  */
-export async function registrierungsOptionen<T extends object>(
+export async function registrationOptions<T extends object>(
   studentId: string,
-  vorname: string,
-  merken: T,
-): Promise<{ optionen: PublicKeyCredentialCreationOptionsJSON; cookie: string }> {
+  firstName: string,
+  remember: T,
+): Promise<{ options: PublicKeyCredentialCreationOptionsJSON; cookie: string }> {
   const { rpID } = await relyingParty();
-  const { bytes, cookie } = neueChallenge("registrieren", merken);
+  const { bytes, cookie } = createChallenge("register", remember);
 
-  const optionen = await generateRegistrationOptions({
+  const options = await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID,
-    userName: vorname,
-    userDisplayName: vorname,
+    userName: firstName,
+    userDisplayName: firstName,
     userID: userHandle(studentId),
     challenge: bytes,
     attestationType: "none",
@@ -94,24 +95,24 @@ export async function registrierungsOptionen<T extends object>(
     },
   });
 
-  return { optionen, cookie };
+  return { options, cookie };
 }
 
-export type NeuerPasskey = {
+export type NewPasskey = {
   credentialId: string;
   publicKey: string;
   counter: number;
   transports: string[] | null;
 };
 
-export async function pruefeRegistrierung(
-  antwort: RegistrationResponseJSON,
+export async function verifyRegistration(
+  response: RegistrationResponseJSON,
   challenge: string,
-): Promise<NeuerPasskey | null> {
+): Promise<NewPasskey | null> {
   const { rpID, origin } = await relyingParty();
 
-  const ergebnis = await verifyRegistrationResponse({
-    response: antwort,
+  const result = await verifyRegistrationResponse({
+    response,
     expectedChallenge: challenge,
     expectedOrigin: origin,
     expectedRPID: rpID,
@@ -120,9 +121,9 @@ export async function pruefeRegistrierung(
     requireUserVerification: false,
   });
 
-  if (!ergebnis.verified) return null;
+  if (!result.verified) return null;
 
-  const { credential } = ergebnis.registrationInfo;
+  const { credential } = result.registrationInfo;
   return {
     credentialId: credential.id,
     publicKey: Buffer.from(credential.publicKey).toString("base64url"),
@@ -136,50 +137,50 @@ export async function pruefeRegistrierung(
  * ist. Das ist die Anmeldung ohne Kennung – und der Grund, warum es die
  * Registrierung mit `residentKey: "required"` braucht.
  */
-export async function anmeldeOptionen(): Promise<{
-  optionen: PublicKeyCredentialRequestOptionsJSON;
+export async function authenticationOptions(): Promise<{
+  options: PublicKeyCredentialRequestOptionsJSON;
   cookie: string;
 }> {
   const { rpID } = await relyingParty();
-  const { bytes, cookie } = neueChallenge("anmelden");
+  const { bytes, cookie } = createChallenge("login");
 
-  const optionen = await generateAuthenticationOptions({
+  const options = await generateAuthenticationOptions({
     rpID,
     challenge: bytes,
     userVerification: "preferred",
   });
 
-  return { optionen, cookie };
+  return { options, cookie };
 }
 
-export type GespeicherterPasskey = {
+export type StoredPasskey = {
   credentialId: string;
   publicKey: string;
   counter: number;
   transports: string[] | null;
 };
 
-export async function pruefeAnmeldung(
-  antwort: AuthenticationResponseJSON,
+export async function verifyAuthentication(
+  response: AuthenticationResponseJSON,
   challenge: string,
-  gespeichert: GespeicherterPasskey,
-): Promise<{ neuerZaehler: number } | null> {
+  stored: StoredPasskey,
+): Promise<{ newCounter: number } | null> {
   const { rpID, origin } = await relyingParty();
 
-  const ergebnis = await verifyAuthenticationResponse({
-    response: antwort,
+  const result = await verifyAuthenticationResponse({
+    response,
     expectedChallenge: challenge,
     expectedOrigin: origin,
     expectedRPID: rpID,
     requireUserVerification: false,
     credential: {
-      id: gespeichert.credentialId,
-      publicKey: alsBytes(gespeichert.publicKey),
-      counter: gespeichert.counter,
-      transports: gespeichert.transports ?? undefined,
+      id: stored.credentialId,
+      publicKey: toBytes(stored.publicKey),
+      counter: stored.counter,
+      transports: stored.transports ?? undefined,
     },
   });
 
-  if (!ergebnis.verified) return null;
-  return { neuerZaehler: ergebnis.authenticationInfo.newCounter };
+  if (!result.verified) return null;
+  return { newCounter: result.authenticationInfo.newCounter };
 }

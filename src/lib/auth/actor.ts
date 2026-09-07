@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 
 import type { Actor } from "@/db/actor";
-import { actorAusSession, SESSION_COOKIE } from "@/lib/auth/student-session";
-import { e2eActor, gewaehlteAnsicht, umschalterVerfuegbar } from "@/lib/dev-actor";
-import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
+import { actorFromSession, SESSION_COOKIE } from "@/lib/auth/student-session";
+import { e2eActor, activeView, switcherAvailable } from "@/lib/dev-actor";
+import { supabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
 import { parentActor, parentLogin } from "./onboarding";
@@ -29,40 +29,40 @@ import { parentActor, parentLogin } from "./onboarding";
  * ADR 0006 – ein leeres Konto anzulegen.
  */
 export async function currentActor(): Promise<Actor | null> {
-  return (await anmeldeStatus()).actor;
+  return (await loginStatus()).actor;
 }
 
-export type AnmeldeStatus = {
+export type LoginStatus = {
   actor: Actor | null;
   email: string | null;
   /** Umschalter anzeigen? Nur außerhalb der Produktion und nur angemeldet. */
-  umschalter: boolean;
-  ansicht: "parent" | "student";
+  switcher: boolean;
+  view: "parent" | "student";
   /** Angemeldetes Elternteil ohne verknüpftes Kind – der leere Zustand. */
-  elternOhneKind: boolean;
+  parentWithoutStudent: boolean;
 };
 
-const LEER: AnmeldeStatus = {
+const EMPTY: LoginStatus = {
   actor: null,
   email: null,
-  umschalter: false,
-  ansicht: "parent",
-  elternOhneKind: false,
+  switcher: false,
+  view: "parent",
+  parentWithoutStudent: false,
 };
 
-export async function anmeldeStatus(): Promise<AnmeldeStatus> {
-  const ausTest = e2eActor();
-  if (ausTest) {
-    return { ...LEER, actor: ausTest, ansicht: ausTest.role };
+export async function loginStatus(): Promise<LoginStatus> {
+  const testActor = e2eActor();
+  if (testActor) {
+    return { ...EMPTY, actor: testActor, view: testActor.role };
   }
 
-  const kekse = await cookies();
-  const alsKind = await actorAusSession(kekse.get(SESSION_COOKIE)?.value);
-  if (alsKind) {
-    return { ...LEER, actor: alsKind, ansicht: "student" };
+  const cookieStore = await cookies();
+  const asStudent = await actorFromSession(cookieStore.get(SESSION_COOKIE)?.value);
+  if (asStudent) {
+    return { ...EMPTY, actor: asStudent, view: "student" };
   }
 
-  if (!supabaseKonfiguration()) return LEER;
+  if (!supabaseConfig()) return EMPTY;
 
   const supabase = await createClient();
   // getUser() prüft das Token serverseitig; getSession() würde dem Cookie
@@ -71,35 +71,35 @@ export async function anmeldeStatus(): Promise<AnmeldeStatus> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user?.email) return LEER;
+  if (!user?.email) return EMPTY;
 
   const login = await parentLogin(user.id);
-  if (!login) return LEER;
+  if (!login) return EMPTY;
 
-  const kind = login.students[0];
-  if (!kind) {
-    return { ...LEER, email: login.email, elternOhneKind: true };
+  const student = login.students[0];
+  if (!student) {
+    return { ...EMPTY, email: login.email, parentWithoutStudent: true };
   }
 
   // Solange es keine Kindauswahl gibt (F-06b), ist es das erste Kind.
-  const eltern = parentActor(login, kind.id);
-  if (!eltern) return LEER;
+  const parent = parentActor(login, student.id);
+  if (!parent) return EMPTY;
 
-  if (umschalterVerfuegbar() && (await gewaehlteAnsicht()) === "student") {
+  if (switcherAvailable() && (await activeView()) === "student") {
     return {
-      ...LEER,
-      actor: { role: "student", studentId: kind.id },
+      ...EMPTY,
+      actor: { role: "student", studentId: student.id },
       email: login.email,
-      umschalter: true,
-      ansicht: "student",
+      switcher: true,
+      view: "student",
     };
   }
 
   return {
-    ...LEER,
-    actor: eltern,
+    ...EMPTY,
+    actor: parent,
     email: login.email,
-    umschalter: umschalterVerfuegbar(),
-    ansicht: "parent",
+    switcher: switcherAvailable(),
+    view: "parent",
   };
 }

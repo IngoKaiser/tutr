@@ -1,16 +1,16 @@
 import { redirect } from "next/navigation";
 
-import { abmelden } from "@/app/anmelden/actions";
+import { logout } from "@/app/anmelden/actions";
 import { ActorSwitch } from "@/components/dev/actor-switch";
 import { BottomNav } from "@/components/shell/bottom-nav";
-import { anmeldeStatus } from "@/lib/auth/actor";
+import { loginStatus } from "@/lib/auth/actor";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { actor, email, umschalter, ansicht, elternOhneKind } = await anmeldeStatus();
+  const { actor, email, switcher, view, parentWithoutStudent } = await loginStatus();
 
-  async function abmeldenUndZurueck() {
+  async function logoutAndRedirect() {
     "use server";
-    await abmelden();
+    await logout();
     redirect("/anmelden");
   }
 
@@ -18,9 +18,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // passieren, weil der erste Login eine leere Familie anlegte – genau die
   // Geisterdaten, die jetzt wegfallen. Zurück auf die Anmeldeseite zu werfen
   // wäre falsch: Das Elternteil *ist* angemeldet, es hat nur nichts zu sehen.
-  if (elternOhneKind) {
+  if (parentWithoutStudent) {
     return (
-      <LeererRahmen email={email} abmelden={abmeldenUndZurueck}>
+      <EmptyShell email={email} logout={logoutAndRedirect}>
         <h1 className="text-2xl font-semibold tracking-tight">Noch kein Kind verknüpft</h1>
         <p className="font-lese text-tinte-weich text-[0.9375rem] leading-relaxed">
           Sobald Ihr Kind sich bei tutr anmeldet und <strong>{email}</strong> als Adresse der Eltern
@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           Sie haben eine Nachricht erhalten, sehen hier aber nichts? Dann wurde eine andere Adresse
           eingetragen als die, mit der Sie angemeldet sind.
         </p>
-      </LeererRahmen>
+      </EmptyShell>
     );
   }
 
@@ -46,13 +46,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="text-koenigsblau text-lg font-bold tracking-tight">tutr</span>
 
           <div className="flex items-center gap-3">
-            {umschalter ? <ActorSwitch aktuell={ansicht} /> : null}
+            {switcher ? <ActorSwitch current={view} /> : null}
             {email ? (
               <>
                 <span className="text-tinte-leise max-w-[10rem] truncate text-xs" title={email}>
                   {email}
                 </span>
-                <form action={abmeldenUndZurueck}>
+                <form action={logoutAndRedirect}>
                   <button
                     type="submit"
                     className="border-linie-stark bg-flaeche text-tinte-weich hover:text-tinte focus-visible:outline-koenigsblau rounded-md border px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1"
@@ -74,13 +74,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 }
 
 /** Kopfbereich mit Abmelden, aber ohne Navigation – es gibt nichts zu navigieren. */
-function LeererRahmen({
+function EmptyShell({
   email,
-  abmelden,
+  logout,
   children,
 }: {
   email: string | null;
-  abmelden: () => Promise<void>;
+  logout: () => Promise<void>;
   children: React.ReactNode;
 }) {
   return (
@@ -94,7 +94,7 @@ function LeererRahmen({
                 {email}
               </span>
             ) : null}
-            <form action={abmelden}>
+            <form action={logout}>
               <button
                 type="submit"
                 className="border-linie-stark bg-flaeche text-tinte-weich hover:text-tinte focus-visible:outline-koenigsblau rounded-md border px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1"

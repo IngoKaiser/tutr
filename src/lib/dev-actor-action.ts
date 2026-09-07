@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
-import { umschalterVerfuegbar } from "./dev-actor";
+import { switcherAvailable } from "./dev-actor";
 import { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
 /**
@@ -14,11 +14,11 @@ import { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
  * Wechselt nur die *Sicht* eines angemeldeten Elternteils. Eine Anmeldung
  * ersetzt sie nicht: Ohne Session kommt man gar nicht erst hierher.
  */
-export async function setDevRole(rolle: DevRole): Promise<void> {
-  if (!umschalterVerfuegbar()) return;
+export async function setDevRole(role: DevRole): Promise<void> {
+  if (!switcherAvailable()) return;
 
   const store = await cookies();
-  store.set(DEV_ACTOR_COOKIE, rolle, {
+  store.set(DEV_ACTOR_COOKIE, role, {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",

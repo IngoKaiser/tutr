@@ -8,7 +8,7 @@ import {
   connectAsMigrationRole,
   loadTestEnv,
   testDbAvailable,
-  ursachenkette,
+  errorChain,
 } from "../test-db";
 
 /**
@@ -25,13 +25,13 @@ import {
 loadTestEnv();
 
 const A = {
-  kind: "eeee0000-0000-4000-8000-000000000002",
+  studentId: "eeee0000-0000-4000-8000-000000000002",
   schuljahr: "eeee0000-0000-4000-8000-000000000003",
   franzoesisch: "eeee0000-0000-4000-8000-000000000004",
   eigenesLehrwerk: "eeee0000-0000-4000-8000-000000000005",
 };
 const B = {
-  kind: "ffff0000-0000-4000-8000-000000000002",
+  studentId: "ffff0000-0000-4000-8000-000000000002",
   fremdesLehrwerk: "ffff0000-0000-4000-8000-000000000003",
 };
 const KURATIERT = {
@@ -39,8 +39,8 @@ const KURATIERT = {
   schulprofil: "aaaa1111-0000-4000-8000-000000000002",
 };
 
-const kind = (studentId: string): Actor => ({ role: "student", studentId });
-const elternteil = (studentId: string): Actor => ({
+const student = (studentId: string): Actor => ({ role: "student", studentId });
+const parent = (studentId: string): Actor => ({
   role: "parent",
   studentId,
   parentId: "aaaa2222-0000-4000-8000-000000000001",
@@ -52,20 +52,20 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
 
   beforeAll(async () => {
     admin = connectAsMigrationRole();
-    await admin.client`delete from student where id in (${A.kind}, ${B.kind})`;
+    await admin.client`delete from student where id in (${A.studentId}, ${B.studentId})`;
     await admin.client`delete from textbook where id in (${KURATIERT.lehrwerk})`;
     await admin.client`delete from school_profile where id in (${KURATIERT.schulprofil})`;
 
     await admin.client`
       insert into student (id, first_name, grade_level) values
-        (${A.kind}, 'Kind A', 8),
-        (${B.kind}, 'Kind B', 8)`;
+        (${A.studentId}, 'Kind A', 8),
+        (${B.studentId}, 'Kind B', 8)`;
     await admin.client`
       insert into school_year (id, student_id, label, grade_level, start_date, end_date, status)
-      values (${A.schuljahr}, ${A.kind}, '2026/27', 8, '2026-08-01', '2027-07-31', 'aktiv')`;
+      values (${A.schuljahr}, ${A.studentId}, '2026/27', 8, '2026-08-01', '2027-07-31', 'aktiv')`;
     await admin.client`
       insert into subject (id, student_id, name)
-      values (${A.franzoesisch}, ${A.kind}, 'Französisch')`;
+      values (${A.franzoesisch}, ${A.studentId}, 'Französisch')`;
 
     // Kuratiert: student_id is null – nur die Migrationsrolle darf das.
     await admin.client`
@@ -78,15 +78,15 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
     // Eigene Lehrwerke beider Kinder.
     await admin.client`
       insert into textbook (id, student_id, title, subject, source) values
-        (${A.eigenesLehrwerk}, ${A.kind}, 'Eigenes Heft A', 'Französisch', 'foto'),
-        (${B.fremdesLehrwerk}, ${B.kind}, 'Eigenes Heft B', 'Französisch', 'foto')`;
+        (${A.eigenesLehrwerk}, ${A.studentId}, 'Eigenes Heft A', 'Französisch', 'foto'),
+        (${B.fremdesLehrwerk}, ${B.studentId}, 'Eigenes Heft B', 'Französisch', 'foto')`;
 
     app = connectAsAppRole();
   });
 
   afterAll(async () => {
     if (admin) {
-      await admin.client`delete from student where id in (${A.kind}, ${B.kind})`;
+      await admin.client`delete from student where id in (${A.studentId}, ${B.studentId})`;
       await admin.client`delete from textbook where id = ${KURATIERT.lehrwerk}`;
       await admin.client`delete from school_profile where id = ${KURATIERT.schulprofil}`;
       await admin.close();
@@ -97,7 +97,7 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
   test("Ein Kind sieht kuratierte und eigene Lehrwerke, nicht die fremden", async () => {
     // Eingegrenzt auf die eigenen Fixtures: kuratierte Zeilen sind global
     // sichtbar, andere Testdateien legen ebenfalls welche an.
-    const titel = await runWithActor(app.db, kind(A.kind), (tx) =>
+    const titel = await runWithActor(app.db, student(A.studentId), (tx) =>
       tx.execute<{ title: string }>(sql`
         select title from textbook
         where id in (${KURATIERT.lehrwerk}, ${A.eigenesLehrwerk}, ${B.fremdesLehrwerk})
@@ -107,9 +107,9 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
   });
 
   test("Kaper-Schutz: kuratiertes Lehrwerk lässt sich nicht auf das eigene Kind umschreiben", async () => {
-    await runWithActor(app.db, kind(A.kind), (tx) =>
+    await runWithActor(app.db, student(A.studentId), (tx) =>
       tx.execute(sql`
-        update textbook set student_id = ${A.kind}, title = 'Gekapert'
+        update textbook set student_id = ${A.studentId}, title = 'Gekapert'
         where id = ${KURATIERT.lehrwerk}`),
     );
     const [row] = await admin.client<{ title: string; student_id: string | null }[]>`
@@ -119,7 +119,7 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
   });
 
   test("Kaper-Schutz: kuratiertes Lehrwerk lässt sich nicht löschen", async () => {
-    await runWithActor(app.db, kind(A.kind), (tx) =>
+    await runWithActor(app.db, student(A.studentId), (tx) =>
       tx.execute(sql`delete from textbook where id = ${KURATIERT.lehrwerk}`),
     );
     const rows = await admin.client<{ id: string }[]>`
@@ -128,37 +128,37 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
   });
 
   test("Die App-Rolle kann keine kuratierte Zeile anlegen", async () => {
-    const fehler = await runWithActor(app.db, kind(A.kind), (tx) =>
+    const error = await runWithActor(app.db, student(A.studentId), (tx) =>
       tx.execute(sql`
         insert into textbook (student_id, title, subject)
         values (null, 'Schleichweg', 'Französisch')`),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
   test("Kind darf ein eigenes Lehrwerk anlegen (Foto vom Inhaltsverzeichnis)", async () => {
-    const zeilen = await runWithActor(app.db, kind(A.kind), async (tx) => {
+    const rows = await runWithActor(app.db, student(A.studentId), async (tx) => {
       const [lehrwerk] = await tx.execute<{ id: string }>(sql`
         insert into textbook (student_id, title, subject, source)
-        values (${A.kind}, 'Aus Foto erstellt', 'Französisch', 'foto')
+        values (${A.studentId}, 'Aus Foto erstellt', 'Französisch', 'foto')
         returning id`);
       await tx.execute(sql`
         insert into chapter (student_id, textbook_id, title, pages, sequence, units)
-        values (${A.kind}, ${lehrwerk!.id}, 'Unité 3', '34–51', 3, ARRAY['3.1', '3.2'])`);
+        values (${A.studentId}, ${lehrwerk!.id}, 'Unité 3', '34–51', 3, ARRAY['3.1', '3.2'])`);
       return tx.execute<{ title: string }>(
         sql`select title from chapter where textbook_id = ${lehrwerk!.id}`,
       );
     });
-    expect(zeilen.map((r) => r.title)).toEqual(["Unité 3"]);
+    expect(rows.map((r) => r.title)).toEqual(["Unité 3"]);
   });
 
   test("Schulprofil: kuratiertes Profil ist lesbar, aber nicht änderbar", async () => {
-    const sicht = await runWithActor(app.db, elternteil(A.kind), (tx) =>
+    const sicht = await runWithActor(app.db, parent(A.studentId), (tx) =>
       tx.execute<{ name: string }>(sql`select name from school_profile`),
     );
     expect(sicht.map((r) => r.name)).toEqual(["Beispielschule"]);
 
-    await runWithActor(app.db, elternteil(A.kind), (tx) =>
+    await runWithActor(app.db, parent(A.studentId), (tx) =>
       tx.execute(sql`update school_profile set federal_state = 'Bayern'
         where id = ${KURATIERT.schulprofil}`),
     );
@@ -168,18 +168,18 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
   });
 
   test("school_year_textbook: Elternteil ordnet zu, Kind liest nur", async () => {
-    await runWithActor(app.db, elternteil(A.kind), (tx) =>
+    await runWithActor(app.db, parent(A.studentId), (tx) =>
       tx.execute(sql`
         insert into school_year_textbook (student_id, school_year_id, subject_id, textbook_id)
-        values (${A.kind}, ${A.schuljahr}, ${A.franzoesisch}, ${KURATIERT.lehrwerk})`),
+        values (${A.studentId}, ${A.schuljahr}, ${A.franzoesisch}, ${KURATIERT.lehrwerk})`),
     );
 
-    const gelesen = await runWithActor(app.db, kind(A.kind), (tx) =>
+    const gelesen = await runWithActor(app.db, student(A.studentId), (tx) =>
       tx.execute<{ textbook_id: string }>(sql`select textbook_id from school_year_textbook`),
     );
     expect(gelesen.map((r) => r.textbook_id)).toEqual([KURATIERT.lehrwerk]);
 
-    await runWithActor(app.db, kind(A.kind), (tx) =>
+    await runWithActor(app.db, student(A.studentId), (tx) =>
       tx.execute(sql`
         update school_year_textbook set textbook_id = ${A.eigenesLehrwerk}`),
     );
@@ -189,11 +189,11 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
   });
 
   test("Pro Schuljahr und Fach nur ein Lehrwerk", async () => {
-    const fehler = await runWithActor(app.db, elternteil(A.kind), (tx) =>
+    const error = await runWithActor(app.db, parent(A.studentId), (tx) =>
       tx.execute(sql`
         insert into school_year_textbook (student_id, school_year_id, subject_id, textbook_id)
-        values (${A.kind}, ${A.schuljahr}, ${A.franzoesisch}, ${A.eigenesLehrwerk})`),
+        values (${A.studentId}, ${A.schuljahr}, ${A.franzoesisch}, ${A.eigenesLehrwerk})`),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/school_year_textbook_year_subject_key|duplicate key/i);
+    expect(errorChain(error)).toMatch(/school_year_textbook_year_subject_key|duplicate key/i);
   });
 });

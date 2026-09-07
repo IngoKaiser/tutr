@@ -8,7 +8,7 @@ import {
   connectAsMigrationRole,
   loadTestEnv,
   testDbAvailable,
-  ursachenkette,
+  errorChain,
 } from "./test-db";
 
 /**
@@ -89,10 +89,10 @@ describe.skipIf(!testDbAvailable())("withActor / RLS-Fundament", () => {
    * *welche* Spalte sie vergleichen – die Quelle der meisten Sonderfälle.
    */
   test("Kind und Elternteil vergleichen dieselbe Spalte", async () => {
-    const alsKind = await runWithActor(app.db, { role: "student", studentId: STUDENT_A }, (tx) =>
+    const asStudent = await runWithActor(app.db, { role: "student", studentId: STUDENT_A }, (tx) =>
       tx.execute<{ notiz: string }>(sql`select notiz from rls_probe`),
     );
-    expect(alsKind.map((r) => r.notiz)).toEqual(["gehört Kind A"]);
+    expect(asStudent.map((r) => r.notiz)).toEqual(["gehört Kind A"]);
   });
 
   test("der Kontext endet mit der Transaktion", async () => {
@@ -104,11 +104,11 @@ describe.skipIf(!testDbAvailable())("withActor / RLS-Fundament", () => {
   });
 
   test("Schreiben auf einen fremden Mandanten schlägt fehl", async () => {
-    const fehler = await runWithActor(app.db, parent(STUDENT_A), (tx) =>
+    const error = await runWithActor(app.db, parent(STUDENT_A), (tx) =>
       tx.execute(sql`insert into rls_probe (student_id, notiz) values (${STUDENT_B}, 'geklaut')`),
     ).catch((err: unknown) => err);
 
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
 
     // und die Zeile ist wirklich nicht da
     const rows = await admin.client<{ notiz: string }[]>`

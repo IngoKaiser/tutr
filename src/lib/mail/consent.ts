@@ -15,32 +15,32 @@
  * Token in derselben Mail und spart die ganze Einlöse-Mechanik (ADR 0005).
  */
 
-export type Einwilligungsmail = { betreff: string; text: string };
+export type ConsentEmail = { subject: string; text: string };
 
-export function einwilligungsmail(kind: { vorname: string; herkunft: string }): Einwilligungsmail {
-  const { vorname, herkunft } = kind;
+export function consentEmail(student: { firstName: string; origin: string }): ConsentEmail {
+  const { firstName, origin } = student;
 
-  const text = `${vorname} hat sich bei tutr angemeldet, einer Lern-App für die Schule, und Ihre Adresse als Kontakt der Eltern angegeben.
+  const text = `${firstName} hat sich bei tutr angemeldet, einer Lern-App für die Schule, und Ihre Adresse als Kontakt der Eltern angegeben.
 
-tutr hilft beim Üben von Unterrichtsthemen, Vokabeln und Prüfungen. Von ${vorname} sind nur Vorname, Jahrgang und Klasse gespeichert — kein Geburtsdatum, keine E-Mail-Adresse, keine Schule.
+tutr hilft beim Üben von Unterrichtsthemen, Vokabeln und Prüfungen. Von ${firstName} sind nur Vorname, Jahrgang und Klasse gespeichert — kein Geburtsdatum, keine E-Mail-Adresse, keine Schule.
 
 Einverstanden? Dann melden Sie sich mit dieser Adresse an:
-${herkunft}/anmelden
+${origin}/anmelden
 
-Sie werden damit Kontoinhaber und sehen Termine, Lernstand, Noten und Zusammenfassungen. ${vorname}s Gespräche mit dem Tutor sehen Sie nicht; das ist Absicht.
+Sie werden damit Kontoinhaber und sehen Termine, Lernstand, Noten und Zusammenfassungen. ${firstName}s Gespräche mit dem Tutor sehen Sie nicht; das ist Absicht.
 
 Nicht einverstanden? Dann schreiben Sie uns über dieselbe Adresse — das Konto und alle Daten werden gelöscht.
 
 Sie hören von uns nur, wenn es etwas zu sagen gibt.`;
 
-  return { betreff: `${vorname} nutzt tutr`, text };
+  return { subject: `${firstName} nutzt tutr`, text };
 }
 
 /**
  * Was das Kind bei der Registrierung liest, direkt unter dem Feld für die
  * Elternadresse. Kurz, duzend, und ehrlich darüber, dass es nicht blockiert.
  */
-export const EINWILLIGUNGSHINWEIS =
+export const CONSENT_NOTICE =
   "Wir schicken deinen Eltern eine kurze Nachricht, dass du tutr benutzt. " +
   "Du kannst sofort loslegen — die Nachricht hält dich nicht auf. " +
   "Die Adresse brauchen wir außerdem, falls du dein Gerät verlierst und wieder reinkommen musst.";

@@ -14,15 +14,15 @@ test.describe("Anmeldeseite", () => {
     await page.goto("/anmelden");
 
     const passkey = page.getByRole("button", { name: /Face ID/i });
-    const elternweg = page.getByRole("heading", { name: "Ich bin ein Elternteil" });
+    const parentPath = page.getByRole("heading", { name: "Ich bin ein Elternteil" });
 
     await expect(passkey).toBeVisible();
-    await expect(elternweg).toBeVisible();
+    await expect(parentPath).toBeVisible();
 
     // Das Kind ist die tägliche Nutzerin – ihr Weg steht oben.
-    const obenPasskey = (await passkey.boundingBox())?.y ?? 0;
-    const obenEltern = (await elternweg.boundingBox())?.y ?? 0;
-    expect(obenPasskey).toBeLessThan(obenEltern);
+    const passkeyTop = (await passkey.boundingBox())?.y ?? 0;
+    const parentTop = (await parentPath.boundingBox())?.y ?? 0;
+    expect(passkeyTop).toBeLessThan(parentTop);
   });
 
   test("führt zur Selbstanlage", async ({ page }) => {

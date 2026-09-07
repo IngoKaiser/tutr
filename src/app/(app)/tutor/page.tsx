@@ -1,4 +1,4 @@
-import { Block, Hinweis, KontextChip, Lesetext, SeitenKopf } from "@/components/shell/bausteine";
+import { Block, Notice, ContextChip, ReadingText, PageHeader } from "@/components/shell/primitives";
 
 export const metadata = { title: "Tutor · tutr" };
 
@@ -7,22 +7,22 @@ export const metadata = { title: "Tutor · tutr" };
  * jederzeit sichtbar ist, worüber geredet wird. Einstiegs-Chips als Abkürzung,
  * „Hausaufgabe" am prominentesten.
  */
-const EINSTIEGE = ["Hausaufgabe", "Verstehen", "Vorschau", "Prüfung", "Nachbereitung"] as const;
+const STARTERS = ["Hausaufgabe", "Verstehen", "Vorschau", "Prüfung", "Nachbereitung"] as const;
 
 export default function TutorPage() {
   return (
     <div className="flex flex-col gap-3">
-      <SeitenKopf titel="Tutor" />
+      <PageHeader title="Tutor" />
 
       <Block>
-        <Lesetext>
+        <ReadingText>
           Reflexive Verben beschreiben eine Handlung, die auf die handelnde Person zurückwirkt. Im
           Deutschen steht dafür „sich“ — im Französischen ändert sich das Pronomen mit der Person.
-        </Lesetext>
+        </ReadingText>
       </Block>
 
       <div className="flex flex-wrap gap-1.5">
-        {EINSTIEGE.map((e, i) => (
+        {STARTERS.map((e, i) => (
           <span
             key={e}
             className={`rounded-md border px-2.5 py-1.5 text-xs font-medium ${
@@ -37,8 +37,8 @@ export default function TutorPage() {
       </div>
 
       <Block>
-        <KontextChip fach="Französisch" thema="Les verbes pronominaux" />
-        <Hinweis>Frag etwas, sprich oder fotografiere die Aufgabe.</Hinweis>
+        <ContextChip subject="Französisch" topic="Les verbes pronominaux" />
+        <Notice>Frag etwas, sprich oder fotografiere die Aufgabe.</Notice>
       </Block>
     </div>
   );

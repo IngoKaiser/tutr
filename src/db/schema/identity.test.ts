@@ -8,7 +8,7 @@ import {
   connectAsMigrationRole,
   loadTestEnv,
   testDbAvailable,
-  ursachenkette,
+  errorChain,
 } from "../test-db";
 
 /**
@@ -105,44 +105,44 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
             values (${S.neu}, 'Neu', 7, 'irgendwer@example.test')`,
       ),
     );
-    const [zeile] = await admin.client<{ first_name: string }[]>`
+    const [row] = await admin.client<{ first_name: string }[]>`
       select first_name from student where id = ${S.neu}`;
-    expect(zeile.first_name).toBe("Neu");
+    expect(row.first_name).toBe("Neu");
   });
 
   test("dasselbe Kind entsteht kein zweites Mal", async () => {
-    const fehler = await runWithActor(app.db, student(S.neu), (tx) =>
+    const error = await runWithActor(app.db, student(S.neu), (tx) =>
       tx.execute(
         sql`insert into student (id, first_name, grade_level) values (${S.neu}, 'Nochmal', 7)`,
       ),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/duplicate key|student_pkey/i);
+    expect(errorChain(error)).toMatch(/duplicate key|student_pkey/i);
   });
 
   test("niemand legt ein Kind an, auf das der eigene Kontext nicht zeigt", async () => {
     const fremd = "bb110000-0000-4000-8000-0000000000ee";
-    const fehler = await runWithActor(app.db, student(S.neu), (tx) =>
+    const error = await runWithActor(app.db, student(S.neu), (tx) =>
       tx.execute(
         sql`insert into student (id, first_name, grade_level) values (${fremd}, 'Fremd', 7)`,
       ),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
   // --- Sichtbarkeit --------------------------------------------------------
 
   test("ein Kind sieht nur sich selbst – Geschwister nicht", async () => {
-    const zeilen = await runWithActor(app.db, student(S.mia), (tx) =>
+    const rows = await runWithActor(app.db, student(S.mia), (tx) =>
       tx.execute<{ first_name: string }>(sql`select first_name from student`),
     );
-    expect(zeilen.map((r) => r.first_name)).toEqual(["Mia"]);
+    expect(rows.map((r) => r.first_name)).toEqual(["Mia"]);
   });
 
   test("ein Kind sieht, wer mit ihm verknüpft ist", async () => {
-    const zeilen = await runWithActor(app.db, student(S.mia), (tx) =>
+    const rows = await runWithActor(app.db, student(S.mia), (tx) =>
       tx.execute<{ name: string }>(sql`select name from parent_account`),
     );
-    expect(zeilen.map((r) => r.name)).toEqual(["Elternteil Eins"]);
+    expect(rows.map((r) => r.name)).toEqual(["Elternteil Eins"]);
   });
 
   test("ein unverknüpftes Kind sieht kein Elternkonto und arbeitet trotzdem", async () => {
@@ -155,10 +155,10 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
   });
 
   test("ein Elternteil sieht das gewählte Kind, nicht das Geschwister daneben", async () => {
-    const zeilen = await runWithActor(app.db, parent(P.one, S.mia), (tx) =>
+    const rows = await runWithActor(app.db, parent(P.one, S.mia), (tx) =>
       tx.execute<{ first_name: string }>(sql`select first_name from student`),
     );
-    expect(zeilen.map((r) => r.first_name)).toEqual(["Mia"]);
+    expect(rows.map((r) => r.first_name)).toEqual(["Mia"]);
   });
 
   // --- Die Anmeldeschleuse für den Eltern-Login ----------------------------
@@ -166,19 +166,19 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
   test("die Auth-ID gibt das eigene Konto und beide Kinder frei – mehr nicht", async () => {
     const sicht = await runWithLoginKey(app.db, "tutr.auth_user_id", P.authOne, async (tx) => ({
       konten: await tx.execute<{ name: string }>(sql`select name from parent_account`),
-      kinder: await tx.execute<{ first_name: string }>(
+      students: await tx.execute<{ first_name: string }>(
         sql`select first_name from student order by first_name`,
       ),
     }));
     expect(sicht.konten.map((r) => r.name)).toEqual(["Elternteil Eins"]);
-    expect(sicht.kinder.map((r) => r.first_name)).toEqual(["Ben", "Mia"]);
+    expect(sicht.students.map((r) => r.first_name)).toEqual(["Ben", "Mia"]);
   });
 
   test("ein unverknüpftes Elternteil sieht kein Kind", async () => {
-    const kinder = await runWithLoginKey(app.db, "tutr.auth_user_id", P.authTwo, (tx) =>
+    const students = await runWithLoginKey(app.db, "tutr.auth_user_id", P.authTwo, (tx) =>
       tx.execute(sql`select 1 from student`),
     );
-    expect(kinder).toHaveLength(0);
+    expect(students).toHaveLength(0);
   });
 
   test("die Anmeldeschleuse darf nicht schreiben", async () => {
@@ -187,9 +187,9 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
     await runWithLoginKey(app.db, "tutr.auth_user_id", P.authOne, (tx) =>
       tx.execute(sql`update parent_account set name = 'gekapert'`),
     );
-    const [zeile] = await admin.client<{ name: string }[]>`
+    const [row] = await admin.client<{ name: string }[]>`
       select name from parent_account where id = ${P.one}`;
-    expect(zeile.name).toBe("Elternteil Eins");
+    expect(row.name).toBe("Elternteil Eins");
   });
 
   // --- Der Beitritt: die wichtigste Bedingung ------------------------------
@@ -201,43 +201,43 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
             values (${P.two}, ${S.lea}, now())`,
       ),
     );
-    const zeilen = await admin.client`
+    const rows = await admin.client`
       select 1 from parent_student where parent_account_id = ${P.two} and student_id = ${S.lea}`;
-    expect(zeilen).toHaveLength(1);
+    expect(rows).toHaveLength(1);
     await admin.client`delete from parent_student where parent_account_id = ${P.two}`;
   });
 
   test("ein Elternteil verknüpft sich NICHT mit einem fremden Kind", async () => {
     // Elternteil Zwei kennt Mias ID, aber Mia hat eine andere Adresse
     // hinterlegt. Ohne app.parent_may_link() wäre der Beitritt ein Einfallstor.
-    const fehler = await runWithActor(app.db, parent(P.two, S.mia), (tx) =>
+    const error = await runWithActor(app.db, parent(P.two, S.mia), (tx) =>
       tx.execute(
         sql`insert into parent_student (parent_account_id, student_id) values (${P.two}, ${S.mia})`,
       ),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
 
-    const zeilen = await admin.client`
+    const rows = await admin.client`
       select 1 from parent_student where parent_account_id = ${P.two} and student_id = ${S.mia}`;
-    expect(zeilen).toHaveLength(0);
+    expect(rows).toHaveLength(0);
   });
 
   test("ein Elternteil verknüpft kein Kind mit einem fremden Konto", async () => {
-    const fehler = await runWithActor(app.db, parent(P.two, S.lea), (tx) =>
+    const error = await runWithActor(app.db, parent(P.two, S.lea), (tx) =>
       tx.execute(
         sql`insert into parent_student (parent_account_id, student_id) values (${P.one}, ${S.lea})`,
       ),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
   test("ein Kind verknüpft sich nicht selbst", async () => {
-    const fehler = await runWithActor(app.db, student(S.lea), (tx) =>
+    const error = await runWithActor(app.db, student(S.lea), (tx) =>
       tx.execute(
         sql`insert into parent_student (parent_account_id, student_id) values (${P.two}, ${S.lea})`,
       ),
     ).catch((err: unknown) => err);
-    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
+    expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
   // --- Löschen (Vorbereitung F-06e) ---------------------------------------
@@ -248,8 +248,8 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
       values ('aa110000-0000-4000-8000-00000000000d', gen_random_uuid(), 'weg@example.test', 'Weg')`;
     await admin.client`delete from parent_account where id = 'aa110000-0000-4000-8000-00000000000d'`;
 
-    const kinder = await admin.client`select 1 from student where id in (${S.mia}, ${S.ben})`;
-    expect(kinder).toHaveLength(2);
+    const students = await admin.client`select 1 from student where id in (${S.mia}, ${S.ben})`;
+    expect(students).toHaveLength(2);
   });
 
   test("das Löschen eines Kindes nimmt seine Verknüpfung mit, nicht die des Geschwisters", async () => {
