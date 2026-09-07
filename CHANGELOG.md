@@ -4,6 +4,17 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Changed
+
+- **Das Kind ist der Mandant** (F-11, ADR 0006). `family` und `parent_user` entfallen, `family_id` verschwindet aus allen 14 Tabellen; an ihre Stelle treten `student` (Mandant), `parent_account` (Identität und späterer Abo-Anker) und `parent_student` (Beziehung, Einwilligung je Kind). Auslöser war die Frage, was passiert, wenn zwei Kinder dieselbe Elternadresse eintragen – im Container-Modell landen sie in zwei Familien, und ein Elternkonto konnte strukturell nur in einer sein. Nachgemessen trugen 8 der 14 Tabellen ohnehin schon `student_id` neben `family_id`
+- Die Policies werden dadurch **kürzer**: Vorher unterschieden sich die Rollen darin, welche Spalte sie vergleichen, und Kind-Policies brauchten zusätzlich `student_id = app.student_id()`. Jetzt vergleichen beide dieselbe Spalte, und die Rolle entscheidet nur über lesen oder schreiben. Der Actor trägt dafür immer eine `studentId` – auch als Elternteil, denn eine Elternansicht zeigt ein Kind zur Zeit
+- **Gegenseitige Rekursion zwischen zwei Policies**, gefunden vom ersten Testlauf gegen die echte Datenbank: Die Policy auf `parent_account` las `parent_student`, deren Policy wieder `parent_account` – Postgres bricht mit „infinite recursion detected in policy" ab. Gelöst über `security definer`-Helfer, die eine Beziehung auflösen, ohne erneut durch RLS zu gehen; jeder ist auf genau eine Frage beschränkt und gibt nur IDs zurück
+- **Der Elternbeitritt wäre ein Einfallstor gewesen.** `parent_account_id = app.parent_id()` prüft nur die eigene Seite der Beziehung – ein angemeldetes Elternteil hätte sich mit einem beliebigen Kind verknüpfen können, wenn es dessen UUID kennt. `app.parent_may_link()` verlangt jetzt, dass die von Supabase **bestätigte** Adresse des Kontos die ist, die das Kind selbst hinterlegt hat. In der Datenbank, nicht im Anwendungscode; ein Test reproduziert den Angriff
+- Ein Login legt nichts mehr an. Vorher entstand bei jedem ersten Eltern-Login eine Familie – seit ADR 0005 wären das leere Geisterdaten neben den echten. Ein angemeldetes Elternteil ohne verknüpftes Kind sieht jetzt einen leeren Zustand statt einer Umleitung auf die Anmeldeseite, auf der es sich ja gerade angemeldet hat
+- **Migrationshistorie einmalig zurückgesetzt** (ADR 0006 D9): drei Migrationen werden zu einer `0000`, beide Datenbanken frisch aufgebaut. Zulässig, weil nachgemessen: ausschließlich Seed-Daten, 0 Passkeys, 0 Sessions, kein Deploy. Die CLAUDE.md-Regel ist geschärft statt gebrochen – **ab dem ersten Deploy (D-01) nie wieder**
+- Bezeichner in Schema, Policies und Tests durchgängig englisch (ADR 0006 D10). Die Regel gab es seit ADR 0004 D8, sie stand nur im Daten-ADR und nie in `CLAUDE.md` – deshalb ist die Anwendungsschicht deutsch gewachsen. Sie steht jetzt in `CLAUDE.md`; der Rest der Anwendung folgt als F-12
+- Policy-Dateien neu geschnitten (6 → 4), `zeitstempel` liegt statt viermal einmal in `columns.ts`, `ADR 0004` trägt einen Überholungshinweis auf D1–D4
+
 ### Added
 
 - Anmeldung des Kindes (F-06): Selbstanlage des Profils, Passkey-Registrierung, Einwilligungsmail an die Eltern, rollierende Session über 30 Tage. `/registrieren` fragt Vorname, Jahrgang und Elternadresse; danach ist die App sofort nutzbar. Wiederkommen ist ein Tipp auf „Mit Face ID anmelden" – ohne Benutzername, ohne E-Mail
