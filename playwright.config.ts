@@ -12,10 +12,21 @@ export default defineConfig({
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {
-    command: "npm run build && npm run start",
+    // Entwicklungsserver, nicht Produktions-Build. Grund: Ab F-05 verlangt der
+    // Proxy eine Anmeldung, und in Produktion ist der Dev-Actor hart aus – ein
+    // produktiver Server würde jeden Test auf /anmelden umleiten. Eine echte
+    // Anmeldung im Test bräuchte serverseitig erzeugte Magic Links und
+    // zusätzliche CI-Secrets; das ist als eigenes Ticket vermerkt (F-10).
+    // Build-Fehler fängt weiterhin der eigene `npm run build`-Schritt in CI.
+    command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
-    env: { SKIP_ENV_VALIDATION: "1", NEXT_TELEMETRY_DISABLED: "1" },
+    env: {
+      SKIP_ENV_VALIDATION: "1",
+      NEXT_TELEMETRY_DISABLED: "1",
+      // Tests melden sich noch nicht echt an – siehe F-10.
+      TUTR_E2E_ACTOR: "parent",
+    },
   },
 });
