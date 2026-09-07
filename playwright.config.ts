@@ -22,6 +22,11 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
-    env: { SKIP_ENV_VALIDATION: "1", NEXT_TELEMETRY_DISABLED: "1" },
+    env: {
+      SKIP_ENV_VALIDATION: "1",
+      NEXT_TELEMETRY_DISABLED: "1",
+      // Tests melden sich noch nicht echt an – siehe F-10.
+      TUTR_E2E_ACTOR: "parent",
+    },
   },
 });

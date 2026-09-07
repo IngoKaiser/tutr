@@ -2,42 +2,52 @@ import { cookies } from "next/headers";
 
 import type { Actor } from "@/db/actor";
 import { SEED_IDS } from "@/db/seed-ids";
-import { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
-/**
- * Platzhalter-Actor für die Entwicklung, bis F-05 (Auth Eltern) und F-06
- * (Auth Kind) echte Sessions liefern.
- *
- * Die App-Shell muss wissen, *ob* gerade ein Elternteil oder ein Kind vor ihr
- * sitzt – nicht, *wie* es sich angemeldet hat. Genau diese Lücke füllt der
- * Dev-Actor, und nur sie.
- *
- * Sicherheitsgrenze: In Produktion gibt es ihn nicht. `devActorEnabled()` ist
- * die einzige Stelle, die das entscheidet, und sie prüft `NODE_ENV` – kein
- * Feature-Flag, kein Cookie, nichts, was sich von außen setzen ließe.
- */
+import { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
 export { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
-export function devActorEnabled(): boolean {
+/**
+ * Zwei getrennte Dinge, die vorher eines waren:
+ *
+ * 1. **Test-Umgehung** (`TUTR_E2E_ACTOR`): verzichtet auf die Anmeldung.
+ *    Ausschließlich für Playwright, bis F-10 die Tests echt anmelden kann.
+ *    Zwei Bedingungen müssen zutreffen – nicht Produktion *und* die Variable
+ *    gesetzt. In Produktion existiert sie nicht.
+ *
+ * 2. **Ansichts-Umschalter** (Cookie): setzt eine *echte* Anmeldung voraus
+ *    und wechselt nur die Sicht. Ein angemeldetes Elternteil kann so die
+ *    Kind-Ansicht der eigenen Familie sehen, solange F-06 fehlt und ein Kind
+ *    sich noch gar nicht anmelden kann.
+ *
+ * Der Unterschied ist wichtig: Die Tür verlangt jetzt auch beim Entwickeln
+ * eine Anmeldung. Nur die Rolle dahinter ist wählbar.
+ */
+
+function nichtProduktion(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
-export function actorFor(rolle: DevRole): Actor {
+/** Nur für Playwright. Umgeht die Anmeldung – deshalb doppelt abgesichert. */
+export function e2eActor(): Actor | null {
+  if (!nichtProduktion()) return null;
+
+  const rolle = process.env.TUTR_E2E_ACTOR;
+  if (rolle !== "parent" && rolle !== "student") return null;
+
   return rolle === "parent"
     ? { role: "parent", familyId: SEED_IDS.familieA, userId: SEED_IDS.elternteilA }
     : { role: "student", familyId: SEED_IDS.familieA, studentId: SEED_IDS.kindA };
 }
 
-/**
- * Der aktuelle Actor. Gibt in Produktion `null` zurück – dort übernehmen
- * F-05/F-06. Aufrufer müssen den Fall behandeln, statt einen Actor anzunehmen.
- */
-export async function currentActor(): Promise<Actor | null> {
-  if (!devActorEnabled()) return null;
+/** Ist der Ansichts-Umschalter verfügbar? */
+export function umschalterVerfuegbar(): boolean {
+  return nichtProduktion();
+}
 
+/** Welche Ansicht ist gewählt? Ohne Cookie: die eigene Rolle, also Eltern. */
+export async function gewaehlteAnsicht(): Promise<DevRole> {
+  if (!umschalterVerfuegbar()) return "parent";
   const store = await cookies();
-  const wert = store.get(DEV_ACTOR_COOKIE)?.value;
-  // Voreinstellung Kind: Sie ist die Hauptnutzerin, Eltern schauen nur zu.
-  return actorFor(wert === "parent" ? "parent" : "student");
+  return store.get(DEV_ACTOR_COOKIE)?.value === "student" ? "student" : "parent";
 }

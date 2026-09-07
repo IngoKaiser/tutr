@@ -15,10 +15,10 @@ export function ActorSwitch({ aktuell }: { aktuell: DevRole }) {
 
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="text-tinte-leise">Dev-Ansicht</span>
+      <span className="text-tinte-leise">Ansicht</span>
       <div
         role="group"
-        aria-label="Rolle für die Entwicklung"
+        aria-label="Ansicht wechseln"
         className="border-linie-stark flex overflow-hidden rounded-md border"
       >
         {(["student", "parent"] as const).map((r) => (

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { e2eActor } from "@/lib/dev-actor";
 import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
 
 /**
@@ -18,6 +19,11 @@ import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
  */
 export async function proxy(request: NextRequest) {
   let antwort = NextResponse.next({ request });
+  // Playwright meldet sich noch nicht echt an (F-10) – bis dahin diese
+  // Umgehung, die es außerhalb der Produktion und nur mit gesetzter
+  // Umgebungsvariable gibt.
+  if (e2eActor()) return antwort;
+
   const konfiguration = supabaseKonfiguration();
   const produktiv = process.env.NODE_ENV === "production";
 
@@ -52,9 +58,9 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // In der Entwicklung übernimmt der Dev-Actor, solange F-06 fehlt – sonst
-  // käme man ohne Elternkonto gar nicht in die App.
-  if (!user && produktiv) {
+  // Anmeldung ist die Tür – in jeder Umgebung. Der Ansichts-Umschalter für
+  // die Kind-Sicht sitzt dahinter, nicht davor.
+  if (!user) {
     const ziel = request.nextUrl.clone();
     ziel.pathname = "/anmelden";
     ziel.searchParams.set("weiter", request.nextUrl.pathname);

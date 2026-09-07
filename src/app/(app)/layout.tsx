@@ -6,7 +6,7 @@ import { BottomNav } from "@/components/shell/bottom-nav";
 import { anmeldeStatus } from "@/lib/auth/actor";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { actor, email, istDevActor } = await anmeldeStatus();
+  const { actor, email, umschalter, ansicht } = await anmeldeStatus();
 
   // Der Proxy leitet bereits um; das hier ist die zweite Sicherung für den
   // Fall, dass eine Route am Matcher vorbeiläuft. Die dritte und eigentliche
@@ -26,14 +26,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="text-koenigsblau text-lg font-bold tracking-tight">tutr</span>
 
           <div className="flex items-center gap-3">
-            {istDevActor ? (
-              <ActorSwitch aktuell={actor.role} />
-            ) : (
+            {umschalter ? <ActorSwitch aktuell={ansicht} /> : null}
+            {email ? (
               <>
-                <span
-                  className="text-tinte-leise max-w-[12rem] truncate text-xs"
-                  title={email ?? ""}
-                >
+                <span className="text-tinte-leise max-w-[10rem] truncate text-xs" title={email}>
                   {email}
                 </span>
                 <form action={abmeldenUndZurueck}>
@@ -45,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   </button>
                 </form>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
