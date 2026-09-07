@@ -21,7 +21,7 @@
     "db:studio": "drizzle-kit studio",
     "db:check": "RUN_DB_TESTS=1 vitest run src/db/connection.test.ts",
     "prepare": "husky",
-    "db:test": "RUN_DB_TESTS=1 vitest run src/db",
+    "db:test": "RUN_DB_TESTS=1 vitest run src/db --no-file-parallelism",
     "db:doctor": "node scripts/db-doctor.mts",
     "db:migrate:test": "node scripts/db-apply.mts --test",
     "db:seed": "node scripts/db-seed.mts"

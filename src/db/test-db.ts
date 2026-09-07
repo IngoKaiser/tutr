@@ -6,6 +6,12 @@ import postgres from "postgres";
  *
  * Der Wächter unten ist der Grund, warum diese Datei existiert: ein Testlauf
  * gegen das Produktivprojekt wäre nicht zu reparieren.
+ *
+ * `npm run db:test` läuft bewusst mit `--no-file-parallelism`. Alle
+ * Testdateien teilen sich *eine* Datenbank und legen Familien an und wieder
+ * weg; parallel laufen sie in Sperrkonflikte, die als Zeitüberschreitung
+ * erscheinen – in CI eher als lokal, weil dort langsamer. Parallelität bringt
+ * hier ohnehin nichts, weil die Datenbank der Engpass ist.
  */
 function projectRef(url: string): string | null {
   const match = /:\/\/[^:@/]*?\.?([a-z0-9]{20})[:@.]/.exec(url);
