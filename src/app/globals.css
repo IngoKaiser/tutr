@@ -1,26 +1,134 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Designsprache tutr: „Traut dir was zu und bringt dich weiter."
+ * Königsblau auf Karopapier – Material aus der Schulwelt statt aus einem
+ * Designtrend. Kein Rot: die Korrekturfarbe ist emotional besetzt.
+ *
+ * Akzent (Königsblau) heißt *bedienbar*, nie „gut".
+ * Semantik (sicher/offen) heißt *Zustand*, nie „bedienbar".
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --papier: #f5f6f3;
+  --papier-tief: #ebede8;
+  --karo: #d8dcd5;
+  --flaeche: #fdfdfc;
+
+  --tinte: #16203a;
+  --tinte-weich: #56607a;
+  --tinte-leise: #838c9f;
+
+  --linie: #dde0da;
+  --linie-stark: #c3c8bf;
+
+  --koenigsblau: #2b4ba3;
+  --koenigsblau-hell: #e6eaf6;
+  --auf-koenigsblau: #ffffff;
+
+  --sicher: #2f8368;
+  --sicher-hell: #dcefe6;
+  --offen: #b4791c;
+  --offen-hell: #f9ebd4;
+
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --papier: #12151c;
+    --papier-tief: #0d1016;
+    --karo: #1d222c;
+    --flaeche: #181c25;
+
+    --tinte: #e8ebf2;
+    --tinte-weich: #a3abbc;
+    --tinte-leise: #757e90;
+
+    --linie: #262c38;
+    --linie-stark: #38404f;
+
+    --koenigsblau: #8aa5e8;
+    --koenigsblau-hell: #1b2440;
+    --auf-koenigsblau: #10141f;
+
+    --sicher: #86bbaa;
+    --sicher-hell: #172723;
+    --offen: #d0a55f;
+    --offen-hell: #2a2216;
+
+    color-scheme: dark;
   }
 }
 
+:root[data-theme="dark"] {
+  --papier: #12151c;
+  --papier-tief: #0d1016;
+  --karo: #1d222c;
+  --flaeche: #181c25;
+
+  --tinte: #e8ebf2;
+  --tinte-weich: #a3abbc;
+  --tinte-leise: #757e90;
+
+  --linie: #262c38;
+  --linie-stark: #38404f;
+
+  --koenigsblau: #8aa5e8;
+  --koenigsblau-hell: #1b2440;
+  --auf-koenigsblau: #10141f;
+
+  --sicher: #86bbaa;
+  --sicher-hell: #172723;
+  --offen: #d0a55f;
+  --offen-hell: #2a2216;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-papier: var(--papier);
+  --color-papier-tief: var(--papier-tief);
+  --color-karo: var(--karo);
+  --color-flaeche: var(--flaeche);
+
+  --color-tinte: var(--tinte);
+  --color-tinte-weich: var(--tinte-weich);
+  --color-tinte-leise: var(--tinte-leise);
+
+  --color-linie: var(--linie);
+  --color-linie-stark: var(--linie-stark);
+
+  --color-koenigsblau: var(--koenigsblau);
+  --color-koenigsblau-hell: var(--koenigsblau-hell);
+  --color-auf-koenigsblau: var(--auf-koenigsblau);
+
+  --color-sicher: var(--sicher);
+  --color-sicher-hell: var(--sicher-hell);
+  --color-offen: var(--offen);
+  --color-offen-hell: var(--offen-hell);
+
+  --font-sans: var(--font-familjen), "Helvetica Neue", Arial, sans-serif;
+  --font-lese: var(--font-newsreader), Georgia, "Times New Roman", serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--papier);
+  /* Karopapier – so leise, dass es Inhalt nicht stört. */
+  background-image:
+    linear-gradient(var(--karo) 1px, transparent 1px),
+    linear-gradient(90deg, var(--karo) 1px, transparent 1px);
+  background-size: 26px 26px;
+  color: var(--tinte);
+}
+
+/* Konzept §15: keine Bewegung ohne Grund, und nie gegen den Wunsch der Nutzerin. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
