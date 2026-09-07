@@ -52,7 +52,7 @@ export const parentUser = pgTable(
 );
 
 /**
- * Kind-Profil, pseudonym: nur Vorname, Jahrgang, Klasse. Kein Geburtsdatum,
+ * Kind-Profil, pseudonym: nur Vorname, Jahrgangsstufe, Klasse. Kein Geburtsdatum,
  * keine E-Mail, keine Schul-ID (Konzept §11, ADR 0002).
  *
  * Der Jahrgang steht hier nur als Startwert für das Onboarding – die
@@ -63,9 +63,9 @@ export const student = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     familyId: uuid("family_id").notNull(),
-    vorname: text("vorname").notNull(),
-    jahrgang: integer("jahrgang").notNull(),
-    klasse: text("klasse"),
+    firstName: text("first_name").notNull(),
+    gradeLevel: integer("grade_level").notNull(),
+    className: text("class_name"),
     ...zeitstempel,
   },
   (t) => [

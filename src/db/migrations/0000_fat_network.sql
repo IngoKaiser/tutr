@@ -20,9 +20,9 @@ CREATE TABLE "parent_user" (
 CREATE TABLE "student" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"family_id" uuid NOT NULL,
-	"vorname" text NOT NULL,
-	"jahrgang" integer NOT NULL,
-	"klasse" text,
+	"first_name" text NOT NULL,
+	"grade_level" integer NOT NULL,
+	"class_name" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "student_id_family_id_key" UNIQUE("id","family_id")

@@ -13,7 +13,7 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 
 ## Domänenregeln (nicht verhandelbar)
 
-- Kernkette: Family → Student → SchoolYear → Subject → Thema → LearningObjective. Karten, Vokabeln, Reviews und Mastery hängen an LearningObjective/Student, **nie** an SchoolYear.
+- Kernkette: Family → Student → SchoolYear → Subject → Topic → LearningObjective. Karten, Vokabeln, Reviews und Mastery hängen an LearningObjective/Student, **nie** an SchoolYear.
 - Eltern sehen Termine, Mastery, Noten, Zusammenfassungen – **nie** `tutor_sessions`. Das wird in RLS erzwungen, nicht nur in der UI.
 - Hausaufgaben-Tutor: keine Lösung vor zwei dokumentierten Versuchen; Hinweisleiter §4a einhalten; Fachtabelle §4a beachten.
 - Wissensschichten: eigenes Material > Lehrwerk > Kurrikulum-Pack > Allgemeinwissen. Der Tutor benennt die Quelle. Prüfungen nur aus Schicht 1+2.

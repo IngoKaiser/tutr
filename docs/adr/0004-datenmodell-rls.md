@@ -92,14 +92,14 @@ Dasselbe Muster erzwingt „ein Thema gehört zu genau einem Fach; eine Prüfung
 
 ```sql
 subject (id pk, student_id, unique (id, student_id))
-thema   (id pk, subject_id, student_id, school_year_id,
+topic   (id pk, subject_id, student_id, school_year_id,
          foreign key (subject_id, student_id) references subject (id, student_id),
          unique (id, subject_id))
 calendar_event (id pk, subject_id, unique (id, subject_id))
-calendar_event_thema (
-  event_id, thema_id, subject_id, primary key (event_id, thema_id),
+calendar_event_topic (
+  event_id, topic_id, subject_id, primary key (event_id, topic_id),
   foreign key (event_id, subject_id) references calendar_event (id, subject_id),
-  foreign key (thema_id,  subject_id) references thema (id, subject_id))
+  foreign key (topic_id,  subject_id) references topic (id, subject_id))
 ```
 
 Ein Insert mit fachfremdem Thema scheitert an der Datenbank. Der Test in P-01 prüft genau diesen Fehlerfall.
@@ -117,13 +117,13 @@ RLS-Matrix (Kurzfassung, Detail in `src/db/policies/`):
 | Tabellengruppe                                                  | Elternteil        | Kind                     |
 | --------------------------------------------------------------- | ----------------- | ------------------------ |
 | `family`, `student`, `school_year`, `subject`, `school_profile` | lesen + schreiben | lesen                    |
-| `thema`, `learning_objective`, `material`                       | lesen             | lesen + schreiben        |
+| `topic`, `learning_objective`, `material`                       | lesen             | lesen + schreiben        |
 | `card`, `review`, `vocab_*`, `objective_mastery`                | lesen             | lesen + schreiben        |
 | `calendar_event`, `study_plan_slot`                             | lesen + schreiben | lesen + schreiben        |
 | `exam`, `exam_attempt`                                          | Ergebnis lesen    | lesen + schreiben        |
 | `tutor_session`, `tutor_message`                                | **kein Zugriff**  | eigene lesen + schreiben |
 | `tutor_session_summary`, `homework_task`                        | lesen             | lesen + schreiben        |
-| `curriculum_pack`, `curriculum_node`, `lehrwerk`, `kapitel`     | lesen             | lesen                    |
+| `curriculum_pack`, `curriculum_node`, `textbook`, `chapter`     | lesen             | lesen                    |
 
 Kind-Policies filtern zusätzlich auf `student_id = app.student_id()`, damit Geschwisterprofile getrennt bleiben.
 
@@ -131,17 +131,17 @@ Kind-Policies filtern zusätzlich auf `student_id = app.student_id()`, damit Ges
 
 §8 skizziert `lernzielIds`, `materialIds`, `themaIds` als Arrays. Arrays haben keine referenzielle Integrität, kein `on delete`, und RLS greift nicht auf Elemente.
 
-- **Join-Tabellen** für alle n:m-Beziehungen: `material_objective`, `calendar_event_thema`, `vocab_set_item`, `objective_prerequisite` (Vorläufer, Selbstreferenz), `school_year_textbook` (ersetzt `lehrwerke{fach→id}`).
+- **Join-Tabellen** für alle n:m-Beziehungen: `material_objective`, `calendar_event_topic`, `vocab_set_item`, `objective_prerequisite` (Vorläufer, Selbstreferenz), `school_year_textbook` (ersetzt `lehrwerke{fach→id}`).
 - **JSONB** nur dort, wo die Struktur wirklich offen ist: `card.fsrs_state`, `exam.aufgaben`, `exam.rubrik`, `calendar_event_change.diff`, `import_batch.rohdaten`. Jedes JSONB-Feld bekommt ein Zod-Schema in `src/ai/schemas/` bzw. `src/db/types/`, das beim Lesen validiert.
-- **Mastery ist abgeleitet**, kein Handfeld: Tabelle `objective_mastery (student_id, objective_id, abdeckung, sicherheit, berechnet_am)` als Cache einer reinen Funktion über Reviews/Checks/Prüfungen. Neuberechnung explizit, nie inkrementell im Request.
+- **Mastery ist abgeleitet**, kein Handfeld: Tabelle `objective_mastery (student_id, objective_id, coverage, confidence, computed_at)` als Cache einer reinen Funktion über Reviews/Checks/Prüfungen. Neuberechnung explizit, nie inkrementell im Request.
 
-## D6 · Zeitscheibe endet bei Thema
+## D6 · Zeitscheibe endet bei Topic
 
-`school_year_id` steht ausschließlich auf `thema`, `calendar_event`, `study_plan_slot` und `school_year_textbook`. `card`, `review`, `vocab_*`, `objective_mastery` haben diese Spalte **nicht** – §9 wird damit strukturell erzwungen statt per Konvention. `subject` hängt am Schüler, nicht am Schuljahr (Französisch bleibt Französisch), `thema` hängt an beidem.
+`school_year_id` steht ausschließlich auf `topic`, `calendar_event`, `study_plan_slot` und `school_year_textbook`. `card`, `review`, `vocab_*`, `objective_mastery` haben diese Spalte **nicht** – §9 wird damit strukturell erzwungen statt per Konvention. `subject` hängt am Schüler, nicht am Schuljahr (Französisch bleibt Französisch), `topic` hängt an beidem.
 
 ## D7 · Referenzdaten: eine Tabelle, `family_id` nullable
 
-`curriculum_pack`, `curriculum_node`, `lehrwerk`, `kapitel`, `school_profile` gibt es in zwei Ausprägungen: kuratiert (`family_id is null`, per Seed/Migration mit dem Secret-Key geschrieben) und selbst angelegt (Foto vom Inhaltsverzeichnis → familieneigenes Lehrwerk). Eine Policy deckt beides:
+`curriculum_pack`, `curriculum_node`, `textbook`, `chapter`, `school_profile` gibt es in zwei Ausprägungen: kuratiert (`family_id is null`, per Seed/Migration mit dem Secret-Key geschrieben) und selbst angelegt (Foto vom Inhaltsverzeichnis → familieneigenes Lehrwerk). Eine Policy deckt beides:
 
 ```sql
 using (family_id is null or family_id = app.family_id())
@@ -152,14 +152,14 @@ Schreibrechte nur auf Zeilen mit eigener `family_id`. Kuratierte Zeilen sind fü
 ## D8 · Schlüssel, Enums, Zeit, Namen
 
 - **PK:** `uuid` mit `default gen_random_uuid()` (auf PG 17.6 ohne `pgcrypto` verfügbar, gemessen). `uuidv7()` gibt es dort noch nicht (PG 18) – die Indexlokalität ist bei einer Familie ohnehin irrelevant.
-- **Enums:** `pgEnum` für Domänenvokabular (`niveau`, `pfad_stufe`, `thema_status`, `material_art`, `event_typ`, `card_type`, `actor_role`). Die TS-Konstante ist die einzige Quelle, das Zod-Schema wird daraus abgeleitet. Werte in deutscher Domänensprache, ASCII (`erhoeht`, nicht `erhöht`).
+- **Enums:** `pgEnum` für Domänenvokabular (`level`, `pathway_stage`, `topic_status`, `material_type`, `event_type`, `card_type`, `actor_role`). Die TS-Konstante ist die einzige Quelle, das Zod-Schema wird daraus abgeleitet. Enum-_Namen_ englisch wie alle Identifier, Enum-_Werte_ deutsche Domänensprache, ASCII (`erhoeht`, nicht `erhöht`) – siehe Namen-Punkt unten.
 - **Zeit:** durchgängig `timestamptz`; reine Kalendertage (`calendar_event.datum`) als `date`. `created_at`/`updated_at` überall, `updated_at` per Drizzle `$onUpdate`, keine Trigger.
-- **Namen:** Tabellen/Spalten snake_case, Entitätsnamen 1:1 aus §8 (`thema` bleibt deutsch – „topic" ist im Kurrikulum-Pack bereits anders belegt). UI-Texte deutsch, Identifier ansonsten englisch.
+- **Namen:** Tabellen/Spalten snake_case, **durchgängig englisch übersetzt** aus den deutschen Feldnamen in §8 (`jahrgang`→`grade_level`, `titel`→`title`, `quelle`→`source` usw.) – auch `thema` wird zu `topic`. Ursprünglich war geplant, `thema` als einzigen deutschen Tabellennamen zu behalten, mit der Begründung, „topic" sei im Kurrikulum-Pack bereits anders belegt – das stimmt nicht (§8 kennt kein „topic"), die Begründung war ein Fehler. Konsequent englische Identifier sind einfacher zu lernen und zu grep(pe)n als eine Mischung mit einer einzigen Ausnahme. **Domänen-_Werte_ bleiben davon unberührt** und sind weiterhin deutsche ASCII-Enum-Werte (`erhoeht`, `regel`, `grundlegend` – CLAUDE.md-Kernkette, App-Sprache Deutsch). UI-Texte deutsch, Identifier englisch – Prosa in Doku und Tickets bleibt deutsch.
 - **Löschen:** `on delete cascade` nur entlang `family → student → …`. `learning_objective → card` ist `restrict`: ein gelöschtes Lernziel darf keine Lernhistorie mitnehmen. Kein Soft-Delete außer wo das Konzept es verlangt (`calendar_event.status = 'abgesagt'` + `calendar_event_change`).
 
 ## D9 · Policies versionieren und testen
 
-- Policies bleiben handgeschriebenes SQL in `src/db/policies/<tabelle>.sql` (CLAUDE.md), **idempotent** (`drop policy if exists` + `create policy`), angewandt von `scripts/db-apply-policies.ts`, aufgerufen von `npm run db:migrate`. `pgPolicy` in Drizzle wurde verworfen: die Policies sind ausdrucksstärker als das Drizzle-API und sollen im Review als SQL lesbar sein.
+- Policies bleiben handgeschriebenes SQL in `src/db/policies/<tabelle>.sql` (CLAUDE.md), **idempotent** (`drop policy if exists` + `create policy`), angewandt von `scripts/db-apply.mts` zusammen mit den Drizzle-Migrationen, aufgerufen von `npm run db:migrate`. `pgPolicy` in Drizzle wurde verworfen: die Policies sind ausdrucksstärker als das Drizzle-API und sollen im Review als SQL lesbar sein.
 - **Metatest** (Vitest, gegen eine Testdatenbank): jede Tabelle in `public` außer `__drizzle_migrations` hat `relrowsecurity = true` **und** mindestens eine Policy. Damit ist „neue Tabelle ohne Policy = Ticket nicht fertig" automatisch geprüft.
 - **Policy-Tests:** zwei Familien, zwei Geschwister, ein Elternteil im Seed; je Tabellengruppe ein Test „Familie B sieht nichts von Familie A", „Elternteil sieht `tutor_message` nicht", „Kind sieht Geschwisterkarten nicht", „ohne Actor-Kontext ist alles leer".
 
@@ -170,12 +170,12 @@ Schreibrechte nur auf Zeilen mit eigener `family_id`. Kuratierte Zeilen sind fü
 ```
 family · parent_user · student                        [F-04b]
 school_year · subject · school_year_textbook
-  · thema · learning_objective · objective_prerequisite  [F-04c]
-curriculum_pack · curriculum_node · lehrwerk · kapitel · school_profile  [F-04d]
+  · topic · learning_objective · objective_prerequisite  [F-04c]
+curriculum_pack · curriculum_node · textbook · chapter · school_profile  [F-04d]
 material · material_objective                          [M-01]
 card · review · objective_mastery                      [M-03]
 vocab_set · vocab_item · vocab_set_item                [V-01]
-calendar_event · calendar_event_thema · calendar_event_change · study_plan_slot  [K-01]
+calendar_event · calendar_event_topic · calendar_event_change · study_plan_slot  [K-01]
 exam · exam_attempt · exam_item_result                 [M6]
 tutor_session · tutor_message · tutor_session_summary · homework_task  [T-01]
 ```
@@ -219,7 +219,7 @@ Damit sind die Mechanismen aus D1 am realen Projekt bestätigt; offen bleibt nur
 | F-04a | DB-Rolle `tutr_app`, `app.*`-Helper, `withActor()`, Policy-Runner in `db:migrate`, RLS-Metatest, Test-DB-Setup           | –       | F-03         |
 | F-04b | Schema Familie/Identität: `family`, `parent_user`, `student` + Policies + Tests                                          | F-04    | F-04a        |
 | F-04c | Schema Schuljahr/Fach/Thema/Lernziel inkl. Fachbindungs-Constraint (D3) + Policies + Tests                               | F-04    | F-04b        |
-| F-04d | Schema Referenzdaten: `curriculum_pack`, `curriculum_node`, `lehrwerk`, `kapitel`, `school_profile` + Shared-Read-Policy | F-04    | F-04b        |
+| F-04d | Schema Referenzdaten: `curriculum_pack`, `curriculum_node`, `textbook`, `chapter`, `school_profile` + Shared-Read-Policy | F-04    | F-04b        |
 | F-04e | Seed-Skript `npm run db:seed`: zwei Familien, Kind Jg. 8, Fächer, ein Thema mit Lernzielen – Basis aller Policy-Tests    | F-04    | F-04c, F-04d |
 | F-04f | CLAUDE.md + `src/db/policies/README.md` um Actor-Regel und Tabellen-Checkliste ergänzen                                  | –       | F-04a        |
 
