@@ -4,7 +4,7 @@
 
 -- 1. Laufzeit-Rolle. NOBYPASSRLS ist der Kern der Entscheidung: verbindet die
 --    Anwendung als `postgres`, umgeht sie RLS vollständig und ein vergessener
---    withActor()-Aufruf sähe alle Familien statt keiner.
+--    withActor()-Aufruf sähe alle Mandanten statt keinen.
 do $$
 declare
   pw text := current_setting('tutr.bootstrap_password', true);
@@ -35,10 +35,13 @@ $$;
 --    sondern NULL – das ist die Fail-closed-Eigenschaft: jede Policy wird falsch.
 create schema if not exists app;
 
-create or replace function app.family_id() returns uuid
-  language sql stable
-  as $$ select nullif(current_setting('tutr.family_id', true), '')::uuid $$;
+-- Altlast aus dem Familienmodell (vor ADR 0006). Steht hier, damit eine
+-- bestehende Datenbank nicht eine Funktion behält, die keine Policy mehr
+-- aufruft – ein stiller Rest, den beim nächsten Lesen niemand einordnen kann.
+drop function if exists app.family_id();
 
+-- Der Mandantenschlüssel. Seit ADR 0006 vergleichen **beide** Rollen genau
+-- diese Spalte; die Rolle entscheidet nur noch über lesen oder schreiben.
 create or replace function app.student_id() returns uuid
   language sql stable
   as $$ select nullif(current_setting('tutr.student_id', true), '')::uuid $$;
@@ -46,6 +49,65 @@ create or replace function app.student_id() returns uuid
 create or replace function app.actor_role() returns text
   language sql stable
   as $$ select nullif(current_setting('tutr.actor_role', true), '') $$;
+
+-- Nur im Eltern-Kontext gesetzt. Wird gebraucht, wo das Elternkonto selbst
+-- Gegenstand ist (eigene Zeile, eigene Verknüpfungen).
+create or replace function app.parent_id() returns uuid
+  language sql stable
+  as $$ select nullif(current_setting('tutr.parent_id', true), '')::uuid $$;
+
+-- Die drei Anmeldeschleusen (ADR 0006 D3). Jede gibt über eine eigene
+-- Policy genau eine Zeile per select frei und sonst nichts.
+create or replace function app.auth_user_id() returns uuid
+  language sql stable
+  as $$ select nullif(current_setting('tutr.auth_user_id', true), '')::uuid $$;
+
+create or replace function app.credential_id() returns text
+  language sql stable
+  as $$ select nullif(current_setting('tutr.credential_id', true), '') $$;
+
+create or replace function app.session_token_hash() returns text
+  language sql stable
+  as $$ select nullif(current_setting('tutr.session_token_hash', true), '') $$;
+
+-- Die Beziehung parent_student aufzulösen, ohne dabei erneut durch RLS zu
+-- gehen. Ohne diese beiden Funktionen entsteht eine gegenseitige Rekursion:
+-- Die Policy auf parent_account läse parent_student, deren Policy läse
+-- parent_account, und Postgres bricht mit „infinite recursion detected in
+-- policy" ab. Beide sind auf genau eine Frage beschränkt und geben nur IDs
+-- zurück, keine Inhalte.
+create or replace function app.parents_of(p_student uuid) returns setof uuid
+  language sql stable security definer
+  set search_path = public, pg_temp
+  as $$ select parent_account_id from parent_student where student_id = p_student $$;
+
+create or replace function app.account_of_auth_user(p_auth uuid) returns uuid
+  language sql stable security definer
+  set search_path = public, pg_temp
+  as $$ select id from parent_account where auth_user_id = p_auth $$;
+
+-- Darf dieses Elternkonto sich mit diesem Kind verknüpfen?
+--
+-- `security definer`, weil die Prüfung `student` und `parent_account` lesen
+-- muss und RLS innerhalb einer Policy-Bedingung sonst genau das verhindert –
+-- die Bedingung wäre immer falsch. Die Funktion gehört der Migrationsrolle
+-- und ist auf diese eine Frage beschränkt.
+--
+-- Damit steht die Regel in der Datenbank statt im Anwendungscode: Verknüpfen
+-- darf sich nur, wessen **bestätigte** Adresse das Kind selbst hinterlegt hat.
+create or replace function app.parent_may_link(p_student uuid, p_parent uuid) returns boolean
+  language sql stable security definer
+  set search_path = public, pg_temp
+  as $$
+    select exists (
+      select 1
+      from student s
+      join parent_account pa on pa.id = p_parent
+      where s.id = p_student
+        and s.parent_email is not null
+        and lower(s.parent_email) = lower(pa.email)
+    )
+  $$;
 
 -- 3. Rechte. Tabellen gehören weiterhin dem Migrations-Nutzer; tutr_app darf
 --    Daten lesen und schreiben, aber nichts anlegen oder ändern.

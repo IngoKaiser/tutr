@@ -4,7 +4,7 @@ import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 import { cookies, headers } from "next/headers";
 
 import { withActor, type Actor } from "@/db/actor";
-import { family, student, studentCredential } from "@/db/schema";
+import { student, studentCredential } from "@/db/schema";
 import { challengeCookieName, challengeMaxAge, pruefeChallenge } from "@/lib/auth/challenge";
 import { registrierungsOptionen, pruefeRegistrierung } from "@/lib/auth/passkey";
 import { SESSION_COOKIE, sessionAnlegen, sessionCookieOptionen } from "@/lib/auth/student-session";
@@ -31,7 +31,7 @@ export type Profil = {
   elternMail: string;
 };
 
-type Gemerkt = Profil & { familyId: string; studentId: string };
+type Gemerkt = Profil & { studentId: string };
 
 export type StartErgebnis =
   { zustand: "bereit"; optionen: unknown } | { zustand: "fehler"; meldung: string };
@@ -63,11 +63,7 @@ export async function registrierungStarten(
   const profil = pruefeProfil(formData);
   if (typeof profil === "string") return { zustand: "fehler", meldung: profil };
 
-  const gemerkt: Gemerkt = {
-    ...profil,
-    familyId: crypto.randomUUID(),
-    studentId: crypto.randomUUID(),
-  };
+  const gemerkt: Gemerkt = { ...profil, studentId: crypto.randomUUID() };
 
   const { optionen, cookie } = await registrierungsOptionen(
     gemerkt.studentId,
@@ -114,38 +110,35 @@ export async function registrierungAbschliessen(
     ...einwilligungsmail({ vorname: gemerkt.vorname, herkunft }),
   });
   // Ein Ausfall beim Versand hält niemanden auf – das ist der Punkt von
-  // ADR 0005. `consent_requested_at` bleibt dann leer und sagt damit die
-  // Wahrheit; nachholen kann es später die Elternansicht.
-  const gesendet = mail.zustand === "gesendet";
+  // ADR 0005. Festgehalten wird der Versand hier bewusst nicht: Die
+  // Einwilligung entsteht erst mit der Verknüpfung (`parent_student.consent_at`,
+  // ADR 0006 D1), und die legt das Elternteil an, nicht das Kind.
+  if (mail.zustand === "fehler") {
+    console.warn("Einwilligungsmail nicht zugestellt:", mail.meldung);
+  }
 
-  const actor: Actor = {
-    role: "student",
-    familyId: gemerkt.familyId,
-    studentId: gemerkt.studentId,
-  };
+  const actor: Actor = { role: "student", studentId: gemerkt.studentId };
 
   // Über den Query-Builder statt über rohes SQL: `transports` ist ein
   // text[]-Feld, und eine JS-Liste in einem sql``-Literal wird von Drizzle zur
   // Wertliste `($1)` ausgerollt statt als Array gebunden.
+  //
+  // Seit ADR 0006 entstehen hier zwei Zeilen statt drei: Eine Familie gibt es
+  // nicht mehr, das Kind selbst ist der Mandant.
   await withActor(actor, async (tx) => {
-    await tx.insert(family).values({
-      id: gemerkt.familyId,
-      name: `Familie ${gemerkt.vorname}`,
-      parentEmail: gemerkt.elternMail,
-      consentRequestedAt: gesendet ? new Date() : null,
-    });
     await tx.insert(student).values({
       id: gemerkt.studentId,
-      familyId: gemerkt.familyId,
       firstName: gemerkt.vorname,
       gradeLevel: gemerkt.jahrgang,
+      // Die Adresse ist der Wiederherstellungsanker und die Bedingung, unter
+      // der sich später ein Elternkonto verknüpfen darf (`app.parent_may_link`).
+      parentEmail: gemerkt.elternMail,
       // Die Klasse wird hier bewusst nicht gefragt. Ihr einziger Verbraucher
       // ist der Gruppenfilter beim Klausurplan-Import (K-03), und die
       // maßgebliche Kopie steht auf `school_year` – hier wäre sie nur ein
       // Startwert. Der erste Bildschirm bleibt dafür um ein Feld kürzer.
     });
     await tx.insert(studentCredential).values({
-      familyId: gemerkt.familyId,
       studentId: gemerkt.studentId,
       credentialId: passkey.credentialId,
       publicKey: passkey.publicKey,

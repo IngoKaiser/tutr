@@ -3,13 +3,20 @@ import { sql } from "drizzle-orm";
 import { getDb } from "./index";
 
 /**
- * Wer stellt die Anfrage. Eltern sehen die ganze Familie, ein Kind nur sich
- * selbst – deshalb trägt nur die Schülerin eine `studentId`.
- * Siehe docs/adr/0004-datenmodell-rls.md (D1, D4).
+ * Wer stellt die Anfrage (ADR 0004 D1, umgestellt durch ADR 0006 D2).
+ *
+ * **Beide Rollen tragen eine `studentId`** – auch das Elternteil, denn eine
+ * Elternansicht zeigt immer ein Kind zur Zeit. Dadurch vergleicht jede Policy
+ * dieselbe Spalte, und die Rolle entscheidet nur noch über lesen oder
+ * schreiben. Vorher unterschieden sich die Rollen darin, *welche* Spalte sie
+ * prüfen; das war die Quelle der meisten Sonderfälle.
+ *
+ * Die Frage „darf dieses Elternteil für dieses Kind handeln?" wird **einmal**
+ * beim Bau des Actors über `parent_student` beantwortet, nicht in jeder
+ * Policy erneut.
  */
 export type Actor =
-  | { role: "parent"; familyId: string; userId: string }
-  | { role: "student"; familyId: string; studentId: string };
+  { role: "student"; studentId: string } | { role: "parent"; studentId: string; parentId: string };
 
 type Database = ReturnType<typeof getDb>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -35,58 +42,46 @@ export async function runWithActor<T>(
   return database.transaction(async (tx) => {
     await tx.execute(sql`set local role tutr_app`);
     // Werte immer als gebundene Parameter – niemals in den SQL-Text interpolieren.
-    await tx.execute(sql`select set_config('tutr.family_id', ${actor.familyId}, true)`);
+    await tx.execute(sql`select set_config('tutr.student_id', ${actor.studentId}, true)`);
     await tx.execute(sql`select set_config('tutr.actor_role', ${actor.role}, true)`);
     await tx.execute(
-      sql`select set_config('tutr.student_id', ${actor.role === "student" ? actor.studentId : ""}, true)`,
+      sql`select set_config('tutr.parent_id', ${actor.role === "parent" ? actor.parentId : ""}, true)`,
     );
     return fn(tx);
   });
 }
 
-/**
- * Nur die bestätigte Supabase-Auth-ID setzen, ohne Actor.
- *
- * Ausschließlich für den einen Schritt nach dem Login, in dem die Familie
- * noch unbekannt ist: das Nachschlagen der eigenen `parent_user`-Zeile. Die
- * zugehörige Policy erlaubt genau das und nichts sonst – kein Schreiben, kein
- * Lesen fremder Zeilen. Danach übernimmt `withActor()`.
- */
-export async function runWithAuthUser<T>(
-  database: Database,
-  authUserId: string,
-  fn: (tx: Transaction) => Promise<T>,
-): Promise<T> {
-  return database.transaction(async (tx) => {
-    await tx.execute(sql`set local role tutr_app`);
-    await tx.execute(sql`select set_config('tutr.auth_user_id', ${authUserId}, true)`);
-    return fn(tx);
-  });
-}
-
-export async function withAuthUser<T>(
-  authUserId: string,
-  fn: (tx: Transaction) => Promise<T>,
-): Promise<T> {
-  return runWithAuthUser(getDb(), authUserId, fn);
+/** Der Normalfall: Actor-Kontext auf der Laufzeitverbindung. */
+export async function withActor<T>(actor: Actor, fn: (tx: Transaction) => Promise<T>): Promise<T> {
+  return runWithActor(getDb(), actor, fn);
 }
 
 /**
- * Dasselbe Muster für die Anmeldung des Kindes (F-06, ADR 0005).
+ * Die Anmeldeschleusen (ADR 0006 D3).
  *
- * Beim Vorzeigen eines Passkeys kennen wir die Credential-ID, beim Prüfen
- * einer Session den Hash des Cookie-Tokens – Familie und Kind aber noch
- * nicht. Statt einer Ausnahme von der Actor-Regel setzt jeder dieser Wege
- * genau eine Session-Variable, zu der es genau eine SELECT-Policy auf genau
- * eine Zeile gibt (`src/db/policies/0050-student-auth.sql`).
+ * Jeder Weg, der ohne Actor-Kontext auskommen muss, bekommt eine eigene
+ * Session-Variable, zu der es genau eine `select`-Policy auf genau eine Zeile
+ * gibt (`src/db/policies/0010-auth.sql`):
  *
- * Ein Actor-Kontext entsteht dabei nicht: `app.family_id()` und
+ * | Variable                   | Tabelle              | Wofür              |
+ * | -------------------------- | -------------------- | ------------------ |
+ * | `tutr.auth_user_id`        | `parent_account`     | Eltern-Login       |
+ * | `tutr.credential_id`       | `student_credential` | Passkey vorzeigen  |
+ * | `tutr.session_token_hash`  | `student_session`    | Session prüfen     |
+ *
+ * Ein Actor-Kontext entsteht dabei nicht: `app.student_id()` und
  * `app.actor_role()` bleiben leer, alle übrigen Policies greifen also ins
  * Leere. Erst nach dem Nachschlagen übernimmt `withActor()`.
+ *
+ * Sie bleiben ausdrücklich einzeln statt verallgemeinert – drei kurze
+ * Policies liest man, eine clevere nicht.
  */
-export async function runWithAnmeldeschluessel<T>(
+export type Anmeldeschluessel =
+  "tutr.auth_user_id" | "tutr.credential_id" | "tutr.session_token_hash";
+
+export async function runWithLoginKey<T>(
   database: Database,
-  variable: "tutr.credential_id" | "tutr.session_token_hash",
+  variable: Anmeldeschluessel,
   wert: string,
   fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
@@ -98,12 +93,23 @@ export async function runWithAnmeldeschluessel<T>(
   });
 }
 
+/**
+ * Nach dem Magic Link: das Elternkonto und – über dieselbe Schleuse – die
+ * verknüpften Kinder nachschlagen, bevor eines gewählt ist.
+ */
+export async function withAuthUser<T>(
+  authUserId: string,
+  fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return runWithLoginKey(getDb(), "tutr.auth_user_id", authUserId, fn);
+}
+
 /** Nachschlagen eines Passkeys anhand der vom Browser gelieferten ID. */
 export async function withCredentialId<T>(
   credentialId: string,
   fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
-  return runWithAnmeldeschluessel(getDb(), "tutr.credential_id", credentialId, fn);
+  return runWithLoginKey(getDb(), "tutr.credential_id", credentialId, fn);
 }
 
 /** Nachschlagen einer Session anhand des SHA-256 des Cookie-Tokens. */
@@ -111,10 +117,5 @@ export async function withSessionTokenHash<T>(
   tokenHash: string,
   fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
-  return runWithAnmeldeschluessel(getDb(), "tutr.session_token_hash", tokenHash, fn);
-}
-
-/** Der Normalfall: Actor-Kontext auf der Laufzeitverbindung. */
-export async function withActor<T>(actor: Actor, fn: (tx: Transaction) => Promise<T>): Promise<T> {
-  return runWithActor(getDb(), actor, fn);
+  return runWithLoginKey(getDb(), "tutr.session_token_hash", tokenHash, fn);
 }

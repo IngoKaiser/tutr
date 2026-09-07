@@ -1,34 +1,22 @@
-import {
-  foreignKey,
-  integer,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  unique,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { foreignKey, integer, pgEnum, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
 
+import { timestamps } from "./columns";
 import { schoolYear, subject } from "./curriculum";
-import { family, student } from "./family";
+import { student } from "./student";
 
 /**
  * Lehrwerk-Registry (Konzept §7 „Lehrwerk-Registry", §10) und die Zuordnung
  * Schuljahr+Fach → Lehrwerk.
  *
  * `textbook` und `chapter` folgen dem kuratiert-oder-eigen-Muster aus
- * ADR 0004 D7: `family_id` ist nullable. NULL = kuratierter Datensatz, den
- * nur die Migrationsrolle schreibt; gesetzt = von dieser Familie selbst
- * angelegt (z. B. aus einem Foto des Inhaltsverzeichnisses).
+ * ADR 0004 D7: `student_id` ist nullable. NULL = kuratierter Datensatz, den
+ * nur die Migrationsrolle schreibt; gesetzt = von diesem Kind selbst angelegt
+ * (z. B. aus einem Foto des Inhaltsverzeichnisses).
+ *
+ * Angenommener Preis des Neuschnitts (ADR 0006): Geschwister an derselben
+ * Schule teilen kein eigenes Lehrwerk mehr – jedes Kind bekommt eine eigene
+ * Zeile. Den Normalfall deckt die kuratierte Schicht ab.
  */
-
-const zeitstempel = {
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-};
 
 /**
  * Woher die Kapitelstruktur stammt (§10: „Inhaltsverzeichnis-Foto
@@ -48,7 +36,7 @@ export const textbook = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     // Nullable: NULL = kuratiert (ADR 0004 D7).
-    familyId: uuid("family_id"),
+    studentId: uuid("student_id"),
     // §8 skizziert für Lehrwerk nur die Kapitel-Struktur, keinen Titel –
     // ohne lesbaren Namen ist der Eintrag aber nicht benutzbar. Ergänzt.
     title: text("title").notNull(),
@@ -58,16 +46,17 @@ export const textbook = pgTable(
     gradeLevel: integer("grade_level"),
     publisher: text("publisher"),
     source: textbookSource("source"),
-    ...zeitstempel,
+    ...timestamps,
   },
-  (t) => [foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade")],
+  (t) => [foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade")],
 );
 
 export const chapter = pgTable(
   "chapter",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id"),
+    // Nullable: NULL = kuratiert (ADR 0004 D7).
+    studentId: uuid("student_id"),
     textbookId: uuid("textbook_id").notNull(),
     title: text("title").notNull(),
     // Seitenangabe als Freitext ("34–51"), weil Bücher auch römisch oder
@@ -77,17 +66,17 @@ export const chapter = pgTable(
     // Vokabel-Units dieses Kapitels (§6 M4: Lehrwerk → Unit → Set). Nur
     // Bezeichner; die Sets selbst entstehen mit V-01.
     units: text("units").array().notNull().default([]),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    // Bewusst einfacher Fremdschlüssel statt zusammengesetzt: `family_id` ist
-    // hier nullable, ein zusammengesetzter FK würde bei NULL ohnehin nicht
-    // prüfen (MATCH SIMPLE) und ein familieneigenes Kapitel an einem
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
+    // Bewusst einfacher Fremdschlüssel statt zusammengesetzt: `student_id`
+    // ist hier nullable, ein zusammengesetzter FK würde bei NULL ohnehin
+    // nicht prüfen (MATCH SIMPLE) und ein eigenes Kapitel an einem
     // kuratierten Lehrwerk unmöglich machen. Bekannte Restlücke: Postgres
-    // prüft Fremdschlüssel ohne RLS, eine Familie könnte also auf ein
-    // fremdes, nicht kuratiertes Lehrwerk verweisen, wenn sie dessen UUID
-    // kennt – lesen kann sie es weiterhin nicht.
+    // prüft Fremdschlüssel ohne RLS, ein Kind könnte also auf ein fremdes,
+    // nicht kuratiertes Lehrwerk verweisen, wenn es dessen UUID kennt –
+    // lesen kann es das weiterhin nicht.
     foreignKey({ columns: [t.textbookId], foreignColumns: [textbook.id] }).onDelete("cascade"),
   ],
 );
@@ -95,27 +84,21 @@ export const chapter = pgTable(
 /**
  * Welches Lehrwerk gilt in diesem Schuljahr für dieses Fach – §8
  * `SchoolYear.lehrwerke{fach→id}` als Join-Tabelle statt Map (ADR 0004 D5).
- * Anders als `textbook` selbst ist das eine familieneigene Entscheidung und
- * folgt darum dem normalen Muster: `family_id` NOT NULL, Eltern schreiben.
+ * Anders als `textbook` selbst ist das eine eigene Entscheidung des Kindes
+ * und folgt darum dem normalen Muster: `student_id` NOT NULL, Eltern schreiben.
  */
 export const schoolYearTextbook = pgTable(
   "school_year_textbook",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    familyId: uuid("family_id").notNull(),
     studentId: uuid("student_id").notNull(),
     schoolYearId: uuid("school_year_id").notNull(),
     subjectId: uuid("subject_id").notNull(),
     textbookId: uuid("textbook_id").notNull(),
-    ...zeitstempel,
+    ...timestamps,
   },
   (t) => [
-    foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade"),
-    foreignKey({
-      name: "school_year_textbook_student_fk",
-      columns: [t.studentId, t.familyId],
-      foreignColumns: [student.id, student.familyId],
-    }).onDelete("cascade"),
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     foreignKey({
       name: "school_year_textbook_school_year_fk",
       columns: [t.schoolYearId, t.studentId],

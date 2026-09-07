@@ -17,8 +17,8 @@ export { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
  *
  * 2. **Ansichts-Umschalter** (Cookie): setzt eine *echte* Anmeldung voraus
  *    und wechselt nur die Sicht. Ein angemeldetes Elternteil kann so die
- *    Kind-Ansicht der eigenen Familie sehen, solange F-06 fehlt und ein Kind
- *    sich noch gar nicht anmelden kann.
+ *    Kind-Ansicht eines verknüpften Kindes sehen, ohne sich als dieses Kind
+ *    anmelden zu müssen.
  *
  * Der Unterschied ist wichtig: Die Tür verlangt jetzt auch beim Entwickeln
  * eine Anmeldung. Nur die Rolle dahinter ist wählbar.
@@ -36,8 +36,8 @@ export function e2eActor(): Actor | null {
   if (rolle !== "parent" && rolle !== "student") return null;
 
   return rolle === "parent"
-    ? { role: "parent", familyId: SEED_IDS.familieA, userId: SEED_IDS.elternteilA }
-    : { role: "student", familyId: SEED_IDS.familieA, studentId: SEED_IDS.kindA };
+    ? { role: "parent", parentId: SEED_IDS.parentOne, studentId: SEED_IDS.studentOne }
+    : { role: "student", studentId: SEED_IDS.studentOne };
 }
 
 /** Ist der Ansichts-Umschalter verfügbar? */

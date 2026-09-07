@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1788771571956,
-      "tag": "0000_aromatic_shinobi_shaw",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1788778487398,
-      "tag": "0001_nebulous_ultimo",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1788802609599,
-      "tag": "0002_confused_vindicator",
+      "when": 1788810160315,
+      "tag": "0000_reflective_jocasta",
       "breakpoints": true
     }
   ]

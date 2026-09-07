@@ -1,14 +1,15 @@
-import { foreignKey, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { foreignKey, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
 
-import { family } from "./family";
+import { timestamps } from "./columns";
+import { student } from "./student";
 
 /**
  * Schulprofil (Konzept §7): Bundesland, Schulform, Notenschlüssel, Ferien,
  * Kalender-Import-Quelle. Optional – ohne Profil läuft alles über Lehrwerk
  * und eigene Themen.
  *
- * Folgt dem kuratiert-oder-eigen-Muster (ADR 0004 D7): Mehrere Familien
- * können dieselbe Schule besuchen, ein kuratiertes Profil ist teilbar.
+ * Folgt dem kuratiert-oder-eigen-Muster (ADR 0004 D7): Mehrere Kinder können
+ * dieselbe Schule besuchen, ein kuratiertes Profil ist teilbar.
  */
 
 export const schoolProfile = pgTable(
@@ -16,7 +17,7 @@ export const schoolProfile = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     // Nullable: NULL = kuratiert (ADR 0004 D7).
-    familyId: uuid("family_id"),
+    studentId: uuid("student_id"),
     name: text("name"),
     // Freitext statt Enum: §7 verlangt ausdrücklich schulagnostisches
     // Design – anderes Bundesland, andere Schulform, gleiches System.
@@ -29,11 +30,7 @@ export const schoolProfile = pgTable(
     holidays: jsonb("holidays"),
     // z. B. "SchulDock s5849" oder eine ICS-URL (§7, §6 M7).
     calendarImportSource: text("calendar_import_source"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+    ...timestamps,
   },
-  (t) => [foreignKey({ columns: [t.familyId], foreignColumns: [family.id] }).onDelete("cascade")],
+  (t) => [foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade")],
 );

@@ -1,111 +1,69 @@
 import { sql } from "drizzle-orm";
 
-import { withActor, withAuthUser, type Actor } from "@/db/actor";
-import { SEED_IDS } from "@/db/seed-ids";
+import { withAuthUser, type Actor } from "@/db/actor";
 
 /**
- * Vom bestätigten Supabase-Login zum Actor (F-05).
+ * Vom bestätigten Supabase-Login zum Actor (F-05, umgestellt in F-11).
  *
- * Beim ersten Login gibt es noch kein Elternkonto, also wird hier das Nötigste
- * angelegt: eine Familie und ein `parent_user`.
+ * Zwei Regeln aus ADR 0006, die zusammen fast allen Code hier ersetzen, den
+ * es vorher gab:
  *
- * Nach ADR 0005 ist das künftig der Sonderfall. Im Normalfall entsteht die
- * Familie durch das Kind (F-06), und ein Elternteil tritt ihr später bei
- * (F-06b) – dieser Weg hier legt dann keine neue Familie mehr an.
+ * 1. **Ein Kind entsteht nur durch die eigene Registrierung.** Ein Login
+ *    legt nichts an – vorher entstand hier bei jedem ersten Eltern-Login eine
+ *    Familie, was seit ADR 0005 leere Geisterfamilien neben den echten
+ *    erzeugt hätte.
+ * 2. **Ein Elternkonto entsteht nur durch den Beitritt zu einem bestehenden
+ *    Kind** (F-06b). Wer sich anmeldet und mit niemandem verknüpft ist, sieht
+ *    einen leeren Zustand statt frisch angelegter Daten.
+ *
+ * Das Nachschlagen läuft über die Anmeldeschleuse `tutr.auth_user_id`
+ * (ADR 0006 D3): Nach dem Magic Link steht die Auth-ID fest, ein Kind aber
+ * noch nicht.
  */
 
-/** Ergebnis eines Logins: der Actor, plus ob dabei etwas angelegt wurde. */
-export type LoginErgebnis = {
-  actor: Actor;
-  neuAngelegt: boolean;
+export type ParentLogin = {
+  parentId: string;
+  email: string;
+  /** Verknüpfte Kinder, nach Vorname sortiert. Kann leer sein. */
+  students: { id: string; firstName: string }[];
 };
 
-/**
- * Sucht das Elternkonto zur Auth-ID. Läuft über `withAuthUser`, weil die
- * Familie an dieser Stelle noch unbekannt ist.
- */
-async function findeElternkonto(
-  authUserId: string,
-): Promise<{ id: string; family_id: string } | null> {
-  const zeilen = await withAuthUser(authUserId, (tx) =>
-    tx.execute<{ id: string; family_id: string }>(
-      sql`select id, family_id from parent_user where auth_user_id = ${authUserId} limit 1`,
-    ),
-  );
-  return zeilen[0] ?? null;
-}
+type AccountRow = { id: string; email: string };
+type StudentRow = { id: string; first_name: string };
 
 /**
- * In der Entwicklung an die Seed-Familie andocken statt eine zweite Welt
- * aufzumachen: Der Dev-Umschalter zeigt auf Familie A, ein frischer Login
- * würde sonst eine parallele Familie anlegen, in der nichts steht.
- *
- * In Produktion gibt es diesen Zweig nicht.
+ * Elternkonto und verknüpfte Kinder in einem Zug. Beides in derselben
+ * Schleuse, weil die Policies `parent_student_self` und
+ * `student_read_for_parent_login` genau darauf ausgelegt sind.
  */
-async function versucheSeedFamilie(authUserId: string, name: string): Promise<Actor | null> {
-  if (process.env.NODE_ENV === "production") return null;
-
-  const actor: Actor = {
-    role: "parent",
-    familyId: SEED_IDS.familieA,
-    userId: SEED_IDS.elternteilA,
-  };
-
-  const zeilen = await withActor(actor, (tx) =>
-    tx.execute<{ id: string }>(
-      sql`select id from parent_user where id = ${SEED_IDS.elternteilA} limit 1`,
-    ),
-  );
-  if (zeilen.length === 0) return null;
-
-  // Die Seed-Zeile auf die echte Auth-ID umschreiben, damit der nächste Login
-  // sie regulär findet und dieser Sonderweg nur einmal greift.
-  await withActor(actor, (tx) =>
-    tx.execute(
-      sql`update parent_user set auth_user_id = ${authUserId}, name = ${name}
-          where id = ${SEED_IDS.elternteilA}`,
-    ),
-  );
-  return actor;
-}
-
-/** Legt Familie und Elternkonto an – im Actor-Kontext, nicht an RLS vorbei. */
-async function legeFamilieAn(authUserId: string, name: string): Promise<Actor> {
-  const familyId = crypto.randomUUID();
-  const userId = crypto.randomUUID();
-
-  // Der Actor zeigt auf die Familie, die gleich entsteht. Die Policies prüfen
-  // `id = app.family_id()` bzw. `family_id = app.family_id()` – beides trifft zu.
-  const actor: Actor = { role: "parent", familyId, userId };
-
-  await withActor(actor, async (tx) => {
-    await tx.execute(sql`insert into family (id, name) values (${familyId}, ${name})`);
-    await tx.execute(
-      sql`insert into parent_user (id, family_id, auth_user_id, name)
-          values (${userId}, ${familyId}, ${authUserId}, ${name})`,
+export async function parentLogin(authUserId: string): Promise<ParentLogin | null> {
+  return withAuthUser(authUserId, async (tx) => {
+    const accounts = await tx.execute<AccountRow>(
+      sql`select id, email from parent_account limit 1`,
     );
-  });
+    const account = accounts[0];
+    if (!account) return null;
 
-  return actor;
+    const students = await tx.execute<StudentRow>(
+      sql`select id, first_name from student order by first_name`,
+    );
+
+    return {
+      parentId: account.id,
+      email: account.email,
+      students: students.map((s) => ({ id: s.id, firstName: s.first_name })),
+    };
+  });
 }
 
 /**
- * Der Einstiegspunkt nach einem bestätigten Login.
- * `name` dient nur als Anzeigename; er kommt aus dem lokalen Teil der E-Mail.
+ * Der Actor für ein angemeldetes Elternteil, das ein bestimmtes Kind ansieht.
+ *
+ * `studentId` muss aus `parentLogin().students` stammen – genau dort wurde
+ * die Berechtigung geprüft. Danach fragt keine Policy mehr danach, sie
+ * vergleichen nur noch `student_id` (ADR 0006 D2).
  */
-export async function actorFuerAuthUser(authUserId: string, email: string): Promise<LoginErgebnis> {
-  const vorhanden = await findeElternkonto(authUserId);
-  if (vorhanden) {
-    return {
-      actor: { role: "parent", familyId: vorhanden.family_id, userId: vorhanden.id },
-      neuAngelegt: false,
-    };
-  }
-
-  const name = email.split("@")[0] || "Elternteil";
-
-  const ausSeed = await versucheSeedFamilie(authUserId, name);
-  if (ausSeed) return { actor: ausSeed, neuAngelegt: false };
-
-  return { actor: await legeFamilieAn(authUserId, name), neuAngelegt: true };
+export function parentActor(login: ParentLogin, studentId: string): Actor | null {
+  if (!login.students.some((s) => s.id === studentId)) return null;
+  return { role: "parent", parentId: login.parentId, studentId };
 }

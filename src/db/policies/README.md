@@ -5,61 +5,62 @@ Eine Datei je Aggregat, lexikalisch angewandt von `scripts/db-apply.mts`
 Dateien müssen **idempotent** sein: `drop policy if exists` vor jedem
 `create policy`.
 
-Grundlage: [ADR 0004](../../../docs/adr/0004-datenmodell-rls.md). Die
-RLS-Matrix dort ist die Referenz dafür, wer was sehen darf.
+Grundlage: [ADR 0004](../../../docs/adr/0004-datenmodell-rls.md) für die
+Muster, [ADR 0006](../../../docs/adr/0006-student-als-mandant.md) für den
+Mandanten. **Das Kind ist der Mandant**: Jede Policy vergleicht
+`student_id = app.student_id()`, und die Rolle entscheidet nur noch über lesen
+oder schreiben. Der Actor trägt dafür immer eine `studentId` – auch als
+Elternteil, denn eine Elternansicht zeigt ein Kind zur Zeit.
 
 ## Checkliste für jede neue Tabelle
 
-1. **`family_id`-Spalte.** Policies vergleichen genau diese Spalte, ohne
+1. **`student_id`-Spalte.** Policies vergleichen genau diese Spalte, ohne
    Join. Zwei Ausprägungen:
-   - Familiendaten: `not null`, plus zusammengesetzter Fremdschlüssel
-     (`(student_id, family_id) → student(id, family_id)`), damit eine
-     familienübergreifende Verknüpfung strukturell unmöglich ist (D2).
+   - Eigene Daten: `not null`, plus Fremdschlüssel auf `student(id)` mit
+     `on delete cascade`, damit ein gelöschtes Kind seine Daten mitnimmt.
    - Referenzdaten: `nullable`, `NULL` = kuratiert (D7).
 2. **Unique-Anker,** wenn spätere Tabellen zusammengesetzt referenzieren
-   sollen: `unique (id, family_id)`, bei Bedarf auch `(id, student_id)`
-   oder `(id, subject_id)` – siehe `topic` in `curriculum.ts`.
+   sollen: `unique (id, student_id)`, bei Bedarf auch `(id, subject_id)` –
+   siehe `topic` in `curriculum.ts`.
 3. **Policy-Datei hier** mit `grant` für `tutr_app` und `enable row level
 security`.
 4. **Policy-Test** in der Testdatei des Aggregats. Mindestens: fremde
-   Familie sieht nichts, und die Schreibrechte stimmen.
+   Mandant sieht nichts, und die Schreibrechte stimmen.
 5. **Zeile in der RLS-Matrix** in ADR 0004 D4.
 
 ## Die drei Muster
 
-**Familieneigen, Eltern schreiben** (`school_year`, `subject`,
-`school_year_textbook`): Eltern `for all` auf die ganze Familie, Kind
-`for select` zusätzlich gefiltert auf `student_id = app.student_id()`,
-damit Geschwisterprofile getrennt bleiben.
+**Eigene Daten, Eltern schreiben** (`school_year`, `subject`,
+`school_year_textbook`): Eltern `for all`, Kind `for select` – beide über
+dieselbe Bedingung, unterschieden nur durch `app.actor_role()`.
 
-**Familieneigen, Kind schreibt** (`topic`, `learning_objective`): umgekehrt
-– Kind `for all` auf die eigenen Zeilen, Eltern `for select` auf die
-Familie.
+**Eigene Daten, Kind schreibt** (`topic`, `learning_objective`): umgekehrt –
+Kind `for all`, Eltern `for select`.
 
 **Kuratiert oder eigen** (`textbook`, `chapter`, `school_profile`): braucht
 **zwei** Policies, keine einzige.
 
 ```sql
-for select using (family_id is null or family_id = app.family_id())
-for all    using (family_id = app.family_id())
-       with check (family_id = app.family_id());
+for select using (student_id is null or student_id = app.student_id())
+for all    using (student_id = app.student_id())
+       with check (student_id = app.student_id());
 ```
 
 Eine einzelne `for all`-Policy, deren `USING` auch `NULL` zulässt, wäre
 angreifbar: Bei `UPDATE` filtert `USING` die Zielzeilen, eine kuratierte
 Zeile passiert diesen Filter, und `WITH CHECK` ist durch dasselbe Update
-erfüllbar, das `family_id` auf die eigene Familie setzt. Die Zeile wäre
-für alle anderen Familien gekapert. Kuratierte Daten schreibt deshalb
-ausschließlich die Migrationsrolle.
+erfüllbar, das `student_id` auf das eigene Kind setzt. Die Zeile wäre für
+alle anderen gekapert. Kuratierte Daten schreibt deshalb ausschließlich die
+Migrationsrolle.
 
-## Anmeldung: der Weg ohne Actor
+## Anmeldung: die drei Schleusen
 
-`parent_user_selbst` (0040) und die beiden Anmelde-Policies in 0050 sind die
-einzigen Stellen, an denen ohne Familien-Kontext gelesen wird. Sie folgen
-alle demselben Zuschnitt, und wer eine vierte braucht, sollte ihn einhalten:
+Drei Stellen lesen ohne Actor-Kontext (ADR 0006 D3): `parent_account_self`
+(0010) sowie die beiden Anmelde-Policies in 0020. Sie folgen alle demselben
+Zuschnitt, und wer eine vierte braucht, sollte ihn einhalten:
 
 - eine eigene Session-Variable (`tutr.auth_user_id`, `tutr.credential_id`,
-  `tutr.session_token_hash`), gesetzt über eine eigene `run…`-Funktion in
+  `tutr.session_token_hash`), gesetzt über `runWithLoginKey` in
   `src/db/actor.ts` – nie über `withActor()`;
 - der Wert muss unratbar sein und von außen bestätigt (Supabase) oder
   serverseitig erzeugt;
@@ -70,14 +71,23 @@ Zu beachten: Ein `update` ohne passende Policy wirft **keinen** Fehler, es
 trifft null Zeilen. Ein Test, der nur eine Ausnahme erwartet, beweist hier
 nichts – er muss die Zeile danach nachlesen.
 
-## Entstehung einer Familie
+## Entstehung eines Kindes
 
-`family` und `student` haben je eine INSERT-Policy, die auf die IDs des
-eigenen Actor-Kontexts prüft (`id = app.family_id()`). Das sieht nach einem
-Loch aus, ist aber der Boden: So entsteht das Elternkonto (F-05) und nach
-ADR 0005 die Kind-Registrierung (F-06). Die IDs erzeugt der Server
-unmittelbar davor, wählbar sind sie von außen nicht, und ein zweiter Versuch
-läuft in den Primärschlüssel.
+`student` hat eine INSERT-Policy, die auf die ID des eigenen Actor-Kontexts
+prüft (`id = app.student_id()`). Das sieht nach einem Loch aus, ist aber der
+Boden: So entsteht nach ADR 0005 die Kind-Registrierung. Die ID erzeugt der
+Server unmittelbar davor, wählbar ist sie von außen nicht, und ein zweiter
+Versuch läuft in den Primärschlüssel.
+
+## Rekursion zwischen Policies
+
+Liest die Policy von A die Tabelle B, und B liest wieder A, bricht Postgres
+mit `infinite recursion detected in policy` ab. Genau das passierte zwischen
+`parent_account` und `parent_student`. Der Ausweg sind die `security
+definer`-Helfer in `0000-setup.sql` (`app.parents_of`,
+`app.account_of_auth_user`, `app.parent_may_link`): Sie lösen eine Beziehung
+auf, ohne erneut durch RLS zu gehen. Jeder ist auf genau eine Frage
+beschränkt und gibt nur IDs oder ein `boolean` zurück.
 
 ## Was der Metatest erzwingt
 

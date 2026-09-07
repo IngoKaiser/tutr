@@ -31,7 +31,7 @@ const sql = postgres(url, { prepare: false, max: 1 });
 try {
   await seed(sql);
   console.log(`Beispieldaten eingespielt (${useTest ? "Test-DB" : "Produktiv-DB"}).`);
-  console.log("Familie A: Mia (Jg. 8) und Ben (Jg. 5) · Familie B: Lea (Jg. 8)");
+  console.log("Ein Elternteil mit Mia (Jg. 8) und Ben (Jg. 5) · Lea (Jg. 8) ohne Elternkonto");
 } finally {
   await sql.end();
 }

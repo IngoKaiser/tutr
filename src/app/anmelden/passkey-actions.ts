@@ -37,7 +37,6 @@ export async function anmeldungStarten(): Promise<PasskeyStart> {
 }
 
 type PasskeyZeile = {
-  family_id: string;
   student_id: string;
   public_key: string;
   counter: string;
@@ -55,7 +54,7 @@ export async function anmeldungAbschliessen(
 
   const zeilen = await withCredentialId(antwort.id, (tx) =>
     tx.execute<PasskeyZeile>(
-      sql`select family_id, student_id, public_key, counter, transports from student_credential`,
+      sql`select student_id, public_key, counter, transports from student_credential`,
     ),
   );
   const zeile = zeilen[0];
@@ -78,11 +77,7 @@ export async function anmeldungAbschliessen(
   }
   kekse.delete(challengeCookieName);
 
-  const actor: Actor = {
-    role: "student",
-    familyId: zeile.family_id,
-    studentId: zeile.student_id,
-  };
+  const actor: Actor = { role: "student", studentId: zeile.student_id };
 
   await withActor(actor, (tx) =>
     tx.execute(
