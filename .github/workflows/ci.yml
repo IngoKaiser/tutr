@@ -38,6 +38,35 @@ jobs:
           path: coverage
           retention-days: 7
 
+  db:
+    name: RLS- und Policy-Tests (Test-Projekt)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: check
+    # Destruktive Tests gegen ein gemeinsames Supabase-Projekt: nie parallel.
+    concurrency:
+      group: db-tests
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Policies anwenden und Tests ausführen
+        env:
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          TEST_MIGRATION_DATABASE_URL: ${{ secrets.TEST_MIGRATION_DATABASE_URL }}
+          TUTR_APP_DB_PASSWORD: ${{ secrets.TUTR_APP_DB_PASSWORD }}
+        run: |
+          if [ -z "$TEST_DATABASE_URL" ]; then
+            echo "::warning::TEST_DATABASE_URL nicht gesetzt – RLS-Tests übersprungen."
+            exit 0
+          fi
+          npm run db:policies:test
+          npm run db:test
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest

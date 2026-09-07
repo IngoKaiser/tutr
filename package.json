@@ -17,10 +17,14 @@
     "check": "npm run lint && npm run typecheck && npm run test",
     "security": "npm audit --audit-level=high",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "drizzle-kit migrate && node scripts/db-apply-sql.mts",
     "db:studio": "drizzle-kit studio",
     "db:check": "RUN_DB_TESTS=1 vitest run src/db/connection.test.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:policies": "node scripts/db-apply-sql.mts",
+    "db:policies:test": "node scripts/db-apply-sql.mts --test",
+    "db:test": "RUN_DB_TESTS=1 vitest run src/db",
+    "db:doctor": "node scripts/db-doctor.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

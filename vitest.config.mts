@@ -13,7 +13,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      include: ["src/lib/**", "src/ai/**", "src/db/**"],
+      // Nur Code – sonst versucht der Provider .sql- und .md-Dateien zu parsen.
+      include: ["src/lib/**/*.ts", "src/ai/**/*.ts", "src/db/**/*.ts"],
     },
   },
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
