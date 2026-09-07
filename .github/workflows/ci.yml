@@ -54,7 +54,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Policies anwenden und Tests ausführen
+      - name: Migrationen und Policies anwenden, Tests ausführen
         env:
           TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
           TEST_MIGRATION_DATABASE_URL: ${{ secrets.TEST_MIGRATION_DATABASE_URL }}
@@ -64,7 +64,7 @@ jobs:
             echo "::warning::TEST_DATABASE_URL nicht gesetzt – RLS-Tests übersprungen."
             exit 0
           fi
-          npm run db:policies:test
+          npm run db:migrate:test
           npm run db:test
 
   e2e:
