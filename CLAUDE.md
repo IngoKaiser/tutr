@@ -27,7 +27,8 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 
 - Mutationen über Server Actions; Route Handler nur für Uploads, Webhooks, Cron.
 - Drizzle-Schema in `src/db/schema/*.ts`, eine Datei pro Aggregat. Migrationen nur über `npm run db:generate`. Keine handgeschriebenen SQL-Migrationen außer für RLS-Policies (`src/db/policies/*.sql`).
-- Jede Tabelle hat RLS. Neue Tabelle ohne Policy = Ticket nicht fertig.
+- Jede Tabelle hat RLS. Neue Tabelle ohne Policy = Ticket nicht fertig. Checkliste in `src/db/policies/README.md`.
+- **Jeder Datenbankzugriff läuft durch `withActor()`** (`src/db/actor.ts`). Direkter `db.*`-Zugriff ist nur in Migrationen, Seeds und Cron-Jobs erlaubt und dort in einem Kommentar zu begründen. Grund: Die Laufzeit verbindet sich als Rolle `tutr_app` ohne `BYPASSRLS`, der Actor-Kontext kommt per `SET LOCAL` – ohne Wrapper sind die Policies falsch und das Resultat leer (ADR 0004 D1).
 - Claude API: Sonnet für Tutor, Vision, Generierung, Bewertung; Haiku für Klassifikation und Vokabel-Checks. Alle Modellantworten mit Structured Output gegen ein Zod-Schema in `src/ai/schemas/`. Prompts in `src/ai/prompts/` als Funktionen, nie inline. Prompt Caching für Thema-Kontextpakete.
 - Spaced Repetition ausschließlich über `ts-fsrs`. Keine eigene Intervall-Logik.
 - Formeln mit KaTeX. Kein MathJax.
@@ -55,7 +56,9 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 
 ## Befehle
 
-`npm run dev` · `npm run check` · `npm run test` · `npm run test:e2e` · `npm run db:generate` · `npm run db:migrate` · `npm run security`
+`npm run dev` · `npm run check` · `npm run test` · `npm run test:e2e` · `npm run security`
+
+Datenbank: `npm run db:generate` (Migration aus dem Schema) · `npm run db:migrate` (Migrationen **und** Policies anwenden) · `npm run db:migrate:test` (dasselbe auf der Test-DB) · `npm run db:test` (Policy- und Constraint-Tests, brauchen die Test-DB) · `npm run db:doctor` (prüft Rolle, Port, `sslmode` und Passwort einer Umgebung, ohne Geheimnisse auszugeben)
 
 ## Was du nicht tun sollst
 
