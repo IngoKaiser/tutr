@@ -3,7 +3,13 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runWithActor, type Actor } from "../actor";
-import { connectAsAppRole, connectAsMigrationRole, loadTestEnv, testDbAvailable } from "../test-db";
+import {
+  connectAsAppRole,
+  connectAsMigrationRole,
+  loadTestEnv,
+  testDbAvailable,
+  ursachenkette,
+} from "../test-db";
 
 /**
  * Policy-Tests für das kuratiert-oder-eigen-Muster (ADR 0004 D7) an
@@ -45,17 +51,6 @@ const elternteil = (familyId: string): Actor => ({
   familyId,
   userId: "aaaa2222-0000-4000-8000-000000000001",
 });
-
-/** Sammelt die ganze cause-Kette; Drizzle verpackt Postgres-Fehler. */
-function ursachenkette(err: unknown): string {
-  const teile: string[] = [];
-  let aktuell = err as { message?: string; cause?: unknown } | undefined;
-  while (aktuell) {
-    if (aktuell.message) teile.push(aktuell.message);
-    aktuell = aktuell.cause as typeof aktuell;
-  }
-  return teile.join(" | ");
-}
 
 describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)", () => {
   let app: ReturnType<typeof connectAsAppRole>;

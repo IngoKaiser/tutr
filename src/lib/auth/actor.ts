@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
+import { cookies } from "next/headers";
 
 import { withActor, type Actor } from "@/db/actor";
+import { actorAusSession, SESSION_COOKIE } from "@/lib/auth/student-session";
 import { e2eActor, gewaehlteAnsicht, umschalterVerfuegbar } from "@/lib/dev-actor";
 import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
 import { createClient } from "@/lib/supabase/server";
@@ -12,9 +14,15 @@ import { actorFuerAuthUser } from "./onboarding";
  *
  * Reihenfolge:
  * 1. Test-Umgehung (nur Playwright, nur außerhalb der Produktion)
- * 2. Echte Supabase-Session → Elternteil
- * 3. Ansichts-Umschalter: angemeldetes Elternteil kann als Kind der eigenen
- *    Familie schauen, solange F-06 fehlt
+ * 2. Kind-Session aus dem Passkey-Cookie (F-06)
+ * 3. Echte Supabase-Session → Elternteil
+ * 4. Ansichts-Umschalter: angemeldetes Elternteil kann als Kind der eigenen
+ *    Familie schauen
+ *
+ * Das Kind steht vor dem Elternteil, weil es auf dem eigenen Gerät sitzt: Wer
+ * beides in einem Browser hat, ist beim Entwickeln – und dort will man die
+ * gerade angelegte Kind-Session sehen, nicht die daneben liegende Eltern-
+ * Anmeldung.
  *
  * Ohne Session gibt es `null` – auch beim Entwickeln. Die Anmeldung ist die
  * Tür, der Umschalter regelt nur die Sicht dahinter.
@@ -44,6 +52,12 @@ export async function anmeldeStatus(): Promise<{
     return { actor: ausTest, email: null, umschalter: false, ansicht: ausTest.role };
   }
 
+  const kekse = await cookies();
+  const alsKind = await actorAusSession(kekse.get(SESSION_COOKIE)?.value);
+  if (alsKind) {
+    return { actor: alsKind, email: null, umschalter: false, ansicht: "student" };
+  }
+
   if (!supabaseKonfiguration()) {
     return { actor: null, email: null, umschalter: false, ansicht: "parent" };
   }
@@ -62,9 +76,9 @@ export async function anmeldeStatus(): Promise<{
   const { actor: eltern } = await actorFuerAuthUser(user.id, user.email);
 
   if (umschalterVerfuegbar() && (await gewaehlteAnsicht()) === "student") {
-    const alsKind = await kindDerFamilie(eltern);
-    if (alsKind) {
-      return { actor: alsKind, email: user.email, umschalter: true, ansicht: "student" };
+    const kindAnsicht = await kindDerFamilie(eltern);
+    if (kindAnsicht) {
+      return { actor: kindAnsicht, email: user.email, umschalter: true, ansicht: "student" };
     }
   }
 

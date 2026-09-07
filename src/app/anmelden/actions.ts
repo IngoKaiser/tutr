@@ -1,7 +1,8 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
+import { SESSION_COOKIE, sessionAbmelden } from "@/lib/auth/student-session";
 import { createClient } from "@/lib/supabase/server";
 
 export type AnmeldeErgebnis =
@@ -43,7 +44,20 @@ export async function magicLinkAnfordern(
   return { zustand: "gesendet", email };
 }
 
+/**
+ * Abmelden gilt für beide Wege: Ein Browser kann eine Eltern-Session und eine
+ * Kind-Session tragen, und „Abmelden" muss beide beenden – sonst führt der
+ * Knopf sichtbar nichts aus.
+ */
 export async function abmelden(): Promise<void> {
+  const kekse = await cookies();
+  const kindToken = kekse.get(SESSION_COOKIE)?.value;
+  if (kindToken) {
+    // Setzt `revoked_at`, damit die Geräteliste den Vorgang zeigt (F-06b).
+    await sessionAbmelden(kindToken);
+    kekse.delete(SESSION_COOKIE);
+  }
+
   const supabase = await createClient();
   await supabase.auth.signOut();
 }

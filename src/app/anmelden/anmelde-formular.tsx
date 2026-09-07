@@ -46,7 +46,9 @@ export function AnmeldeFormular() {
       <button
         type="submit"
         disabled={laeuft}
-        className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau rounded-[9px] px-4 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60"
+        // Leise statt königsblau: Auf der Anmeldeseite steht daneben der Weg
+        // des Kindes, und zwei gleich starke Knöpfe hätten keine Rangfolge.
+        className="border-linie-stark bg-flaeche text-tinte hover:bg-papier-tief focus-visible:outline-koenigsblau rounded-[9px] border px-4 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60"
       >
         {laeuft ? "Wird verschickt …" : "Anmeldelink schicken"}
       </button>

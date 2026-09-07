@@ -6,10 +6,12 @@ import { SEED_IDS } from "@/db/seed-ids";
 /**
  * Vom bestätigten Supabase-Login zum Actor (F-05).
  *
- * Beim ersten Login gibt es noch kein Elternkonto. Statt einer eigenen
- * Onboarding-Strecke – die gehört zu F-06a – wird hier das Nötigste angelegt:
- * eine Familie und ein `parent_user`. Alles Weitere (Kindprofil, Schuljahr,
- * Einwilligung) folgt dort.
+ * Beim ersten Login gibt es noch kein Elternkonto, also wird hier das Nötigste
+ * angelegt: eine Familie und ein `parent_user`.
+ *
+ * Nach ADR 0005 ist das künftig der Sonderfall. Im Normalfall entsteht die
+ * Familie durch das Kind (F-06), und ein Elternteil tritt ihr später bei
+ * (F-06b) – dieser Weg hier legt dann keine neue Familie mehr an.
  */
 
 /** Ergebnis eines Logins: der Actor, plus ob dabei etwas angelegt wurde. */

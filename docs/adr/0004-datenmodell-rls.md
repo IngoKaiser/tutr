@@ -114,18 +114,24 @@ Postgres kennt keine spaltenweise Sichtbarkeit innerhalb einer Policy. Statt ein
 
 RLS-Matrix (Kurzfassung, Detail in `src/db/policies/`):
 
-| Tabellengruppe                                                                | Elternteil                        | Kind                              |
-| ----------------------------------------------------------------------------- | --------------------------------- | --------------------------------- |
-| `family`, `student`, `school_year`, `subject`, `school_year_textbook`         | lesen + schreiben                 | lesen                             |
-| `topic`, `learning_objective`, `material`                                     | lesen                             | lesen + schreiben                 |
-| `card`, `review`, `vocab_*`, `objective_mastery`                              | lesen                             | lesen + schreiben                 |
-| `calendar_event`, `study_plan_slot`                                           | lesen + schreiben                 | lesen + schreiben                 |
-| `exam`, `exam_attempt`                                                        | Ergebnis lesen                    | lesen + schreiben                 |
-| `tutor_session`, `tutor_message`                                              | **kein Zugriff**                  | eigene lesen + schreiben          |
-| `tutor_session_summary`, `homework_task`                                      | lesen                             | lesen + schreiben                 |
-| `curriculum_pack`, `curriculum_node`, `textbook`, `chapter`, `school_profile` | kuratiert lesen, eigene schreiben | kuratiert lesen, eigene schreiben |
+| Tabellengruppe                                                                | Elternteil                           | Kind                              |
+| ----------------------------------------------------------------------------- | ------------------------------------ | --------------------------------- |
+| `family`, `student`, `school_year`, `subject`, `school_year_textbook`         | lesen + schreiben                    | lesen                             |
+| `topic`, `learning_objective`, `material`                                     | lesen                                | lesen + schreiben                 |
+| `card`, `review`, `vocab_*`, `objective_mastery`                              | lesen                                | lesen + schreiben                 |
+| `calendar_event`, `study_plan_slot`                                           | lesen + schreiben                    | lesen + schreiben                 |
+| `exam`, `exam_attempt`                                                        | Ergebnis lesen                       | lesen + schreiben                 |
+| `tutor_session`, `tutor_message`                                              | **kein Zugriff**                     | eigene lesen + schreiben          |
+| `tutor_session_summary`, `homework_task`                                      | lesen                                | lesen + schreiben                 |
+| `curriculum_pack`, `curriculum_node`, `textbook`, `chapter`, `school_profile` | kuratiert lesen, eigene schreiben    | kuratiert lesen, eigene schreiben |
+| `student_credential`, `student_session`                                       | lesen, Gerät abmelden bzw. entfernen | eigene lesen + schreiben          |
 
 Kind-Policies filtern zusätzlich auf `student_id = app.student_id()`, damit Geschwisterprofile getrennt bleiben.
+
+Zwei Nachträge aus F-06 (ADR 0005):
+
+- `student_credential` und `student_session` tragen je eine zusätzliche SELECT-Policy für den Anmeldeweg selbst, gesteuert über `tutr.credential_id` bzw. `tutr.session_token_hash`. Sie geben genau eine Zeile frei und stehen im selben Muster wie `parent_user_selbst` – die Alternative wäre eine Ausnahme von der `withActor()`-Regel gewesen.
+- `family` und `student` bekommen je eine INSERT-Policy für die Rolle `student`, weil nach ADR 0005 das Kind die Familie anlegt. Sie greifen nur auf die IDs des eigenen Actor-Kontexts, also genau einmal: Beim zweiten Versuch steht der Primärschlüssel im Weg.
 
 `school_profile` stand hier ursprünglich in der ersten Zeile bei den familieneigenen Tabellen – ein Fehler: mehrere Familien können dieselbe Schule besuchen, ein kuratiertes Schulprofil soll teilbar sein. Es folgt D7 (korrigiert 2026-09-07, F-04d).
 

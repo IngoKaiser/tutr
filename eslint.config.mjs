@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Playwright-Artefakte. Sie stehen in .gitignore, aber ESLint 9 liest die
+    // nicht – ohne diese Zeilen scheitert `npm run check`, sobald jemand die
+    // E2E-Tests mit dem HTML-Reporter laufen lässt (also in CI-Nachstellungen).
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 

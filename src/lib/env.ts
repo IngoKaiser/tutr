@@ -10,8 +10,9 @@ const serverSchema = z.object({
   // Supabase "Secret key" (neues API-Key-System, Präfix sb_secret_) – umgeht RLS, nur serverseitig.
   SUPABASE_SECRET_KEY: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().min(1),
-  INVITE_TOKEN_SECRET: z.string().min(32),
-  RESEND_API_KEY: z.string().optional(),
+  // Signiert kurzlebige Auth-Cookies (die WebAuthn-Challenge, F-06). Hieß bis
+  // ADR 0005 INVITE_TOKEN_SECRET – Einladungslinks gibt es nicht mehr.
+  AUTH_COOKIE_SECRET: z.string().min(32),
 });
 
 const clientSchema = z.object({
@@ -22,6 +23,16 @@ const clientSchema = z.object({
 
 const dbSchema = z.object({
   DATABASE_URL: z.string().url(),
+});
+
+const authSchema = z.object({
+  AUTH_COOKIE_SECRET: z.string().min(32),
+});
+
+const mailSchema = z.object({
+  RESEND_API_KEY: z.string().optional(),
+  // Ohne verifizierte Domain akzeptiert Resend nur onboarding@resend.dev.
+  RESEND_FROM: z.string().optional(),
 });
 
 const skip = process.env.SKIP_ENV_VALIDATION === "1";
@@ -63,4 +74,28 @@ export function dbEnv() {
     throw new Error("dbEnv() darf nicht im Browser aufgerufen werden.");
   }
   return skip ? (process.env as unknown as z.infer<typeof dbSchema>) : dbSchema.parse(process.env);
+}
+
+/**
+ * Schmale Ausschnitte, aus demselben Grund wie `dbEnv()` abgetrennt: Weder
+ * die Anmeldung noch der Mailversand sollen daran scheitern, dass ein
+ * ANTHROPIC_API_KEY fehlt. `serverEnv()` prüft alles auf einmal und ist
+ * deshalb nur dort richtig, wo wirklich alles gebraucht wird.
+ */
+export function authEnv() {
+  if (typeof window !== "undefined") {
+    throw new Error("authEnv() darf nicht im Browser aufgerufen werden.");
+  }
+  return skip
+    ? (process.env as unknown as z.infer<typeof authSchema>)
+    : authSchema.parse(process.env);
+}
+
+export function mailEnv() {
+  if (typeof window !== "undefined") {
+    throw new Error("mailEnv() darf nicht im Browser aufgerufen werden.");
+  }
+  return skip
+    ? (process.env as unknown as z.infer<typeof mailSchema>)
+    : mailSchema.parse(process.env);
 }

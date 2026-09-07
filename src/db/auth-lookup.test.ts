@@ -3,7 +3,13 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runWithActor, runWithAuthUser, type Actor } from "./actor";
-import { connectAsAppRole, connectAsMigrationRole, loadTestEnv, testDbAvailable } from "./test-db";
+import {
+  connectAsAppRole,
+  connectAsMigrationRole,
+  loadTestEnv,
+  testDbAvailable,
+  ursachenkette,
+} from "./test-db";
 
 /**
  * Die Selbst-Lese-Policy auf parent_user (F-05) ist die einzige Stelle, an der
@@ -22,16 +28,6 @@ const B = {
   parent: "88880000-0000-4000-8000-000000000002",
   auth: "88880000-0000-4000-8000-0000000000b1",
 };
-
-function ursachenkette(err: unknown): string {
-  const teile: string[] = [];
-  let a = err as { message?: string; cause?: unknown } | undefined;
-  while (a) {
-    if (a.message) teile.push(a.message);
-    a = a.cause as typeof a;
-  }
-  return teile.join(" | ");
-}
 
 describe.skipIf(!testDbAvailable())("Nachschlagen des Elternkontos über die Auth-ID", () => {
   let app: ReturnType<typeof connectAsAppRole>;
