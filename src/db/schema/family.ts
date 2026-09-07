@@ -18,9 +18,22 @@ const zeitstempel = {
     .$onUpdate(() => new Date()),
 };
 
+/**
+ * Die Familie ist der Mandantenschlüssel: Genau diese `id` vergleicht jede
+ * Policy. Sie entsteht nach ADR 0005 im Normalfall durch das Kind – das
+ * Elternkonto tritt später hinzu (F-06b).
+ *
+ * `parentEmail` ist deshalb der Wiederherstellungsanker, nicht die
+ * Einwilligung: Das Kind hat keine eigene E-Mail, irgendwo muss eine Adresse
+ * liegen. Die Einwilligung selbst steht als Zeitstempel am `parentUser`, denn
+ * erteilt hat sie erst, wer sich über einen Magic Link an dieser Adresse
+ * ausgewiesen hat.
+ */
 export const family = pgTable("family", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  parentEmail: text("parent_email"),
+  consentRequestedAt: timestamp("consent_requested_at", { withTimezone: true }),
   ...zeitstempel,
 });
 

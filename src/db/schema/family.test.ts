@@ -3,7 +3,13 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runWithActor, type Actor } from "../actor";
-import { connectAsAppRole, connectAsMigrationRole, loadTestEnv, testDbAvailable } from "../test-db";
+import {
+  connectAsAppRole,
+  connectAsMigrationRole,
+  loadTestEnv,
+  testDbAvailable,
+  ursachenkette,
+} from "../test-db";
 
 /**
  * Policy-Tests für family, parent_user und student (F-04b).
@@ -125,12 +131,6 @@ describe.skipIf(!testDbAvailable())("RLS: family, parent_user, student", () => {
       ),
     ).catch((err: unknown) => err);
 
-    let text = "";
-    let e = fehler as { message?: string; cause?: unknown } | undefined;
-    while (e) {
-      if (e.message) text += ` ${e.message}`;
-      e = e.cause as typeof e;
-    }
-    expect(text).toMatch(/row-level security/i);
+    expect(ursachenkette(fehler)).toMatch(/row-level security/i);
   });
 });

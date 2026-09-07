@@ -3,7 +3,13 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runWithActor, type Actor } from "./actor";
-import { connectAsAppRole, connectAsMigrationRole, loadTestEnv, testDbAvailable } from "./test-db";
+import {
+  connectAsAppRole,
+  connectAsMigrationRole,
+  loadTestEnv,
+  testDbAvailable,
+  ursachenkette,
+} from "./test-db";
 
 /**
  * Beweist die Kernaussage von ADR 0004 D1 an einer echten Datenbank:
@@ -11,17 +17,6 @@ import { connectAsAppRole, connectAsMigrationRole, loadTestEnv, testDbAvailable 
  * Läuft nur bei `npm run db:test` (RUN_DB_TESTS=1).
  */
 loadTestEnv();
-
-/** Drizzle verpackt Postgres-Fehler; die Ursache steht in der cause-Kette. */
-function ursachenkette(err: unknown): string {
-  const teile: string[] = [];
-  let aktuell = err as { message?: string; cause?: unknown } | undefined;
-  while (aktuell) {
-    if (aktuell.message) teile.push(aktuell.message);
-    aktuell = aktuell.cause as typeof aktuell;
-  }
-  return teile.join(" | ");
-}
 
 const FAMILIE_A = "11111111-1111-1111-1111-111111111111";
 const FAMILIE_B = "22222222-2222-2222-2222-222222222222";

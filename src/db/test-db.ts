@@ -67,3 +67,18 @@ export function connectAsMigrationRole(): { client: postgres.Sql; close: () => P
   const client = postgres(url, { prepare: false, max: 1 });
   return { client, close: () => client.end() };
 }
+
+/**
+ * Drizzle verpackt Postgres-Fehler; die eigentliche Meldung steht in der
+ * `cause`-Kette. Policy-Tests prüfen darauf, ob wirklich RLS abgewiesen hat
+ * und nicht ein Tippfehler im SQL.
+ */
+export function ursachenkette(err: unknown): string {
+  const teile: string[] = [];
+  let aktuell = err as { message?: string; cause?: unknown } | undefined;
+  while (aktuell) {
+    if (aktuell.message) teile.push(aktuell.message);
+    aktuell = aktuell.cause as typeof aktuell;
+  }
+  return teile.join(" | ");
+}

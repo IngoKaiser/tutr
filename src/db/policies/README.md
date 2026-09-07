@@ -52,6 +52,33 @@ erfüllbar, das `family_id` auf die eigene Familie setzt. Die Zeile wäre
 für alle anderen Familien gekapert. Kuratierte Daten schreibt deshalb
 ausschließlich die Migrationsrolle.
 
+## Anmeldung: der Weg ohne Actor
+
+`parent_user_selbst` (0040) und die beiden Anmelde-Policies in 0050 sind die
+einzigen Stellen, an denen ohne Familien-Kontext gelesen wird. Sie folgen
+alle demselben Zuschnitt, und wer eine vierte braucht, sollte ihn einhalten:
+
+- eine eigene Session-Variable (`tutr.auth_user_id`, `tutr.credential_id`,
+  `tutr.session_token_hash`), gesetzt über eine eigene `run…`-Funktion in
+  `src/db/actor.ts` – nie über `withActor()`;
+- der Wert muss unratbar sein und von außen bestätigt (Supabase) oder
+  serverseitig erzeugt;
+- **nur `for select`**, und die Bedingung gibt genau eine Zeile frei;
+- ein Test, der belegt, dass der Weg keine andere Tabelle öffnet.
+
+Zu beachten: Ein `update` ohne passende Policy wirft **keinen** Fehler, es
+trifft null Zeilen. Ein Test, der nur eine Ausnahme erwartet, beweist hier
+nichts – er muss die Zeile danach nachlesen.
+
+## Entstehung einer Familie
+
+`family` und `student` haben je eine INSERT-Policy, die auf die IDs des
+eigenen Actor-Kontexts prüft (`id = app.family_id()`). Das sieht nach einem
+Loch aus, ist aber der Boden: So entsteht das Elternkonto (F-05) und nach
+ADR 0005 die Kind-Registrierung (F-06). Die IDs erzeugt der Server
+unmittelbar davor, wählbar sind sie von außen nicht, und ein zweiter Versuch
+läuft in den Primärschlüssel.
+
 ## Was der Metatest erzwingt
 
 `src/db/rls.test.ts` lässt CI fehlschlagen, sobald eine Tabelle in `public`

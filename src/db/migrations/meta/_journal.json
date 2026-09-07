@@ -15,6 +15,13 @@
       "when": 1788778487398,
       "tag": "0001_nebulous_ultimo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788802609599,
+      "tag": "0002_confused_vindicator",
+      "breakpoints": true
     }
   ]
 }
