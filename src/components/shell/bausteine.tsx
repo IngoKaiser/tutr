@@ -113,7 +113,7 @@ export function Knopf({ children, leise = false }: { children: React.ReactNode; 
       type="button"
       className={`focus-visible:outline-koenigsblau w-full rounded-[9px] border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
         leise
-          ? "border-linie-stark text-tinte hover:bg-papier-tief bg-transparent"
+          ? "border-linie-stark bg-flaeche text-tinte hover:bg-papier-tief"
           : "bg-koenigsblau text-auf-koenigsblau border-transparent"
       }`}
     >

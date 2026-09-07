@@ -28,7 +28,7 @@ export default function TutorPage() {
             className={`rounded-md border px-2.5 py-1.5 text-xs font-medium ${
               i === 0
                 ? "border-koenigsblau bg-koenigsblau-hell text-koenigsblau"
-                : "border-linie-stark text-tinte-weich"
+                : "border-linie-stark bg-flaeche text-tinte-weich"
             }`}
           >
             {e}
