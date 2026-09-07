@@ -44,6 +44,33 @@ export async function runWithActor<T>(
   });
 }
 
+/**
+ * Nur die bestätigte Supabase-Auth-ID setzen, ohne Actor.
+ *
+ * Ausschließlich für den einen Schritt nach dem Login, in dem die Familie
+ * noch unbekannt ist: das Nachschlagen der eigenen `parent_user`-Zeile. Die
+ * zugehörige Policy erlaubt genau das und nichts sonst – kein Schreiben, kein
+ * Lesen fremder Zeilen. Danach übernimmt `withActor()`.
+ */
+export async function runWithAuthUser<T>(
+  database: Database,
+  authUserId: string,
+  fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return database.transaction(async (tx) => {
+    await tx.execute(sql`set local role tutr_app`);
+    await tx.execute(sql`select set_config('tutr.auth_user_id', ${authUserId}, true)`);
+    return fn(tx);
+  });
+}
+
+export async function withAuthUser<T>(
+  authUserId: string,
+  fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return runWithAuthUser(getDb(), authUserId, fn);
+}
+
 /** Der Normalfall: Actor-Kontext auf der Laufzeitverbindung. */
 export async function withActor<T>(actor: Actor, fn: (tx: Transaction) => Promise<T>): Promise<T> {
   return runWithActor(getDb(), actor, fn);

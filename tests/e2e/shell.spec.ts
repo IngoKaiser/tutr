@@ -68,3 +68,23 @@ test("Manifest-Icons werden ausgeliefert", async ({ request }) => {
     expect(res.headers()["content-type"]).toContain("image/png");
   }
 });
+
+test("Anmeldeseite ist ohne Session erreichbar und erklärt den Weg fürs Kind", async ({ page }) => {
+  await page.goto("/anmelden");
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Anmelden");
+  await expect(page.getByLabel("E-Mail-Adresse")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Anmeldelink schicken" })).toBeVisible();
+  // Konzept §11: Das Kind meldet sich nie per E-Mail an – das muss auf der
+  // Seite stehen, sonst versucht ein Elternteil es für sie.
+  await expect(page.getByText(/Einladungslink/)).toBeVisible();
+});
+
+test("Anmeldung weist eine unvollständige Adresse zurück", async ({ page }) => {
+  await page.goto("/anmelden");
+  await page.getByLabel("E-Mail-Adresse").fill("keine-adresse");
+  await page.getByRole("button", { name: "Anmeldelink schicken" }).click();
+
+  // Browser-Validierung greift vor dem Absenden – das Formular bleibt stehen.
+  await expect(page.getByRole("button", { name: "Anmeldelink schicken" })).toBeVisible();
+});
