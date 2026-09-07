@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { withActor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
+import { databaseConfigured } from "@/lib/env";
 
 /**
  * Geräteliste des gerade gewählten Kindes (F-06b).
@@ -19,6 +20,11 @@ import { loginStatus } from "@/lib/auth/actor";
  * Die Policies `student_credential_read_parent` und `student_session_read_
  * parent` filtern zusätzlich auf `student_id = app.student_id()` – selbst
  * eine erratene fremde ID eines anderen eigenen Kindes träfe keine Zeile.
+ *
+ * `databaseConfigured()` schützt den Dev-Actor-Bypass: Die E2E-Umgebung
+ * läuft ohne `DATABASE_URL`, und diese Seite ist die erste unter dem Bypass,
+ * die überhaupt eine Datenbankverbindung braucht. Ohne die Prüfung hinge der
+ * Verbindungsversuch dort, statt sauber den leeren Zustand zu zeigen.
  */
 
 type CredentialRow = {
@@ -37,6 +43,7 @@ type SessionRow = {
 export type DeviceList = { credentials: CredentialRow[]; sessions: SessionRow[] };
 
 async function requireParentActor() {
+  if (!databaseConfigured()) return null;
   const { actor } = await loginStatus();
   if (!actor || actor.role !== "parent") return null;
   return actor;

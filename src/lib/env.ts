@@ -65,6 +65,22 @@ export function serverEnv() {
 }
 
 /**
+ * Ist überhaupt eine Datenbank konfiguriert? Für Aufrufer, die ohne DB
+ * einen leeren statt gar keinen Zustand zeigen können sollen – analog zu
+ * `supabaseConfig()`.
+ *
+ * Der Anlass war ein CI-Fehlschlag: Die E2E-Umgebung setzt `SKIP_ENV_
+ * VALIDATION=1` **ohne** `DATABASE_URL`, weil bis F-06b keine Seite unter
+ * dem Dev-Actor-Bypass eine echte Verbindung brauchte. Ein ungeprüfter
+ * `postgres(undefined, …)`-Aufruf hängt dort nicht mit einem Fehler, sondern
+ * mit einem TCP-Verbindungsversuch ins Leere – sichtbar erst als 30-
+ * Sekunden-Timeout beim Seitenaufruf, nicht als klarer Fehler.
+ */
+export function databaseConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
+}
+
+/**
  * Nur die Datenbank-URL – für den Drizzle-Client und Migrationen.
  * Entkoppelt von den übrigen Server-Secrets, damit ein Verbindungstest
  * nicht an einem noch fehlenden ANTHROPIC_API_KEY o. Ä. scheitert.
