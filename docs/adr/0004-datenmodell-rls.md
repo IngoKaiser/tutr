@@ -114,18 +114,20 @@ Postgres kennt keine spaltenweise Sichtbarkeit innerhalb einer Policy. Statt ein
 
 RLS-Matrix (Kurzfassung, Detail in `src/db/policies/`):
 
-| Tabellengruppe                                                  | Elternteil        | Kind                     |
-| --------------------------------------------------------------- | ----------------- | ------------------------ |
-| `family`, `student`, `school_year`, `subject`, `school_profile` | lesen + schreiben | lesen                    |
-| `topic`, `learning_objective`, `material`                       | lesen             | lesen + schreiben        |
-| `card`, `review`, `vocab_*`, `objective_mastery`                | lesen             | lesen + schreiben        |
-| `calendar_event`, `study_plan_slot`                             | lesen + schreiben | lesen + schreiben        |
-| `exam`, `exam_attempt`                                          | Ergebnis lesen    | lesen + schreiben        |
-| `tutor_session`, `tutor_message`                                | **kein Zugriff**  | eigene lesen + schreiben |
-| `tutor_session_summary`, `homework_task`                        | lesen             | lesen + schreiben        |
-| `curriculum_pack`, `curriculum_node`, `textbook`, `chapter`     | lesen             | lesen                    |
+| Tabellengruppe                                                                | Elternteil                        | Kind                              |
+| ----------------------------------------------------------------------------- | --------------------------------- | --------------------------------- |
+| `family`, `student`, `school_year`, `subject`, `school_year_textbook`         | lesen + schreiben                 | lesen                             |
+| `topic`, `learning_objective`, `material`                                     | lesen                             | lesen + schreiben                 |
+| `card`, `review`, `vocab_*`, `objective_mastery`                              | lesen                             | lesen + schreiben                 |
+| `calendar_event`, `study_plan_slot`                                           | lesen + schreiben                 | lesen + schreiben                 |
+| `exam`, `exam_attempt`                                                        | Ergebnis lesen                    | lesen + schreiben                 |
+| `tutor_session`, `tutor_message`                                              | **kein Zugriff**                  | eigene lesen + schreiben          |
+| `tutor_session_summary`, `homework_task`                                      | lesen                             | lesen + schreiben                 |
+| `curriculum_pack`, `curriculum_node`, `textbook`, `chapter`, `school_profile` | kuratiert lesen, eigene schreiben | kuratiert lesen, eigene schreiben |
 
 Kind-Policies filtern zusätzlich auf `student_id = app.student_id()`, damit Geschwisterprofile getrennt bleiben.
+
+`school_profile` stand hier ursprünglich in der ersten Zeile bei den familieneigenen Tabellen – ein Fehler: mehrere Familien können dieselbe Schule besuchen, ein kuratiertes Schulprofil soll teilbar sein. Es folgt D7 (korrigiert 2026-09-07, F-04d).
 
 ## D5 · Beziehungen als Join-Tabellen, JSONB nur für echte Payloads
 
@@ -141,13 +143,23 @@ Kind-Policies filtern zusätzlich auf `student_id = app.student_id()`, damit Ges
 
 ## D7 · Referenzdaten: eine Tabelle, `family_id` nullable
 
-`curriculum_pack`, `curriculum_node`, `textbook`, `chapter`, `school_profile` gibt es in zwei Ausprägungen: kuratiert (`family_id is null`, per Seed/Migration mit dem Secret-Key geschrieben) und selbst angelegt (Foto vom Inhaltsverzeichnis → familieneigenes Lehrwerk). Eine Policy deckt beides:
+`curriculum_pack`, `curriculum_node`, `textbook`, `chapter`, `school_profile` gibt es in zwei Ausprägungen: kuratiert (`family_id is null`, per Seed/Migration mit dem Secret-Key geschrieben) und selbst angelegt (Foto vom Inhaltsverzeichnis → familieneigenes Lehrwerk).
+
+Das braucht **zwei** Policies, nicht eine (Korrektur vom 2026-09-07, F-04d):
 
 ```sql
-using (family_id is null or family_id = app.family_id())
+-- Lesen: kuratiert oder eigen
+for select using (family_id is null or family_id = app.family_id())
+-- Schreiben: nur eigen – in USING *und* WITH CHECK
+for all    using (family_id = app.family_id())
+       with check (family_id = app.family_id());
 ```
 
-Schreibrechte nur auf Zeilen mit eigener `family_id`. Kuratierte Zeilen sind für die App-Rolle read-only.
+Die ursprünglich hier skizzierte einzelne Policy mit `using (family_id is null or …)` war unsicher: Bei `UPDATE` filtert `USING` die Zieltabellenzeilen, und eine kuratierte Zeile (`family_id is null`) hätte diesen Filter passiert. `WITH CHECK (family_id = app.family_id())` wäre dann durch dasselbe Update erfüllbar gewesen, das `family_id` auf die eigene Familie setzt – eine Familie hätte eine kuratierte Zeile für alle anderen Familien kapern können.
+
+Mit der Trennung greift für `UPDATE`/`DELETE` nur die zweite Policy, und `family_id = app.family_id()` ist für `NULL` niemals wahr; für `INSERT` zählt allein `WITH CHECK`. Kuratierte Zeilen sind für `tutr_app` damit strukturell weder änder- noch löschbar, und die Rolle kann auch keine anlegen. **Kuratierte Daten schreibt ausschließlich die Migrationsrolle** – das ist kein Nebeneffekt, sondern die Absicht.
+
+Abweichend von der Eltern/Kind-Trennung in D4 dürfen bei diesen Tabellen **beide Rollen** familieneigene Zeilen schreiben: Das Kind fotografiert laut §10 das Inhaltsverzeichnis, es muss das Ergebnis speichern können.
 
 ## D8 · Schlüssel, Enums, Zeit, Namen
 
