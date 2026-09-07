@@ -108,8 +108,13 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
   });
 
   test("Familie sieht kuratierte und eigene Lehrwerke, nicht die fremden", async () => {
+    // Eingegrenzt auf die eigenen Fixtures: kuratierte Zeilen sind global
+    // sichtbar, andere Testdateien legen ebenfalls welche an.
     const titel = await runWithActor(app.db, kind(A.family, A.kind), (tx) =>
-      tx.execute<{ title: string }>(sql`select title from textbook order by title`),
+      tx.execute<{ title: string }>(sql`
+        select title from textbook
+        where id in (${KURATIERT.lehrwerk}, ${A.eigenesLehrwerk}, ${B.fremdesLehrwerk})
+        order by title`),
     );
     expect(titel.map((r) => r.title)).toEqual(["Découvertes 4", "Eigenes Heft A"]);
   });
@@ -153,7 +158,9 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
       await tx.execute(sql`
         insert into chapter (family_id, textbook_id, title, pages, sequence, units)
         values (${A.family}, ${lehrwerk!.id}, 'Unité 3', '34–51', 3, ARRAY['3.1', '3.2'])`);
-      return tx.execute<{ title: string }>(sql`select title from chapter`);
+      return tx.execute<{ title: string }>(
+        sql`select title from chapter where textbook_id = ${lehrwerk!.id}`,
+      );
     });
     expect(zeilen.map((r) => r.title)).toEqual(["Unité 3"]);
   });

@@ -23,7 +23,8 @@
     "prepare": "husky",
     "db:test": "RUN_DB_TESTS=1 vitest run src/db",
     "db:doctor": "node scripts/db-doctor.mts",
-    "db:migrate:test": "node scripts/db-apply.mts --test"
+    "db:migrate:test": "node scripts/db-apply.mts --test",
+    "db:seed": "node scripts/db-seed.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

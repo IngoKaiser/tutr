@@ -6,6 +6,9 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // Node führt .mts-Skripte direkt aus und braucht dort die Dateiendung
+    // im Import (scripts/db-seed.mts). Zulässig, weil wir ohnehin nicht emittieren.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",

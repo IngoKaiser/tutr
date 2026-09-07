@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import type { Actor } from "@/db/actor";
+import { SEED_IDS } from "@/db/seed-ids";
 import { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
 /**
@@ -18,19 +19,14 @@ import { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
 export { DEV_ACTOR_COOKIE, type DevRole } from "./dev-actor-shared";
 
-/** Feste IDs, damit der Dev-Actor zu den Seed-Daten aus F-04e passen kann. */
-const DEV_FAMILY = "00000000-0000-4000-8000-00000000d001";
-const DEV_PARENT = "00000000-0000-4000-8000-00000000d002";
-const DEV_STUDENT = "00000000-0000-4000-8000-00000000d003";
-
 export function devActorEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
 export function actorFor(rolle: DevRole): Actor {
   return rolle === "parent"
-    ? { role: "parent", familyId: DEV_FAMILY, userId: DEV_PARENT }
-    : { role: "student", familyId: DEV_FAMILY, studentId: DEV_STUDENT };
+    ? { role: "parent", familyId: SEED_IDS.familieA, userId: SEED_IDS.elternteilA }
+    : { role: "student", familyId: SEED_IDS.familieA, studentId: SEED_IDS.kindA };
 }
 
 /**
