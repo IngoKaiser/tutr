@@ -1,11 +1,17 @@
+import Link from "next/link";
+
 import { AnmeldeFehler } from "./anmelde-fehler";
 import { AnmeldeFormular } from "./anmelde-formular";
+import { PasskeyAnmeldung } from "./passkey-anmeldung";
 
 export const metadata = { title: "Anmelden · tutr" };
 
 /**
- * Anmeldung des Elternteils (ADR 0002): E-Mail und Magic Link. Das Kind meldet
- * sich nie hier an – es kommt über einen Einladungslink (F-06).
+ * Zwei Wege hinein, in der Reihenfolge, in der sie gebraucht werden (ADR 0005):
+ *
+ * Das Kind zuerst, per Passkey – es ist die tägliche Nutzerin. Eltern kommen
+ * seltener und über den Magic Link; typischerweise genau einmal, aus der
+ * Einwilligungsmail heraus. Deshalb steht ihr Weg unten und leiser.
  */
 export default function AnmeldenPage() {
   return (
@@ -13,19 +19,32 @@ export default function AnmeldenPage() {
       <div className="flex flex-col gap-2">
         <span className="text-koenigsblau text-xl font-bold tracking-tight">tutr</span>
         <h1 className="text-2xl font-semibold tracking-tight">Anmelden</h1>
-        <p className="font-lese text-tinte-weich text-[0.9375rem] leading-relaxed">
-          Für Eltern. Du bekommst einen Link per E-Mail — kein Passwort, nichts zu merken.
-        </p>
       </div>
 
       <AnmeldeFehler />
 
-      <AnmeldeFormular />
+      <div className="flex flex-col gap-3">
+        <PasskeyAnmeldung />
+        <p className="text-tinte-leise text-[0.8125rem] leading-normal">
+          Zum ersten Mal hier?{" "}
+          <Link href="/registrieren" className="text-koenigsblau underline underline-offset-2">
+            Profil anlegen
+          </Link>
+          .
+        </p>
+      </div>
 
-      <p className="text-tinte-leise text-[0.8125rem] leading-normal">
-        Deine Tochter meldet sich nicht hier an. Sie bekommt von dir einen Einladungslink und
-        richtet auf ihrem Gerät einen Passkey ein.
-      </p>
+      <div className="border-linie flex items-center gap-3 border-t pt-6">
+        <div className="flex w-full flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-[0.9375rem] font-semibold">Ich bin ein Elternteil</h2>
+            <p className="text-tinte-weich text-[0.8125rem] leading-normal">
+              Du bekommst einen Link per E-Mail — kein Passwort, nichts zu merken.
+            </p>
+          </div>
+          <AnmeldeFormular />
+        </div>
+      </div>
     </main>
   );
 }

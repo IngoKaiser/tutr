@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { SESSION_COOKIE } from "@/lib/auth/student-session";
 import { e2eActor } from "@/lib/dev-actor";
 import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
 
@@ -23,6 +24,11 @@ export async function proxy(request: NextRequest) {
   // Umgehung, die es außerhalb der Produktion und nur mit gesetzter
   // Umgebungsvariable gibt.
   if (e2eActor()) return antwort;
+
+  // Das Kind meldet sich mit einem Passkey an, nicht über Supabase (F-06).
+  // Optimistisch wie der Rest hier: dass das Cookie *gilt*, prüft
+  // `actorAusSession()` – und danach ohnehin RLS.
+  if (request.cookies.has(SESSION_COOKIE)) return antwort;
 
   const konfiguration = supabaseKonfiguration();
   const produktiv = process.env.NODE_ENV === "production";
@@ -73,6 +79,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Anmeldung, Auth-Rückweg und statische Dateien bleiben außen vor.
   matcher: [
-    "/((?!anmelden|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest).*)",
+    "/((?!anmelden|registrieren|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest).*)",
   ],
 };

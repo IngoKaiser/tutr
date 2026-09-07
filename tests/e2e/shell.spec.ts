@@ -69,15 +69,15 @@ test("Manifest-Icons werden ausgeliefert", async ({ request }) => {
   }
 });
 
-test("Anmeldeseite ist ohne Session erreichbar und erklärt den Weg fürs Kind", async ({ page }) => {
+test("Anmeldeseite ist ohne Session erreichbar", async ({ page }) => {
   await page.goto("/anmelden");
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Anmelden");
   await expect(page.getByLabel("E-Mail-Adresse")).toBeVisible();
   await expect(page.getByRole("button", { name: "Anmeldelink schicken" })).toBeVisible();
-  // Konzept §11: Das Kind meldet sich nie per E-Mail an – das muss auf der
-  // Seite stehen, sonst versucht ein Elternteil es für sie.
-  await expect(page.getByText(/Einladungslink/)).toBeVisible();
+  // Der Einladungslink, auf den dieser Test einmal prüfte, ist mit ADR 0005
+  // entfallen: Das Kind meldet sich selbst an. Was stattdessen auf der Seite
+  // stehen muss, prüft `anmeldung.spec.ts`.
 });
 
 test("Anmeldung weist eine unvollständige Adresse zurück", async ({ page }) => {

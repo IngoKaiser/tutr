@@ -1,20 +1,26 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { authEnv } from "@/lib/env";
 
 /**
- * Die WebAuthn-Challenge zwischen „Optionen holen" und „Antwort prüfen" (F-06).
+ * Der Zwischenstand zwischen „Optionen holen" und „Antwort prüfen" (F-06).
  *
- * Sie muss irgendwo liegen, und die naheliegende Wahl wäre eine Tabelle. Ein
- * signiertes Cookie kommt hier ohne aus: Die Challenge ist ohnehin an genau
- * diesen Browser gebunden, sie lebt fünf Minuten, und sie hat keinen Wert,
- * der eine Zeile rechtfertigt.
+ * Zu merken ist mindestens die WebAuthn-Challenge, bei der Registrierung
+ * zusätzlich das Profil und die frisch erzeugten IDs. Die naheliegende Wahl
+ * wäre eine Tabelle. Ein signiertes Cookie kommt ohne aus: Der Zwischenstand
+ * ist ohnehin an genau diesen Browser gebunden, er lebt fünf Minuten, und er
+ * hat keinen Wert, der eine Zeile rechtfertigt.
  *
- * Signiert werden muss sie trotzdem. Ein httpOnly-Cookie schützt nur vor
- * JavaScript im Browser – wer HTTP-Anfragen selbst baut, setzt den
- * Cookie-Header frei. Eine selbst gewählte Challenge wiederum macht das
- * Wiedereinspielen einer mitgeschnittenen Antwort möglich. Die HMAC schließt
- * genau das: Nur eine Challenge, die dieser Server erzeugt hat, wird geprüft.
+ * Signiert werden muss er trotzdem, aus zwei Gründen:
+ *
+ * 1. Ein httpOnly-Cookie schützt nur vor JavaScript im Browser. Wer HTTP-
+ *    Anfragen selbst baut, setzt den Cookie-Header frei – und eine selbst
+ *    gewählte Challenge macht das Wiedereinspielen einer mitgeschnittenen
+ *    Antwort möglich.
+ * 2. Im Cookie stehen die IDs, unter denen gleich Familie und Profil
+ *    entstehen. Dürfte der Client sie wählen, könnte er ein Kind-Profil in
+ *    eine fremde Familie schreiben – die INSERT-Policy prüft nur gegen den
+ *    Actor-Kontext, und der käme dann aus seiner Eingabe.
  */
 
 const COOKIE_NAME = "tutr_webauthn";
@@ -25,43 +31,69 @@ export type ChallengeZweck = "registrieren" | "anmelden";
 export const challengeCookieName = COOKIE_NAME;
 export const challengeMaxAge = LEBENSDAUER_MS / 1000;
 
-function signatur(zweck: ChallengeZweck, challenge: string, ablauf: number): string {
+type Inhalt = { challenge: string; ablauf: number };
+
+function signatur(zweck: ChallengeZweck, nutzlast: string): string {
   return createHmac("sha256", authEnv().AUTH_COOKIE_SECRET)
-    .update(`${zweck}.${challenge}.${ablauf}`)
+    .update(`${zweck}.${nutzlast}`)
     .digest("base64url");
 }
 
-/** Erzeugt eine frische Challenge und den dazu passenden Cookie-Wert. */
-export function neueChallenge(zweck: ChallengeZweck): { challenge: string; cookie: string } {
-  // Base64url ohne Polsterung – genau das Format, das WebAuthn erwartet.
-  const challenge = Buffer.from(randomUUID() + randomUUID()).toString("base64url");
-  const ablauf = Date.now() + LEBENSDAUER_MS;
-  return {
+/**
+ * Erzeugt eine frische Challenge und den Cookie-Wert dazu. `merken` wandert
+ * unverändert mit und kommt beim Prüfen zurück.
+ */
+export function neueChallenge<T extends object = Record<string, never>>(
+  zweck: ChallengeZweck,
+  merken?: T,
+): { challenge: string; bytes: Uint8Array<ArrayBuffer>; cookie: string } {
+  // Zwei Darstellungen derselben Zufallszahl, und beide werden gebraucht:
+  // `bytes` geht an @simplewebauthn (bekommt es eine Zeichenkette, kodiert es
+  // sie ein zweites Mal, und die Prüfung schlägt fehl), `challenge` ist die
+  // base64url-Fassung, die der Browser später zurückschickt.
+  const roh = randomBytes(32);
+  const bytes = new Uint8Array(new ArrayBuffer(roh.length));
+  bytes.set(roh);
+  const challenge = roh.toString("base64url");
+  const inhalt: Inhalt & Partial<T> = {
     challenge,
-    cookie: `${zweck}.${challenge}.${ablauf}.${signatur(zweck, challenge, ablauf)}`,
+    ablauf: Date.now() + LEBENSDAUER_MS,
+    ...(merken ?? ({} as T)),
   };
+  const nutzlast = Buffer.from(JSON.stringify(inhalt)).toString("base64url");
+  return { challenge, bytes, cookie: `${nutzlast}.${signatur(zweck, nutzlast)}` };
 }
 
 /**
- * Gibt die Challenge zurück, wenn das Cookie von uns stammt, zum Zweck passt
- * und noch lebt – sonst `null`. Der Vergleich läuft in konstanter Zeit.
+ * Gibt Challenge und Mitgeführtes zurück, wenn das Cookie von uns stammt, zum
+ * Zweck passt und noch lebt – sonst `null`. Der Signaturvergleich läuft in
+ * konstanter Zeit.
  */
-export function pruefeChallenge(zweck: ChallengeZweck, cookie: string | undefined): string | null {
+export function pruefeChallenge<T extends object = Record<string, never>>(
+  zweck: ChallengeZweck,
+  cookie: string | undefined,
+): ({ challenge: string } & T) | null {
   if (!cookie) return null;
 
-  const teile = cookie.split(".");
-  if (teile.length !== 4) return null;
-  const [gelesenerZweck, challenge, ablaufText, gelieferteSignatur] = teile;
+  const trenner = cookie.lastIndexOf(".");
+  if (trenner < 1) return null;
+  const nutzlast = cookie.slice(0, trenner);
+  const gelieferteSignatur = cookie.slice(trenner + 1);
 
-  if (gelesenerZweck !== zweck) return null;
-
-  const ablauf = Number(ablaufText);
-  if (!Number.isFinite(ablauf) || ablauf < Date.now()) return null;
-
-  const erwartet = Buffer.from(signatur(zweck, challenge, ablauf));
+  const erwartet = Buffer.from(signatur(zweck, nutzlast));
   const geliefert = Buffer.from(gelieferteSignatur);
   if (erwartet.length !== geliefert.length) return null;
   if (!timingSafeEqual(erwartet, geliefert)) return null;
 
-  return challenge;
+  let inhalt: (Inhalt & T) | null = null;
+  try {
+    inhalt = JSON.parse(Buffer.from(nutzlast, "base64url").toString()) as Inhalt & T;
+  } catch {
+    return null;
+  }
+
+  if (!inhalt?.challenge || typeof inhalt.ablauf !== "number") return null;
+  if (inhalt.ablauf < Date.now()) return null;
+
+  return inhalt;
 }

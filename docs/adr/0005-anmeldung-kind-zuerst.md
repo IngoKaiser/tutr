@@ -35,7 +35,7 @@ Nur Punkt 2 ist architektonisch zwingend.
 ## Entscheidung
 
 - **Das Kind meldet sich selbst an.** Passkey anlegen (Face ID), Vorname, Jahrgang,
-  Klasse, Elternadresse. Danach sofort nutzbar.
+  Elternadresse. Danach sofort nutzbar.
 - **Die Einwilligungsmail geht an die Elternadresse und blockiert nichts.** Klickt das
   Elternteil, wird es Kontoinhaber und erhält die Elternansicht.
 - **Die Elternadresse ist Pflicht**, weil sie der Wiederherstellungsanker ist – nicht
@@ -88,6 +88,14 @@ hängt.
   braucht dafür einen zweiten Weg: Elternteil tritt einer bestehenden Familie bei.
 - **ADR 0002 bleibt gültig, wo es nicht widersprochen wird**: Familienmodell, RLS-Trennung
   Eltern/Kind, kein Social Login fürs Kind, keine Altersverifikation, keine Passwortregeln.
+
+## Nachtrag beim Bauen (F-06)
+
+**Die Klasse wird nicht gefragt.** Sie stand oben ursprünglich mit in der Liste. Ihr
+einziger Verbraucher ist der Gruppenfilter beim Klausurplan-Import (K-03), und maßgeblich
+steht sie dort ohnehin am Schuljahr, nicht am Kind – an `student` wäre sie nur ein
+Startwert. Der erste Bildschirm bleibt dafür um ein Feld kürzer; gefragt wird sie, wenn
+K-03 sie braucht.
 
 ## Festgelegt beim Beschluss
 

@@ -62,12 +62,18 @@ function alsBytes(base64url: string): Uint8Array<ArrayBuffer> {
   return ziel;
 }
 
-export async function registrierungsOptionen(
+/**
+ * `merken` wandert signiert im Cookie mit – dort stehen die IDs, unter denen
+ * gleich Familie und Profil entstehen. Sie dürfen nicht über den Client
+ * laufen, siehe `challenge.ts`.
+ */
+export async function registrierungsOptionen<T extends object>(
   studentId: string,
   vorname: string,
+  merken: T,
 ): Promise<{ optionen: PublicKeyCredentialCreationOptionsJSON; cookie: string }> {
   const { rpID } = await relyingParty();
-  const { challenge, cookie } = neueChallenge("registrieren");
+  const { bytes, cookie } = neueChallenge("registrieren", merken);
 
   const optionen = await generateRegistrationOptions({
     rpName: RP_NAME,
@@ -75,7 +81,7 @@ export async function registrierungsOptionen(
     userName: vorname,
     userDisplayName: vorname,
     userID: userHandle(studentId),
-    challenge,
+    challenge: bytes,
     attestationType: "none",
     authenticatorSelection: {
       // Der Kern des Entwurfs, siehe oben.
@@ -135,11 +141,11 @@ export async function anmeldeOptionen(): Promise<{
   cookie: string;
 }> {
   const { rpID } = await relyingParty();
-  const { challenge, cookie } = neueChallenge("anmelden");
+  const { bytes, cookie } = neueChallenge("anmelden");
 
   const optionen = await generateAuthenticationOptions({
     rpID,
-    challenge,
+    challenge: bytes,
     userVerification: "preferred",
   });
 
