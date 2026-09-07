@@ -7,11 +7,13 @@ import postgres from "postgres";
  * Der Wächter unten ist der Grund, warum diese Datei existiert: ein Testlauf
  * gegen das Produktivprojekt wäre nicht zu reparieren.
  *
- * `npm run db:test` läuft bewusst mit `--no-file-parallelism`. Alle
- * Testdateien teilen sich *eine* Datenbank und legen Familien an und wieder
- * weg; parallel laufen sie in Sperrkonflikte, die als Zeitüberschreitung
- * erscheinen – in CI eher als lokal, weil dort langsamer. Parallelität bringt
- * hier ohnehin nichts, weil die Datenbank der Engpass ist.
+ * `npm run db:test` setzt `--testTimeout=30000`. Die Tests sprechen mit einer
+ * echten Datenbank in Frankfurt, und jede `withActor`-Transaktion kostet rund
+ * sechs Rundreisen (Rolle setzen, drei Session-Variablen, Abfrage, Commit).
+ * Lokal sind das ~21 ms pro Rundreise, aus der CI-Region deutlich mehr – die
+ * voreingestellten 5 Sekunden reichen dort für die längeren Tests nicht.
+ * Wer hier Zeitüberschreitungen sieht, sollte zuerst die Latenz prüfen und
+ * nicht Sperren vermuten.
  */
 function projectRef(url: string): string | null {
   const match = /:\/\/[^:@/]*?\.?([a-z0-9]{20})[:@.]/.exec(url);
