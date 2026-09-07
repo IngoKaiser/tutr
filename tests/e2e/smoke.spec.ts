@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("Startseite lädt und zeigt tutr", async ({ page }) => {
+test("Startseite leitet auf Heute", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("tutr");
+  await expect(page).toHaveURL(/\/heute$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Heute");
 });
 
 test("Sicherheits-Header sind gesetzt", async ({ request }) => {
