@@ -13,11 +13,12 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 
 ## Domänenregeln (nicht verhandelbar)
 
-- Kernkette: Family → Student → SchoolYear → Subject → Topic → LearningObjective. Karten, Vokabeln, Reviews und Mastery hängen an LearningObjective/Student, **nie** an SchoolYear.
+- Kernkette: Student → SchoolYear → Subject → Topic → LearningObjective. **Student ist der Mandant**: Jede Tabelle trägt `student_id`, jede Policy vergleicht genau diese Spalte (ADR 0006). Eltern hängen über `parent_student` daran, nicht umgekehrt – ein Kind funktioniert ohne Elternkonto. Karten, Vokabeln, Reviews und Mastery hängen an LearningObjective/Student, **nie** an SchoolYear.
+- `konzept.md` §8 kennt noch eine `Family` als Wurzel. Die ist mit ADR 0006 entfallen; die Spec bleibt unverändert, der ADR ist die dokumentierte Abweichung.
 - Eltern sehen Termine, Mastery, Noten, Zusammenfassungen – **nie** `tutor_sessions`. Das wird in RLS erzwungen, nicht nur in der UI.
 - Hausaufgaben-Tutor: keine Lösung vor zwei dokumentierten Versuchen; Hinweisleiter §4a einhalten; Fachtabelle §4a beachten.
 - Wissensschichten: eigenes Material > Lehrwerk > Kurrikulum-Pack > Allgemeinwissen. Der Tutor benennt die Quelle. Prüfungen nur aus Schicht 1+2.
-- Kind-Profile sind pseudonym: kein Geburtsdatum, keine E-Mail, keine Schul-ID. Nur Vorname, Jahrgang, Klasse.
+- Kind-Profile sind pseudonym: kein Geburtsdatum, keine E-Mail, keine Schul-ID. Nur Vorname, Jahrgang, Klasse. Die Elternadresse an `student` ist der Wiederherstellungsanker, nicht die Einwilligung – die steht als `consent_at` an `parent_student`, je Kind (ADR 0005, 0006).
 - UI-Sprache Deutsch, Du-Ansprache, Ton für 14-Jährige: respektvoll, nicht kindlich, kein Lob ohne Grund. Der Tutor antwortet immer auf Deutsch (Ausnahme: Zielsprache in Fremdsprachenfächern) – das wird getestet.
 - Ein Thema gehört zu genau einem Fach; eine Prüfung verknüpft nur Themen ihres Fachs (DB-Constraint + Test).
 - Kein Lösungsmodus, keine Bestenlisten, keine Streaks im Header, keine Kauf-/Dringlichkeits-Elemente (Konzept §15).
@@ -27,6 +28,7 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 
 - Mutationen über Server Actions; Route Handler nur für Uploads, Webhooks, Cron.
 - Drizzle-Schema in `src/db/schema/*.ts`, eine Datei pro Aggregat. Migrationen nur über `npm run db:generate`. Keine handgeschriebenen SQL-Migrationen außer für RLS-Policies (`src/db/policies/*.sql`).
+- **Bezeichner englisch, Prosa deutsch** (ADR 0004 D8, geschärft in ADR 0006 D10). Englisch: Tabellen, Spalten, Funktionen, Typen, Konstanten, lokale Variablen, Dateinamen. Deutsch: UI-Texte, Fehlermeldungen, Kommentare, Dokumentation, Enum-_Werte_ (`erhoeht`, `regel`) und Routen – `/anmelden` und `/pruefungen` sind URLs, die die Nutzerin sieht. Kein Mischmasch in einem Bezeichner (`actorFuerAuthUser` war der Anlass für die Regel).
 - Jede Tabelle hat RLS. Neue Tabelle ohne Policy = Ticket nicht fertig. Checkliste in `src/db/policies/README.md`.
 - **Jeder Datenbankzugriff läuft durch `withActor()`** (`src/db/actor.ts`). Direkter `db.*`-Zugriff ist nur in Migrationen, Seeds und Cron-Jobs erlaubt und dort in einem Kommentar zu begründen. Grund: Die Laufzeit verbindet sich als Rolle `tutr_app` ohne `BYPASSRLS`, der Actor-Kontext kommt per `SET LOCAL` – ohne Wrapper sind die Policies falsch und das Resultat leer (ADR 0004 D1).
 - Claude API: Sonnet für Tutor, Vision, Generierung, Bewertung; Haiku für Klassifikation und Vokabel-Checks. Alle Modellantworten mit Structured Output gegen ein Zod-Schema in `src/ai/schemas/`. Prompts in `src/ai/prompts/` als Funktionen, nie inline. Prompt Caching für Thema-Kontextpakete.
@@ -63,5 +65,6 @@ Datenbank: `npm run db:generate` (Migration aus dem Schema) · `npm run db:migra
 ## Was du nicht tun sollst
 
 - Keine Dateien in `docs/konzept.md` umschreiben – das ist die Spec, Änderungen laufen über den Menschen.
-- Keine `git push --force`, kein Löschen von Migrationen, kein Deaktivieren von Hooks oder CI-Schritten.
+- Keine `git push --force`, kein Deaktivieren von Hooks oder CI-Schritten.
+- **Ab dem ersten Deploy (D-01) werden Migrationen nie gelöscht.** Davor war ein Reset der Historie erlaubt; er ist zweimal passiert und in ADR 0006 D9 datiert festgehalten. Ab D-01 gilt die Regel ohne Ausnahme.
 - Keine Testdaten mit echten Namen von Lehrkräften oder Mitschülern.
