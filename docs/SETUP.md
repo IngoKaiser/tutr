@@ -47,7 +47,7 @@ Zielgruppe: du, einmalig auf deinem Mac/PC. Dauer ca. 45 Minuten inkl. GitHub- u
 10. **.env.local**
     ```bash
     cp .env.example .env.local
-    openssl rand -base64 32    # → INVITE_TOKEN_SECRET
+    openssl rand -base64 32    # → AUTH_COOKIE_SECRET
     ```
     Werte eintragen. Die Datei ist in `.gitignore` und für Claude Code per `.claude/settings.json` gesperrt.
 11. **Vercel** (kann warten bis Ticket D-01): vercel.com → Import Git Repository → Environment Variables aus `.env.local` übernehmen, Region Frankfurt (fra1).
