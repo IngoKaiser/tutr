@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { clientEnv } from "@/lib/env";
+import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
 
 /**
  * Heißt in Next 16 `proxy.ts`, nicht mehr `middleware.ts` – die alte
@@ -18,28 +18,35 @@ import { clientEnv } from "@/lib/env";
  */
 export async function proxy(request: NextRequest) {
   let antwort = NextResponse.next({ request });
-  const env = clientEnv();
+  const konfiguration = supabaseKonfiguration();
+  const produktiv = process.env.NODE_ENV === "production";
 
-  const supabase = createServerClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
-            request.cookies.set(name, value);
-          }
-          antwort = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) {
-            antwort.cookies.set(name, value, options);
-          }
-        },
+  if (!konfiguration) {
+    // Produktiv ist das eine Fehlkonfiguration: dann lieber die Anmeldung
+    // zeigen als stillschweigend durchlassen. Sonst (Tests, lokaler Lauf
+    // ohne .env) durchlassen – dort übernimmt der Dev-Actor.
+    if (!produktiv) return antwort;
+    const ziel = request.nextUrl.clone();
+    ziel.pathname = "/anmelden";
+    return NextResponse.redirect(ziel);
+  }
+
+  const supabase = createServerClient(konfiguration.url, konfiguration.key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value);
+        }
+        antwort = NextResponse.next({ request });
+        for (const { name, value, options } of cookiesToSet) {
+          antwort.cookies.set(name, value, options);
+        }
       },
     },
-  );
+  });
 
   const {
     data: { user },
@@ -47,9 +54,7 @@ export async function proxy(request: NextRequest) {
 
   // In der Entwicklung übernimmt der Dev-Actor, solange F-06 fehlt – sonst
   // käme man ohne Elternkonto gar nicht in die App.
-  const devErlaubt = process.env.NODE_ENV !== "production";
-
-  if (!user && !devErlaubt) {
+  if (!user && produktiv) {
     const ziel = request.nextUrl.clone();
     ziel.pathname = "/anmelden";
     ziel.searchParams.set("weiter", request.nextUrl.pathname);

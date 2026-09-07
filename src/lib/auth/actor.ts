@@ -1,5 +1,6 @@
 import type { Actor } from "@/db/actor";
 import { currentActor as devActor, devActorEnabled } from "@/lib/dev-actor";
+import { supabaseKonfiguration } from "@/lib/supabase/konfiguration";
 import { createClient } from "@/lib/supabase/server";
 
 import { actorFuerAuthUser } from "./onboarding";
@@ -15,6 +16,9 @@ import { actorFuerAuthUser } from "./onboarding";
  * `null` heißt: nicht angemeldet. Aufrufer müssen das behandeln.
  */
 export async function currentActor(): Promise<Actor | null> {
+  // Ohne Konfiguration gäbe es nur einen Absturz statt einer Antwort.
+  if (!supabaseKonfiguration()) return devActorEnabled() ? devActor() : null;
+
   const supabase = await createClient();
 
   // getUser() prüft das Token serverseitig; getSession() würde dem Cookie
@@ -37,6 +41,11 @@ export async function anmeldeStatus(): Promise<{
   email: string | null;
   istDevActor: boolean;
 }> {
+  if (!supabaseKonfiguration()) {
+    const ohne = devActorEnabled() ? await devActor() : null;
+    return { actor: ohne, email: null, istDevActor: ohne !== null };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
