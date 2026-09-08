@@ -39,10 +39,10 @@ export async function seed(sql: postgres.Sql): Promise<void> {
     insert into textbook (id, student_id, title, subject, grade_level, publisher, source)
     values (${SEED_IDS.textbookCurated}, null, 'Découvertes 4', 'Französisch', 8, 'Klett', 'manuell')`;
   await sql`
-    insert into chapter (student_id, textbook_id, title, pages, sequence, units)
+    insert into chapter (id, student_id, textbook_id, title, pages, sequence, units)
     values
-      (null, ${SEED_IDS.textbookCurated}, 'Unité 3 · Une journée particulière', '48–67', 3, ARRAY['3.1', '3.2']),
-      (null, ${SEED_IDS.textbookCurated}, 'Unité 4 · En vacances', '68–85', 4, ARRAY['4.1'])`;
+      (${SEED_IDS.chapterUnite3}, null, ${SEED_IDS.textbookCurated}, 'Unité 3 · Une journée particulière', '48–67', 3, ARRAY['3.1', '3.2']),
+      (gen_random_uuid(), null, ${SEED_IDS.textbookCurated}, 'Unité 4 · En vacances', '68–85', 4, ARRAY['4.1'])`;
 
   // --- Kinder. Pseudonym: Vorname, Jahrgang, Klasse – sonst nichts (§11). ---
   // Die Elternadresse ist der Wiederherstellungsanker und die Bedingung, unter
@@ -125,6 +125,96 @@ export async function seed(sql: postgres.Sql): Promise<void> {
       and frueher.title = 'Reflexivpronomen richtig zuordnen'
       and spaeter.student_id = ${SEED_IDS.studentOne}
       and frueher.student_id = ${SEED_IDS.studentOne}`;
+
+  // --- Vokabelset zu Unité 3 (V-02): zwölf Einträge zum Thema "Les verbes
+  //     pronominaux" (Tagesablauf, reflexive Verben), beide Richtungen als
+  //     Karten – sonst hat eine Übungssession beim Seed nichts zu tun.
+  //
+  //     Der FSRS-Ruhezustand steht hier als Literal, nicht importiert aus
+  //     `src/lib/vocab/fsrs.ts`: Dieses Skript läuft per `node` ohne
+  //     Next.js-Bundler, `@/`-Alias-Importe lösen dort nicht auf (siehe
+  //     Kommentar oben zu `seed-ids.ts`). Der Wert ist genau das, was
+  //     `createEmptyCard()` für eine frische Karte liefert – gegen die
+  //     echte Bibliothek geprüft, nicht auswendig hingeschrieben.
+  await sql`
+    insert into vocab_set (id, student_id, subject_id, chapter_id, unit, title)
+    values (${SEED_IDS.vocabSetUnite3}, ${SEED_IDS.studentOne}, ${SEED_IDS.subjectFrench}, ${SEED_IDS.chapterUnite3}, '3.1', 'Unité 3 · Le quotidien')`;
+
+  // Jeder Wert als gebundener Parameter, keine SQL-Text-Literale –
+  // "s'habiller" und "d'abord" tragen ein Apostroph. `sql(rows, [...])` –
+  // die Klammerform, nicht `sql(rows, "a", "b")` direkt in der Vorlage, die
+  // hat in dieser Paketversion eine Typisierungsschwäche (ein
+  // `readonly`-Array passt nicht auf die intern erwartete `any[]`).
+  const VOCAB: [term: string, translation: string][] = [
+    ["se lever", "aufstehen"],
+    ["se laver", "sich waschen"],
+    ["se brosser les dents", "sich die Zähne putzen"],
+    ["s'habiller", "sich anziehen"],
+    ["se coucher", "sich hinlegen"],
+    ["se réveiller", "aufwachen"],
+    ["le petit-déjeuner", "das Frühstück"],
+    ["la salle de bain", "das Badezimmer"],
+    ["tous les jours", "jeden Tag"],
+    ["d'abord", "zuerst"],
+    ["ensuite", "danach"],
+    ["avant de", "bevor"],
+  ];
+
+  const now = new Date().toISOString();
+  const freshFsrsState = JSON.stringify({
+    due: now,
+    stability: 0,
+    difficulty: 0,
+    elapsed_days: 0,
+    scheduled_days: 0,
+    learning_steps: 0,
+    reps: 0,
+    lapses: 0,
+    state: 0,
+  });
+
+  // Drei Bulk-Inserts statt einer Schleife mit 3 × 12 Einzelabfragen: Gegen
+  // eine entfernte Datenbank (Supabase) hätten 36 sequenzielle Round-Trips
+  // in CI den Standard-Hook-Timeout von `seed.test.ts` (10 s) gesprengt –
+  // dort gefunden, lokal war die Verbindung schnell genug, es zu verdecken.
+  const vocabItemRows: { student_id: string; term: string; translation: string }[] = VOCAB.map(
+    ([term, translation]) => ({ student_id: SEED_IDS.studentOne, term, translation }),
+  );
+  // Kein `sql<{ id: string }[]>`-Generic auf dem Vorlagen-Aufruf – das
+  // schaltet eine engere Überladung ein, unter der `sql(rows, [...])` aus
+  // demselben Grund nicht mehr typprüft wie oben. Stattdessen das Ergebnis
+  // hinterher casten.
+  const items = (await sql`
+    insert into vocab_item ${sql(vocabItemRows, ["student_id", "term", "translation"])}
+    returning id`) as { id: string }[];
+
+  const setLinkRows: { student_id: string; vocab_set_id: string; vocab_item_id: string }[] =
+    items.map((item) => ({
+      student_id: SEED_IDS.studentOne,
+      vocab_set_id: SEED_IDS.vocabSetUnite3,
+      vocab_item_id: item.id,
+    }));
+  await sql`insert into vocab_set_item ${sql(setLinkRows, ["student_id", "vocab_set_id", "vocab_item_id"])}`;
+
+  const cardRows: {
+    student_id: string;
+    vocab_item_id: string;
+    direction: "vorwaerts" | "rueckwaerts";
+    fsrs_state: string;
+    due_at: string;
+    state: string;
+  }[] = items.flatMap((item) =>
+    (["vorwaerts", "rueckwaerts"] as const).map((direction) => ({
+      student_id: SEED_IDS.studentOne,
+      vocab_item_id: item.id,
+      direction,
+      fsrs_state: freshFsrsState,
+      due_at: now,
+      state: "neu",
+    })),
+  );
+  await sql`
+    insert into card ${sql(cardRows, ["student_id", "vocab_item_id", "direction", "fsrs_state", "due_at", "state"])}`;
 
   // --- Das unverknüpfte Kind: bewusst mager. Es beweist, dass ein Kind
   //     ohne Elternkonto funktioniert (ADR 0005). ---

@@ -112,14 +112,23 @@ export function ContextChip({ subject, topic }: { subject: string; topic: string
 export function Button({
   children,
   quiet = false,
+  type = "button",
+  onClick,
+  disabled = false,
 }: {
   children: React.ReactNode;
   quiet?: boolean;
+  /** "submit", wenn der Knopf in einem `<form onSubmit>` steht (V-02: Tippen-Eingabe). */
+  type?: "button" | "submit";
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
-      type="button"
-      className={`focus-visible:outline-koenigsblau w-full rounded-[9px] border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`focus-visible:outline-koenigsblau w-full rounded-[9px] border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${
         quiet
           ? "border-linie-stark bg-flaeche text-tinte hover:bg-papier-tief"
           : "bg-koenigsblau text-auf-koenigsblau border-transparent"

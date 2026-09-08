@@ -13,8 +13,15 @@ import { z } from "zod";
  * damit „welche Karten sind fällig" und „wie viele sind neu" ohne einen
  * Ausdrucks-Index auf JSONB auskommen. Geschrieben werden sie ausschließlich
  * zusammen mit `fsrs_state`, in `src/lib/vocab/fsrs.ts` – nirgends sonst.
+ *
+ * Ein `z.preprocess()` vor der eigentlichen Prüfung, weil `tx.execute()`
+ * (der rohe SQL-Weg über `drizzle-orm/postgres-js`, nicht der
+ * Query-Builder) ein `jsonb`-Feld als **String** zurückgibt, nicht als
+ * geparstes Objekt – gegen einen echten Playwright-Lauf gefunden, nicht
+ * angenommen. Damit ist dieselbe Zeile korrekt, ob sie von hier kommt oder
+ * (wie in Tests) schon ein echtes Objekt ist.
  */
-export const fsrsCardStateSchema = z.object({
+const rawFsrsCardStateSchema = z.object({
   due: z.coerce.date(),
   stability: z.number(),
   difficulty: z.number(),
@@ -27,5 +34,10 @@ export const fsrsCardStateSchema = z.object({
   state: z.number().int().min(0).max(3),
   last_review: z.coerce.date().optional(),
 });
+
+export const fsrsCardStateSchema = z.preprocess(
+  (value) => (typeof value === "string" ? JSON.parse(value) : value),
+  rawFsrsCardStateSchema,
+);
 
 export type FsrsCardState = z.infer<typeof fsrsCardStateSchema>;

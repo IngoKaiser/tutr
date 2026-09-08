@@ -27,6 +27,10 @@ export const SEED_IDS = {
   topicEquations: "00000000-0000-4000-8000-00000000d031",
 
   textbookCurated: "00000000-0000-4000-8000-00000000c001",
+  chapterUnite3: "00000000-0000-4000-8000-00000000c002",
+
+  /** Vokabelset zu Unité 3 (V-02) – Anker, damit Playwright darauf zeigen kann. */
+  vocabSetUnite3: "00000000-0000-4000-8000-00000000d040",
 } as const;
 
 /** Adresse des Beispiel-Elternteils – Anker für `app.parent_may_link`. */
