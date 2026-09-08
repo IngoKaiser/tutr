@@ -3,11 +3,46 @@
  * kommen nicht aus einem UI-Kit.
  */
 
-export function PageHeader({ title, trailing }: { title: string; trailing?: string }) {
+import Link from "next/link";
+
+/**
+ * Die Überschrift jeder Seite – und der einzige Weg eine Ebene höher.
+ *
+ * **Jede Seite unterhalb eines Fußleisten-Bereichs trägt einen `back`.** Die
+ * Fußleiste kennt nur die fünf Bereiche und keine Tiefe darunter; ohne diesen
+ * Link gäbe es aus einer Unterseite keinen Ausgang außer dem Umweg über die
+ * Fußleiste. Dass die Regel hier steht und nicht in jedem Ticket neu bedacht
+ * wird, ist Absicht: Sie ist zweimal vergessen worden.
+ *
+ * Ein echter Link auf die Elternseite, kein Browser-Zurück: In der
+ * installierten PWA gibt es keine Browserleiste, und „zurück" landet dort, wo
+ * man herkam, nicht dort, wo man hingehört. `label` benennt deshalb das Ziel
+ * („Vokabelsets"), nicht die Richtung („Zurück").
+ */
+export function PageHeader({
+  title,
+  trailing,
+  back,
+}: {
+  title: string;
+  trailing?: string;
+  back?: { href: string; label: string };
+}) {
   return (
-    <div className="mb-4 flex items-baseline justify-between gap-3">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      {trailing ? <span className="text-tinte-leise text-xs">{trailing}</span> : null}
+    <div className="mb-4 flex flex-col gap-1">
+      {back ? (
+        <Link
+          href={back.href}
+          className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex w-fit items-center gap-1 px-1 py-1.5 text-[0.8125rem] font-medium"
+        >
+          <span aria-hidden="true">‹</span>
+          {back.label}
+        </Link>
+      ) : null}
+      <div className="flex items-baseline justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        {trailing ? <span className="text-tinte-leise text-xs">{trailing}</span> : null}
+      </div>
     </div>
   );
 }

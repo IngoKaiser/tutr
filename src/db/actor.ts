@@ -19,7 +19,8 @@ export type Actor =
   { role: "student"; studentId: string } | { role: "parent"; studentId: string; parentId: string };
 
 type Database = ReturnType<typeof getDb>;
-type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+/** Exportiert, damit Server Actions kleine `tx`-Helfer typisieren können (V-03a). */
+export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
  * Führt `fn` in einer Transaktion aus, in der Postgres weiß, wer fragt.
