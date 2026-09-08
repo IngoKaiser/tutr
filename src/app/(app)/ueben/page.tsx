@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { PageHeader } from "@/components/shell/primitives";
 import { loginStatus } from "@/lib/auth/actor";
 
 import { loadDueOverview } from "./actions";
@@ -16,6 +15,10 @@ export const metadata = { title: "Üben · tutr" };
  * `loadDueOverview()` prüft `databaseConfigured()` selbst und liefert dann
  * `null` – dieselbe Absicherung wie bei `/einstellungen` (F-06b): die
  * CI-E2E läuft ohne `DATABASE_URL`.
+ *
+ * `PageHeader` steckt in `PracticeSession`, nicht hier: Die Kopfzeile muss
+ * während des Übens den Fortschritt zeigen, nicht die beim Laden der Seite
+ * eingefrorene Zahl – die wäre nach der ersten Antwort schon falsch.
  */
 export default async function PracticePage() {
   const { actor } = await loginStatus();
@@ -23,10 +26,5 @@ export default async function PracticePage() {
 
   const overview = await loadDueOverview();
 
-  return (
-    <div className="flex flex-col gap-3">
-      <PageHeader title="Üben" trailing={overview ? `${overview.total} fällig` : undefined} />
-      <PracticeSession overview={overview} canStart={actor.role === "student"} />
-    </div>
-  );
+  return <PracticeSession overview={overview} canStart={actor.role === "student"} />;
 }
