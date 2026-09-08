@@ -5,3 +5,4 @@ export * from "./auth";
 export * from "./curriculum";
 export * from "./textbook";
 export * from "./school-profile";
+export * from "./vocab";

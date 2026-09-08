@@ -4,6 +4,14 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Added
+
+- Vokabel-Schema (V-01, Konzept §6 M4/§8): `vocab_set`, `vocab_item`, `vocab_set_item` (n:m, „eine Vokabel in mehreren Sets"), dazu `card` und `review`. `card` ist bewusst **generisch**, nicht `vocab_card` – §8 modelliert Card/Review für alle Kartentypen, nicht nur Vokabeln; M-03 („Karten-Generierung aus Material") bekommt `objective_id` als zweite, schon vorhandene Quelle statt einer Migration. Zwei Check-Constraints statt Anwendungscode: genau eine Quelle je Karte (`vocab_item_id` xor `objective_id`), Richtung (`vorwaerts`/`rueckwaerts`) nur bei einer Vokabelkarte
+- `card.fsrs_state` als JSONB (ADR 0004 D5 – bereits vorher entschieden, nicht neu). `due_at` und `state` sind echte, indizierbare Spiegel-Spalten daneben, geschrieben ausschließlich zusammen mit dem JSONB-Feld in `src/lib/vocab/fsrs.ts` – der einzigen Stelle im Code, die alle drei anfasst. Ein Zod-Schema in `src/db/types/fsrs.ts` validiert beim Lesen
+- `src/lib/vocab/fsrs.ts`: Übersetzung zwischen `ts-fsrs` und den deutschen ASCII-Enum-Werten der Datenbank (`card_state`, `review_rating`) – `ts-fsrs` kennt nur seine eigenen numerischen Enums. `newCardColumns()`, `applyReview()`
+- RLS wie `topic`/`learning_objective` (ADR 0004 D4, Zeile bereits vorher für `card, review, vocab_*` festgelegt): Kind liest und schreibt, Eltern lesen nur – Übungsfortschritt ist Tagesgeschäft des Kindes
+- Ein echter Fund beim Testen: Ein rohes JS-Objekt als Parameter für eine `jsonb`-Spalte in der `sql`-Vorlage wirft „argument must be of type string" – dieselbe Klasse Fehler wie der JS-Array-in-`text[]`-Fund aus F-06, nur diesmal mit Objekten statt Arrays. Fix: `JSON.stringify(...)` explizit, mit `::jsonb` gecastet
+
 ### Changed
 
 - **Das Kind ist der Mandant** (F-11, ADR 0006). `family` und `parent_user` entfallen, `family_id` verschwindet aus allen 14 Tabellen; an ihre Stelle treten `student` (Mandant), `parent_account` (Identität und späterer Abo-Anker) und `parent_student` (Beziehung, Einwilligung je Kind). Auslöser war die Frage, was passiert, wenn zwei Kinder dieselbe Elternadresse eintragen – im Container-Modell landen sie in zwei Familien, und ein Elternkonto konnte strukturell nur in einer sein. Nachgemessen trugen 8 der 14 Tabellen ohnehin schon `student_id` neben `family_id`

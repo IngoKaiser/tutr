@@ -15,6 +15,13 @@
       "when": 1788845798518,
       "tag": "0001_overconfident_starhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788881736388,
+      "tag": "0002_rainy_black_tom",
+      "breakpoints": true
     }
   ]
 }
