@@ -1,12 +1,14 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { logout } from "@/app/anmelden/actions";
 import { ActorSwitch } from "@/components/dev/actor-switch";
 import { BottomNav } from "@/components/shell/bottom-nav";
+import { StudentSwitch } from "@/components/shell/student-switch";
 import { loginStatus } from "@/lib/auth/actor";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { actor, email, switcher, view, parentWithoutStudent } = await loginStatus();
+  const { actor, email, switcher, view, parentWithoutStudent, login } = await loginStatus();
 
   async function logoutAndRedirect() {
     "use server";
@@ -46,6 +48,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="text-koenigsblau text-lg font-bold tracking-tight">tutr</span>
 
           <div className="flex items-center gap-3">
+            {view === "parent" && login && actor?.role === "parent" ? (
+              <>
+                <StudentSwitch students={login.students} current={actor.studentId} />
+                <Link
+                  href="/einstellungen"
+                  className="text-tinte-leise hover:text-tinte text-xs font-medium"
+                >
+                  Einstellungen
+                </Link>
+              </>
+            ) : null}
             {switcher ? <ActorSwitch current={view} /> : null}
             {email ? (
               <>

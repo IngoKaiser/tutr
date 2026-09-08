@@ -192,6 +192,31 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
     expect(row.name).toBe("Elternteil Eins");
   });
 
+  // --- Kandidaten für den Beitritt (F-06b) ---------------------------------
+
+  test("students_by_parent_email findet passende Kinder, ohne Actor-Kontext", async () => {
+    // Bewusst ohne runWithActor/runWithLoginKey: security definer braucht
+    // keinen – das ist der ganze Punkt der Funktion.
+    const rows = await app.db.execute<{ id: string; first_name: string; grade_level: number }>(
+      sql`select id, first_name, grade_level from app.students_by_parent_email(${P.mailOne})`,
+    );
+    expect(rows.map((r) => r.first_name)).toEqual(["Ben", "Mia"]);
+  });
+
+  test("students_by_parent_email ist case-insensitiv", async () => {
+    const rows = await app.db.execute<{ first_name: string }>(
+      sql`select first_name from app.students_by_parent_email(${P.mailOne.toUpperCase()})`,
+    );
+    expect(rows.map((r) => r.first_name)).toEqual(["Ben", "Mia"]);
+  });
+
+  test("students_by_parent_email liefert nichts für eine unbekannte Adresse", async () => {
+    const rows = await app.db.execute(
+      sql`select 1 from app.students_by_parent_email('niemand-fuer-identity-test@example.test')`,
+    );
+    expect(rows).toHaveLength(0);
+  });
+
   // --- Der Beitritt: die wichtigste Bedingung ------------------------------
 
   test("ein Elternteil verknüpft sich mit einem Kind, das seine Adresse nennt", async () => {
