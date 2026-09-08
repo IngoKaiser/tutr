@@ -1,4 +1,4 @@
-import { integer, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 import { timestamps } from "./columns";
 
@@ -37,6 +37,18 @@ export const student = pgTable(
      * Die bestätigte Adresse steht an `parent_account.email`.
      */
     parentEmail: text("parent_email"),
+    /**
+     * Wiederherstellung nach Passkey-Verlust (F-06d, ADR 0006 D4).
+     *
+     * Zwei Spalten statt einer eigenen Tabelle, absichtlich – der Token ist
+     * einmalig: Ein neuer überschreibt den alten, Einlösen löscht beide.
+     * Gespeichert wird nur der Hash, wie bei `student_session.token_hash`.
+     * Verbraucht wird er ausschließlich über `app.redeem_recovery_token()`
+     * (security definer) – das Kind selbst hat keine UPDATE-Policy auf diese
+     * Zeile, das bliebe sonst eine Hintertür zu F-06c (Profil bearbeiten).
+     */
+    recoveryTokenHash: text("recovery_token_hash"),
+    recoveryExpiresAt: timestamp("recovery_expires_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [

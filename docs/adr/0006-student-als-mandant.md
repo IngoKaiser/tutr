@@ -232,3 +232,29 @@ sieht. Die Regel wandert nach `CLAUDE.md`, denn dass sie dort fehlte, ist die Ur
 - **Der Zuschnitt:** F-11 Modell-Neuschnitt · F-12 Sprachbereinigung · F-06b Elternbeitritt,
   Kindliste, Geräteliste · F-06d Wiederherstellung · F-06e Löschen. (Die Fundament-Reihe wird
   fortgesetzt; `M-01`/`M-02` sind in Meilenstein 2 bereits für Material vergeben.)
+
+## Nachtrag beim Bauen von F-06d (8.9.2026)
+
+D4 nennt zwei Auslöser für einen Wiederherstellungslink: das angemeldete Elternteil in der
+Kindliste, und der Anmeldebildschirm ohne jedes Elternkonto (Adresse eintippen, eine Mail
+mit einem Link je passendem Kind). Gebaut wurde nur der erste.
+
+Der zweite braucht eine verifizierte Resend-Domain — ohne die erreicht die Mail nur die
+Adresse des eigenen Resend-Kontos, dieselbe Einschränkung wie bei der Einwilligungsmail aus
+F-06. Er wäre außerdem heute nicht sinnvoll zu prüfen: keine echte Zustellung, kein
+End-to-End-Test möglich. Dazu kämen eine neue, kontextfreie Schreibfunktion und ein
+Ratenbegrenzungs-Mechanismus, den es im Projekt noch nirgends gibt — eine E-Mail-Adresse
+einzutippen löst sonst unbegrenzt Versand an eine beliebige hinterlegte Adresse aus.
+
+Verschoben auf **F-06f**, bis eine Domain bei Resend hinterlegt ist. Bis dahin bleibt der
+Elternteil-Weg der einzige: Für die tatsächliche Nutzung (ein Elternteil mit Konto, im
+selben Haushalt) deckt er den relevanten Fall ab; der zweite Weg ist für den Fall gedacht,
+den es hier noch nicht gibt — ein Elternteil, das sich nie angemeldet hat.
+
+Der Link selbst ist kein `<a>`, sondern anklickbarer, markierbarer Text neben einem
+Kopier-Knopf: Ein `<a>` hätte das Elternteil selbst auf die Einrichtungsseite des Kindes
+geschickt. `navigator.clipboard` braucht einen sicheren Kontext (https/localhost); schlägt
+das Kopieren fehl, wird der Text stattdessen markiert (⌘C/Strg+C) statt einen Haken zu
+zeigen, der dann lügen würde. Kein QR-Code: Die Praxis-Fälle (AirDrop, WhatsApp, vorlesen)
+deckt ein Kopier-Knopf ab, ohne neue Abhängigkeit — QR bliebe nachrüstbar, sollte sich
+"neues Gerät, gleicher Raum, kein Messenger" als der häufigere Fall erweisen.

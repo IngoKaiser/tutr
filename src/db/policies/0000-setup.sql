@@ -56,8 +56,9 @@ create or replace function app.parent_id() returns uuid
   language sql stable
   as $$ select nullif(current_setting('tutr.parent_id', true), '')::uuid $$;
 
--- Die drei Anmeldeschleusen (ADR 0006 D3). Jede gibt über eine eigene
--- Policy genau eine Zeile per select frei und sonst nichts.
+-- Die Anmeldeschleusen (ADR 0006 D3, um eine vierte ergänzt in F-06d). Jede
+-- gibt über eine eigene Policy genau eine Zeile per select frei und sonst
+-- nichts.
 create or replace function app.auth_user_id() returns uuid
   language sql stable
   as $$ select nullif(current_setting('tutr.auth_user_id', true), '')::uuid $$;
@@ -69,6 +70,14 @@ create or replace function app.credential_id() returns text
 create or replace function app.session_token_hash() returns text
   language sql stable
   as $$ select nullif(current_setting('tutr.session_token_hash', true), '') $$;
+
+-- Wiederherstellung (F-06d): der Token aus dem Link, den ein Elternteil für
+-- ein Kind erzeugt hat. Wie die anderen drei nur zum *Finden* der Zeile –
+-- verbraucht wird er ausschließlich über app.redeem_recovery_token() weiter
+-- unten, nie über einen direkten UPDATE-Pfad.
+create or replace function app.recovery_token_hash() returns text
+  language sql stable
+  as $$ select nullif(current_setting('tutr.recovery_token_hash', true), '') $$;
 
 -- Die Beziehung parent_student aufzulösen, ohne dabei erneut durch RLS zu
 -- gehen. Ohne diese beiden Funktionen entsteht eine gegenseitige Rekursion:
@@ -135,6 +144,31 @@ create or replace function app.students_by_parent_email(p_email text)
     where s.parent_email is not null
       and lower(s.parent_email) = lower(p_email)
     order by s.first_name
+  $$;
+
+-- Löst einen Wiederherstellungstoken ein (F-06d).
+--
+-- `security definer`, weil das Kind an dieser Stelle noch gar keinen
+-- Actor-Kontext hat – der entsteht ja erst durch das Ergebnis dieser
+-- Funktion. Eine gewöhnliche UPDATE-Policy für die Rolle „student" wäre die
+-- falsche Alternative: RLS schränkt nicht spaltenweise ein, eine solche
+-- Policy gäbe dem Kind nebenbei die Fähigkeit, sein ganzes Profil zu
+-- ändern – eine Entscheidung, die erst F-06c trifft, nicht diese Funktion.
+--
+-- Prüfen und Löschen des Tokens passieren in einem einzigen UPDATE, nicht
+-- als SELECT gefolgt von einem UPDATE: Sonst könnten zwei gleichzeitige
+-- Einlöseversuche mit demselben Token beide den SELECT-Teil bestehen, bevor
+-- einer von ihnen löscht. So gewinnt höchstens der erste – RETURNING liefert
+-- beim zweiten Versuch keine Zeile mehr, weil der Hash dann schon NULL ist.
+create or replace function app.redeem_recovery_token(p_token_hash text) returns uuid
+  language sql security definer
+  set search_path = public, pg_temp
+  as $$
+    update student
+    set recovery_token_hash = null, recovery_expires_at = null
+    where recovery_token_hash = p_token_hash
+      and recovery_expires_at > now()
+    returning id
   $$;
 
 -- 3. Rechte. Tabellen gehören weiterhin dem Migrations-Nutzer; tutr_app darf

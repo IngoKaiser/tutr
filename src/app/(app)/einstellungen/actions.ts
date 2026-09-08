@@ -3,8 +3,11 @@
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { headers } from "next/headers";
+
 import { withActor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
+import { issueRecoveryToken } from "@/lib/auth/recovery";
 import { databaseConfigured } from "@/lib/env";
 
 /**
@@ -86,4 +89,22 @@ export async function revokeStudentSession(sessionId: string): Promise<void> {
     tx.execute(sql`update student_session set revoked_at = now() where id = ${sessionId}`),
   );
   revalidatePath("/einstellungen");
+}
+
+/**
+ * Erzeugt einen Wiederherstellungslink für das gerade gewählte Kind (F-06d).
+ *
+ * Gibt die volle URL genau einmal zurück – hier, nicht über einen erneuten
+ * Seitenaufruf: Der rohe Token ist ein Geheimnis, gespeichert wird nur sein
+ * Hash (`issueRecoveryToken()`), ein Neuladen der Seite könnte ihn also gar
+ * nicht zeigen.
+ */
+export async function createRecoveryLink(): Promise<string | null> {
+  const actor = await requireParentActor();
+  if (!actor) return null;
+
+  const token = await issueRecoveryToken(actor);
+  const headerList = await headers();
+  const origin = headerList.get("origin") ?? "http://localhost:3000";
+  return `${origin}/wiederherstellen?token=${token}`;
 }
