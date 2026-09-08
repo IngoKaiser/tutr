@@ -39,10 +39,10 @@ export async function seed(sql: postgres.Sql): Promise<void> {
     insert into textbook (id, student_id, title, subject, grade_level, publisher, source)
     values (${SEED_IDS.textbookCurated}, null, 'Découvertes 4', 'Französisch', 8, 'Klett', 'manuell')`;
   await sql`
-    insert into chapter (student_id, textbook_id, title, pages, sequence, units)
+    insert into chapter (id, student_id, textbook_id, title, pages, sequence, units)
     values
-      (null, ${SEED_IDS.textbookCurated}, 'Unité 3 · Une journée particulière', '48–67', 3, ARRAY['3.1', '3.2']),
-      (null, ${SEED_IDS.textbookCurated}, 'Unité 4 · En vacances', '68–85', 4, ARRAY['4.1'])`;
+      (${SEED_IDS.chapterUnite3}, null, ${SEED_IDS.textbookCurated}, 'Unité 3 · Une journée particulière', '48–67', 3, ARRAY['3.1', '3.2']),
+      (gen_random_uuid(), null, ${SEED_IDS.textbookCurated}, 'Unité 4 · En vacances', '68–85', 4, ARRAY['4.1'])`;
 
   // --- Kinder. Pseudonym: Vorname, Jahrgang, Klasse – sonst nichts (§11). ---
   // Die Elternadresse ist der Wiederherstellungsanker und die Bedingung, unter
@@ -125,6 +125,69 @@ export async function seed(sql: postgres.Sql): Promise<void> {
       and frueher.title = 'Reflexivpronomen richtig zuordnen'
       and spaeter.student_id = ${SEED_IDS.studentOne}
       and frueher.student_id = ${SEED_IDS.studentOne}`;
+
+  // --- Vokabelset zu Unité 3 (V-02): zwölf Einträge zum Thema "Les verbes
+  //     pronominaux" (Tagesablauf, reflexive Verben), beide Richtungen als
+  //     Karten – sonst hat eine Übungssession beim Seed nichts zu tun.
+  //
+  //     Der FSRS-Ruhezustand steht hier als Literal, nicht importiert aus
+  //     `src/lib/vocab/fsrs.ts`: Dieses Skript läuft per `node` ohne
+  //     Next.js-Bundler, `@/`-Alias-Importe lösen dort nicht auf (siehe
+  //     Kommentar oben zu `seed-ids.ts`). Der Wert ist genau das, was
+  //     `createEmptyCard()` für eine frische Karte liefert – gegen die
+  //     echte Bibliothek geprüft, nicht auswendig hingeschrieben.
+  await sql`
+    insert into vocab_set (id, student_id, subject_id, chapter_id, unit, title)
+    values (${SEED_IDS.vocabSetUnite3}, ${SEED_IDS.studentOne}, ${SEED_IDS.subjectFrench}, ${SEED_IDS.chapterUnite3}, '3.1', 'Unité 3 · Le quotidien')`;
+
+  // Jeder Wert als gebundener Parameter (`${...}`), keine SQL-Text-Literale –
+  // "s'habiller" und "d'abord" tragen ein Apostroph, das als Text-Literal
+  // erst escapet werden müsste. Zwölf Zeilen statt einer Bulk-Hilfsfunktion:
+  // `sql(rows, "spalte", …)` hat in dieser Paketversion eine bekannte
+  // Typisierungsschwäche (ein `readonly`-Array passt nicht auf die intern
+  // erwartete `any[]`) – lieber das bereits bewährte Muster wiederholen als
+  // sie mit `any` zu umgehen.
+  const VOCAB: [term: string, translation: string][] = [
+    ["se lever", "aufstehen"],
+    ["se laver", "sich waschen"],
+    ["se brosser les dents", "sich die Zähne putzen"],
+    ["s'habiller", "sich anziehen"],
+    ["se coucher", "sich hinlegen"],
+    ["se réveiller", "aufwachen"],
+    ["le petit-déjeuner", "das Frühstück"],
+    ["la salle de bain", "das Badezimmer"],
+    ["tous les jours", "jeden Tag"],
+    ["d'abord", "zuerst"],
+    ["ensuite", "danach"],
+    ["avant de", "bevor"],
+  ];
+
+  const now = new Date().toISOString();
+  const freshFsrsState = JSON.stringify({
+    due: now,
+    stability: 0,
+    difficulty: 0,
+    elapsed_days: 0,
+    scheduled_days: 0,
+    learning_steps: 0,
+    reps: 0,
+    lapses: 0,
+    state: 0,
+  });
+
+  for (const [term, translation] of VOCAB) {
+    const [item] = await sql<{ id: string }[]>`
+      insert into vocab_item (student_id, term, translation)
+      values (${SEED_IDS.studentOne}, ${term}, ${translation})
+      returning id`;
+    await sql`
+      insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id)
+      values (${SEED_IDS.studentOne}, ${SEED_IDS.vocabSetUnite3}, ${item!.id})`;
+    await sql`
+      insert into card (student_id, vocab_item_id, direction, fsrs_state, due_at, state) values
+        (${SEED_IDS.studentOne}, ${item!.id}, 'vorwaerts', ${freshFsrsState}::jsonb, ${now}, 'neu'),
+        (${SEED_IDS.studentOne}, ${item!.id}, 'rueckwaerts', ${freshFsrsState}::jsonb, ${now}, 'neu')`;
+  }
 
   // --- Das unverknüpfte Kind: bewusst mager. Es beweist, dass ein Kind
   //     ohne Elternkonto funktioniert (ADR 0005). ---

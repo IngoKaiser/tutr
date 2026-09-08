@@ -69,7 +69,31 @@ export async function loginStatus(): Promise<LoginStatus> {
         : testActor.studentId;
     const actor: Actor =
       testActor.role === "parent" && studentId ? { ...testActor, studentId } : testActor;
-    return { ...EMPTY, actor, view: testActor.role, login: testLogin };
+
+    // Derselbe Ansichts-Umschalter wie beim echten Login (unten) – ohne ihn
+    // gibt es unter dem Bypass keinen Weg zu einem Kind-Actor mit Schreib-
+    // rechten, und `<ActorSwitch>` wird gar nicht erst gerendert (`switcher`
+    // blieb hier immer `false`). Gefunden beim Bauen von V-02: Ohne diesen
+    // Zweig hatten Vokabel-Policies ("Kind schreibt") keine
+    // Browser-Abdeckung – ein Playwright-Test, der prüfte, konnte den
+    // Umschalter nicht einmal finden.
+    if (testActor.role === "parent" && switcherAvailable() && (await activeView()) === "student") {
+      return {
+        ...EMPTY,
+        actor: { role: "student", studentId: actor.studentId },
+        view: "student",
+        switcher: true,
+        login: testLogin,
+      };
+    }
+
+    return {
+      ...EMPTY,
+      actor,
+      view: testActor.role,
+      switcher: testActor.role === "parent" && switcherAvailable(),
+      login: testLogin,
+    };
   }
 
   const cookieStore = await cookies();
