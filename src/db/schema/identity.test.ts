@@ -364,7 +364,10 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
       update student set recovery_token_hash = null, recovery_expires_at = null where id = ${S.mia}`;
   });
 
-  // --- Löschen (Vorbereitung F-06e) ---------------------------------------
+  // --- Löschen (F-06e, ADR 0006 D5/D6) -------------------------------------
+  //
+  // Eigene Wegwerf-Zeilen statt Mia/Ben/Lea – die laufen nach dieser Stelle
+  // im File noch weiter und dürfen von hier aus nicht verschwinden.
 
   test("das Löschen eines Elternkontos lässt die Kinder stehen", async () => {
     await admin.client`
@@ -388,5 +391,105 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
     const verbleibend = await admin.client<{ student_id: string }[]>`
       select student_id from parent_student where parent_account_id = ${P.one} order by student_id`;
     expect(verbleibend.map((r) => r.student_id).sort()).toEqual([S.mia, S.ben].sort());
+  });
+
+  test("ein Elternteil löscht das Kind, auf das sein Actor zeigt", async () => {
+    const kind = "cc110000-0000-4000-8000-000000000001";
+    await admin.client`
+      insert into student (id, first_name, grade_level) values (${kind}, 'Weg', 9)`;
+
+    await runWithActor(app.db, parent(P.one, kind), (tx) =>
+      tx.execute(sql`delete from student where id = ${kind}`),
+    );
+
+    const rows = await admin.client`select 1 from student where id = ${kind}`;
+    expect(rows).toHaveLength(0);
+  });
+
+  test("ein Elternteil löscht damit nicht das Geschwister daneben", async () => {
+    const kind = "cc110000-0000-4000-8000-000000000002";
+    await admin.client`
+      insert into student (id, first_name, grade_level) values (${kind}, 'Bleibt', 9)`;
+
+    // Actor zeigt auf Mia, der DELETE zielt auf ein anderes Kind – die
+    // Policy filtert über app.student_id(), nicht über die WHERE-Klausel.
+    await runWithActor(app.db, parent(P.one, S.mia), (tx) =>
+      tx.execute(sql`delete from student where id = ${kind}`),
+    );
+
+    const rows = await admin.client`select 1 from student where id = ${kind}`;
+    expect(rows).toHaveLength(1);
+    await admin.client`delete from student where id = ${kind}`;
+  });
+
+  test("ein Kind löscht sich selbst", async () => {
+    const kind = "cc110000-0000-4000-8000-000000000003";
+    await admin.client`
+      insert into student (id, first_name, grade_level) values (${kind}, 'Weg', 9)`;
+
+    await runWithActor(app.db, student(kind), (tx) =>
+      tx.execute(sql`delete from student where id = ${kind}`),
+    );
+
+    const rows = await admin.client`select 1 from student where id = ${kind}`;
+    expect(rows).toHaveLength(0);
+  });
+
+  test("linked_students zeigt, wer bei einem Elternteil (noch) verknüpft ist", async () => {
+    const parentId = "aa110000-0000-4000-8000-00000000000e";
+    const a = "cc110000-0000-4000-8000-000000000004";
+    const b = "cc110000-0000-4000-8000-000000000005";
+    await admin.client`
+      insert into parent_account (id, auth_user_id, email, name)
+      values (${parentId}, gen_random_uuid(), 'linked-students@example.test', 'Probe')`;
+    await admin.client`
+      insert into student (id, first_name, grade_level) values
+        (${a}, 'Anna', 8), (${b}, 'Bodo', 6)`;
+    await admin.client`
+      insert into parent_student (parent_account_id, student_id) values
+        (${parentId}, ${a}), (${parentId}, ${b})`;
+
+    // Bewusst ohne runWithActor: security definer braucht keinen Actor-Kontext.
+    const vorher = await app.db.execute<{ first_name: string }>(
+      sql`select first_name from app.linked_students(${parentId})`,
+    );
+    expect(vorher.map((r) => r.first_name)).toEqual(["Anna", "Bodo"]);
+
+    await admin.client`delete from student where id = ${a}`;
+    const nachher = await app.db.execute<{ first_name: string }>(
+      sql`select first_name from app.linked_students(${parentId})`,
+    );
+    expect(nachher.map((r) => r.first_name)).toEqual(["Bodo"]);
+
+    await admin.client`delete from student where id = ${b}`;
+    await admin.client`delete from parent_account where id = ${parentId}`;
+  });
+
+  test("linked_students sieht die Kaskade schon in derselben Transaktion", async () => {
+    // Genau der Ablauf aus deleteSelfAsStudent(): löschen und im selben
+    // Atemzug nachfragen, ohne das gelöschte Kind manuell auszuschließen.
+    const parentId = "aa110000-0000-4000-8000-00000000000f";
+    const a = "cc110000-0000-4000-8000-000000000006";
+    const b = "cc110000-0000-4000-8000-000000000007";
+    await admin.client`
+      insert into parent_account (id, auth_user_id, email, name)
+      values (${parentId}, gen_random_uuid(), 'linked-students-tx@example.test', 'Probe')`;
+    await admin.client`
+      insert into student (id, first_name, grade_level) values
+        (${a}, 'Anna', 8), (${b}, 'Bodo', 6)`;
+    await admin.client`
+      insert into parent_student (parent_account_id, student_id) values
+        (${parentId}, ${a}), (${parentId}, ${b})`;
+
+    const rest = await runWithActor(app.db, student(a), async (tx) => {
+      await tx.execute(sql`delete from student where id = ${a}`);
+      return tx.execute<{ first_name: string }>(
+        sql`select first_name from app.linked_students(${parentId})`,
+      );
+    });
+    expect(rest.map((r) => r.first_name)).toEqual(["Bodo"]);
+
+    await admin.client`delete from student where id = ${b}`;
+    await admin.client`delete from parent_account where id = ${parentId}`;
   });
 });

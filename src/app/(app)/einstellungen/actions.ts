@@ -2,13 +2,18 @@
 
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { headers } from "next/headers";
 
+import { logout } from "@/app/anmelden/actions";
 import { withActor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
-import { issueRecoveryToken } from "@/lib/auth/recovery";
+import { deleteChildAsParent, deleteParentAccount, deleteSelfAsStudent } from "@/lib/auth/deletion";
 import { databaseConfigured } from "@/lib/env";
+import { deletionEmail } from "@/lib/mail/deletion";
+import { issueRecoveryToken } from "@/lib/auth/recovery";
+import { sendMail } from "@/lib/mail/resend";
 
 /**
  * Geräteliste des gerade gewählten Kindes (F-06b).
@@ -50,6 +55,26 @@ async function requireParentActor() {
   const { actor } = await loginStatus();
   if (!actor || actor.role !== "parent") return null;
   return actor;
+}
+
+async function requireStudentActor() {
+  if (!databaseConfigured()) return null;
+  const { actor } = await loginStatus();
+  if (!actor || actor.role !== "student") return null;
+  return actor;
+}
+
+/** Der eigene Vorname eines Kind-Actors – für die Löschbestätigung auf der eigenen Einstellungsseite (F-06e). */
+export async function loadOwnFirstName(): Promise<string | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+
+  const rows = await withActor(actor, (tx) =>
+    tx.execute<{ first_name: string }>(
+      sql`select first_name from student where id = ${actor.studentId}`,
+    ),
+  );
+  return rows[0]?.first_name ?? null;
 }
 
 export async function loadDevices(): Promise<DeviceList | null> {
@@ -107,4 +132,59 @@ export async function createRecoveryLink(): Promise<string | null> {
   const headerList = await headers();
   const origin = headerList.get("origin") ?? "http://localhost:3000";
   return `${origin}/wiederherstellen?token=${token}`;
+}
+
+/**
+ * Ein Elternteil löscht das Kind, auf das sein Actor gerade zeigt (F-06e).
+ *
+ * Kein `logout()`, kein Redirect: Das Elternteil bleibt angemeldet, hat
+ * vielleicht weitere Kinder, und `loginStatus()` wählt beim nächsten
+ * Seitenaufruf automatisch neu (`selectedStudentId()` fällt zurück, wenn das
+ * gewählte Kind nicht mehr in `login.students` steckt). War es das letzte
+ * Kind, greift `parentWithoutStudent` – derselbe leere Zustand wie sonst auch.
+ */
+export async function deleteChild(): Promise<void> {
+  const actor = await requireParentActor();
+  if (!actor) return;
+
+  await deleteChildAsParent(actor);
+  revalidatePath("/einstellungen");
+}
+
+/**
+ * Ein Kind löscht sich selbst (F-06e, ADR 0006 D6).
+ *
+ * Die Benachrichtigungsmails laufen **nach** der erfolgreich committeten
+ * Löschtransaktion, nicht davor: `sendMail()` wirft nie, aber ein
+ * Mail-Ausfall darf das Löschen so oder so nicht verhindern oder verzögern.
+ */
+export async function deleteMyAccount(): Promise<void> {
+  const actor = await requireStudentActor();
+  if (!actor) return;
+
+  const result = await deleteSelfAsStudent(actor);
+  for (const parent of result.notify) {
+    await sendMail({ to: parent.email, ...deletionEmail({ ...result, ...parent }) });
+  }
+
+  await logout();
+  redirect("/konto-geloescht");
+}
+
+/**
+ * Ein Elternteil löscht das eigene Konto (F-06e, ADR 0006 D5).
+ *
+ * Keine Bestätigung durch Eintippen eines Namens, anders als bei den beiden
+ * Wegen oben: Die Kinder bleiben unberührt, der Vorgang ist umkehrbar – bei
+ * erneuter Anmeldung mit derselben Adresse entsteht das Konto über den
+ * Beitritt (`join()`) automatisch neu, sofern ein Kind diese Adresse weiter
+ * einträgt.
+ */
+export async function deleteMyParentAccount(): Promise<void> {
+  const actor = await requireParentActor();
+  if (!actor) return;
+
+  await deleteParentAccount(actor);
+  await logout();
+  redirect("/konto-geloescht");
 }

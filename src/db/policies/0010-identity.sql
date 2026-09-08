@@ -65,6 +65,19 @@ create policy student_recovery_lookup on student
     and recovery_expires_at > now()
   );
 
+-- Löschen (F-06e, ADR 0006 D5): eine Zeile, beide Rollen – wie student_read.
+-- Ein Elternteil löscht das Kind, auf das sein Actor gerade zeigt, ein Kind
+-- sich selbst; beides ist derselbe Satz, „die eigene Zeile löschen". Welcher
+-- der beiden Wege es war, unterscheidet nur die Anwendung (Bestätigungstext,
+-- Benachrichtigungsmail) – die Datenbank braucht dafür keine zweite Policy.
+-- Alles, was zu dieser Zeile gehört, kaskadiert (Fremdschlüssel „on delete
+-- cascade" auf student.id in jeder abhängigen Tabelle); ein Aufräumschritt
+-- im Anwendungscode ist deshalb nicht nötig.
+drop policy if exists student_delete on student;
+create policy student_delete on student
+  for delete to tutr_app
+  using (id = app.student_id());
+
 -- --- parent_account -------------------------------------------------------
 alter table parent_account enable row level security;
 

@@ -3,16 +3,27 @@ import { redirect } from "next/navigation";
 import { Block, Notice, PageHeader } from "@/components/shell/primitives";
 import { loginStatus } from "@/lib/auth/actor";
 
-import { loadDevices } from "./actions";
+import {
+  deleteChild,
+  deleteMyAccount,
+  deleteMyParentAccount,
+  loadDevices,
+  loadOwnFirstName,
+} from "./actions";
+import { DeleteChild } from "./delete-child";
+import { DeleteParentAccount } from "./delete-parent-account";
 import { DeviceRow } from "./device-row";
 import { RecoveryLink } from "./recovery-link";
 
 export const metadata = { title: "Einstellungen · tutr" };
 
 /**
- * Bewusst schmal (F-06b): Kindliste und Geräteliste des gerade gewählten
- * Kindes, mehr nicht. Das Löschen eines Kontos kommt mit F-06e dazu, wenn
- * die Regeln dafür feststehen – kein Platzhalter davor.
+ * Kindliste, Geräteliste des gerade gewählten Kindes, Löschen (F-06b, F-06e).
+ *
+ * Zwei völlig verschiedene Ansichten unter einer Route statt zwei Routen:
+ * Ein Kind hat sonst keine eigene Einstellungsfläche, und „Konto löschen"
+ * ist die einzige Aktion, die es dort braucht – eine zweite Route nur dafür
+ * wäre mehr Fläche, nicht mehr Klarheit.
  *
  * Passkeys und Sitzungen stehen als **zwei** Listen, nicht zusammengeführt:
  * Ein Passkey trägt keinen Gerätenamen (wird nirgends gesetzt), eine Sitzung
@@ -21,7 +32,13 @@ export const metadata = { title: "Einstellungen · tutr" };
  */
 export default async function SettingsPage() {
   const { actor, login } = await loginStatus();
-  if (!actor || actor.role !== "parent" || !login) redirect("/heute");
+  if (!actor) redirect("/anmelden");
+
+  if (actor.role === "student") {
+    return <StudentSettings />;
+  }
+
+  if (!login) redirect("/heute");
 
   const devices = await loadDevices();
   const currentStudent = login.students.find((s) => s.id === actor.studentId);
@@ -94,7 +111,45 @@ export default async function SettingsPage() {
             </ul>
           )}
         </Block>
+
+        {currentStudent ? (
+          <Block title="Kind entfernen">
+            <DeleteChild
+              firstName={currentStudent.firstName}
+              buttonLabel="Kind entfernen"
+              warning={`${currentStudent.firstName}s Konto wird unwiderruflich gelöscht – Lernstand, Karten, Vokabeln, Gespräche mit dem Tutor. Das lässt sich nicht rückgängig machen. ${currentStudent.firstName} wird darüber nicht benachrichtigt – sag es selbst weiter.`}
+              action={deleteChild}
+            />
+          </Block>
+        ) : null}
+
+        <Block title="Elternkonto löschen">
+          <Notice>
+            Löscht nur Ihr eigenes Konto. Ihre Kinder bleiben unberührt und sind weiterhin über ihre
+            eigenen Geräte erreichbar.
+          </Notice>
+          <DeleteParentAccount action={deleteMyParentAccount} />
+        </Block>
       </div>
+    </>
+  );
+}
+
+/** Die einzige Aktion, die ein Kind hier braucht (F-06e). */
+async function StudentSettings() {
+  const firstName = await loadOwnFirstName();
+
+  return (
+    <>
+      <PageHeader title="Einstellungen" trailing={firstName ?? undefined} />
+      <Block title="Konto löschen">
+        <DeleteChild
+          firstName={firstName ?? ""}
+          buttonLabel="Konto löschen"
+          warning="Dein Konto wird unwiderruflich gelöscht – Lernstand, Karten, Vokabeln, Gespräche mit dem Tutor. Das lässt sich nicht rückgängig machen. Ist ein Elternteil mit deinem Konto verknüpft, bekommt es eine Nachricht darüber."
+          action={deleteMyAccount}
+        />
+      </Block>
     </>
   );
 }

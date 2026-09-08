@@ -171,6 +171,28 @@ create or replace function app.redeem_recovery_token(p_token_hash text) returns 
     returning id
   $$;
 
+-- Welche Kinder aktuell mit einem Elternkonto verknüpft sind (F-06e, ADR
+-- 0006 D6): Die Mail an die Eltern beim Selbstlöschen eines Kindes muss
+-- sagen, ob noch weitere Kinder verknüpft sind – aber Geschwister sehen
+-- einander nicht (`parent_student_read_by_student` zeigt nur die eigene
+-- Verknüpfung), also kann das löschende Kind selbst diese Frage nicht
+-- beantworten. `security definer`, aus demselben Grund wie bei den Funktionen
+-- oben.
+--
+-- Aufgerufen in derselben Transaktion wie das `delete from student` (siehe
+-- `deleteSelfAsStudent()`): Danach sieht diese Funktion die Kaskade bereits
+-- ohne das gelöschte Kind, ganz ohne es hier manuell auszuschließen.
+create or replace function app.linked_students(p_parent uuid) returns table (first_name text)
+  language sql stable security definer
+  set search_path = public, pg_temp
+  as $$
+    select s.first_name
+    from student s
+    join parent_student ps on ps.student_id = s.id
+    where ps.parent_account_id = p_parent
+    order by s.first_name
+  $$;
+
 -- 3. Rechte. Tabellen gehören weiterhin dem Migrations-Nutzer; tutr_app darf
 --    Daten lesen und schreiben, aber nichts anlegen oder ändern.
 do $$
