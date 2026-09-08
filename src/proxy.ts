@@ -80,7 +80,10 @@ export const config = {
   // Anmeldung, Auth-Rückweg und statische Dateien bleiben außen vor.
   // `wiederherstellen` (F-06d) ausdrücklich mit: Wer hier ankommt, hat per
   // Definition noch keine gültige Session – sonst bräuchte es den Link nicht.
+  // `konto-geloescht` (F-06e) aus demselben Grund, nur umgekehrt: `logout()`
+  // ist schon gelaufen, bevor der Redirect hierher zeigt – ohne die Ausnahme
+  // würde diese Seite den Redirect auf `/anmelden` nie überleben.
   matcher: [
-    "/((?!anmelden|registrieren|wiederherstellen|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest).*)",
+    "/((?!anmelden|registrieren|wiederherstellen|konto-geloescht|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest).*)",
   ],
 };

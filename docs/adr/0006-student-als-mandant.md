@@ -258,3 +258,33 @@ das Kopieren fehl, wird der Text stattdessen markiert (⌘C/Strg+C) statt einen 
 zeigen, der dann lügen würde. Kein QR-Code: Die Praxis-Fälle (AirDrop, WhatsApp, vorlesen)
 deckt ein Kopier-Knopf ab, ohne neue Abhängigkeit — QR bliebe nachrüstbar, sollte sich
 "neues Gerät, gleicher Raum, kein Messenger" als der häufigere Fall erweisen.
+
+## Nachtrag beim Bauen von F-06e (8.9.2026)
+
+D5 nennt drei Löschwege, ohne sie in der Datenbank zu unterscheiden: `student_delete` ist
+eine einzige Policy für beide Rollen, denn „darf die Zeile löschen, auf die der eigene
+Actor-Kontext zeigt" ist für ein Elternteil und ein Kind derselbe Satz. Was die Wege
+unterscheidet, sitzt ausschließlich in der Anwendung – zwei Entscheidungen, die beim Bauen
+gefallen sind und hier nachgetragen werden:
+
+**„Elternkonto löschen" ist faktisch umkehrbar, nicht die dritte harte Löschung.** Der
+Beitritt (D8) ist bedingungslos: `join()` prüft nur `students_by_parent_email()`, kein Feld
+hält fest, dass eine Adresse einmal verknüpft _und wieder gelöst_ wurde. Ohne diese Erinnerung
+entstünde beim nächsten Login mit derselben Adresse automatisch ein neues Konto, solange ein
+Kind sie weiter einträgt – das Löschen hielte nur bis zum nächsten Seitenaufruf. Statt dagegen
+ein Sperrfeld einzuführen (das D7, „keine Zählerfelder", widerspräche), heißt „Elternkonto
+löschen" ehrlich _Konto löschen und abmelden_: keine Eintipp-Bestätigung wie bei den beiden
+anderen Wegen, weil nichts unwiderruflich verloren geht – die Kinder bleiben unberührt, und
+das Konto entsteht bei Bedarf über denselben Beitritt neu.
+
+**Ein Kind, dessen Elternteil das Konto löscht, wird nicht benachrichtigt – bewusst, nicht
+versehentlich.** Kind-Profile sind pseudonym (keine E-Mail, keine Schul-ID), es gibt keinen
+Kanal zu ihm außer dem eigenen Gerät. Eine Nachricht dort hinterlegen hieße, eine Zeile über
+eine gelöschte Person aufzubewahren – das wäre kein hartes Löschen mehr. Sein Gerät bietet
+nach der Kaskade weiter den Passkey an; der Server antwortet „Dieser Passkey gehört zu keinem
+Profil. Leg dir eines an." (`passkey-actions.ts`) – korrekt, aber ohne den Grund zu nennen.
+Der Bestätigungsdialog beim Elternteil sagt stattdessen ausdrücklich, dass keine
+Benachrichtigung erfolgt: Das Sagen bleibt zwischen Elternteil und Kind, nicht bei tutr.
+
+Die Benachrichtigungsmail (D6) gilt deshalb nur für den Weg, den D6 auch nennt – „löscht ein
+Kind sein Konto" –, nicht für den umgekehrten Fall.

@@ -59,6 +59,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </Link>
               </>
             ) : null}
+            {view === "student" && actor?.role === "student" ? (
+              // Schmal (F-06e): Für die Kind-Rolle zeigt /einstellungen nur
+              // „Konto löschen" – keine Kindliste, keine Geräteverwaltung.
+              <Link
+                href="/einstellungen"
+                className="text-tinte-leise hover:text-tinte text-xs font-medium"
+              >
+                Einstellungen
+              </Link>
+            ) : null}
             {switcher ? <ActorSwitch current={view} /> : null}
             {email ? (
               <>
