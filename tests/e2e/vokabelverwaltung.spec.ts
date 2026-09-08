@@ -1,0 +1,150 @@
+import { expect, test } from "@playwright/test";
+import postgres from "postgres";
+
+/**
+ * Sets und Vokabelverwaltung (V-03a, ADR 0007 D2–D4).
+ *
+ * Ein einziger durchgehender Weg statt vieler kleiner Tests: Set anlegen →
+ * einfügen → korrigieren → löschen → Set löschen. Genau so benutzt man die
+ * Seite auch, und jeder Schritt braucht das Ergebnis des vorigen.
+ *
+ * Zwei Dinge lassen sich nur hier prüfen, nicht in den Unit-Tests:
+ * - Das Einfügen klassifiziert **gegen den wachsenden Bestand**, nicht gegen
+ *   eine Momentaufnahme vom Anfang. Dieselbe Zeile zweimal im selben Text
+ *   wird verknüpft, nicht verdoppelt.
+ * - „Set löschen" nimmt nur das Set mit. Die Vokabeln selbst zählen wir
+ *   danach direkt in der Datenbank nach – im UI wären sie schlicht
+ *   unsichtbar, was den Unterschied zwischen „erhalten" und „gelöscht"
+ *   verwischt.
+ *
+ * Jeder Lauf schreibt unter einem eigenen Präfix und räumt hinterher per
+ * Migrationsrolle auf, damit wiederholte Läufe dasselbe Ergebnis liefern und
+ * die Seed-Daten unberührt bleiben. Nur Chromium (der Rollenwechsel bricht
+ * unter WebKit den Dev-Server ab, siehe `practice.spec.ts`), nur mit
+ * Datenbank (`RUN_DB_TESTS=1`).
+ */
+
+const WITH_DB = process.env.RUN_DB_TESTS === "1";
+
+/**
+ * Ein Präfix je Worker – so kollidieren weder Wiederholungen noch die beiden
+ * Playwright-Projekte, die parallel in eigenen Prozessen laufen. Der
+ * Zufallsanteil ist nötig: Zwei Worker können in derselben Millisekunde
+ * starten, und das Aufräumen am Ende löscht alles unter dem eigenen Präfix.
+ */
+const PREFIX = `e2e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+const SET_TITLE = `${PREFIX} Unité`;
+const ALPHA = `${PREFIX}alpha`;
+const BETA = `${PREFIX}beta`;
+const GAMMA = `${PREFIX}gamma`;
+
+test.describe("Vokabelverwaltung", () => {
+  test.skip(!WITH_DB, "Braucht eine Datenbank – mit RUN_DB_TESTS=1 ausführen.");
+
+  let admin: postgres.Sql | undefined;
+
+  test.beforeAll(() => {
+    try {
+      process.loadEnvFile(".env.local");
+    } catch {
+      // Kein .env.local – dann bleibt admin undefined und der Test bricht unten sichtbar ab.
+    }
+    if (process.env.MIGRATION_DATABASE_URL) {
+      admin = postgres(process.env.MIGRATION_DATABASE_URL, { prepare: false, max: 1 });
+    }
+  });
+
+  test.afterAll(async () => {
+    if (!admin) return;
+    // Direkt über die Migrationsrolle, nicht über die UI: Aufräumen soll auch
+    // dann laufen, wenn der Test vorher gescheitert ist.
+    // `vocab_item` nimmt `vocab_set_item`, `card` und `review` mit (V-01).
+    await admin`delete from vocab_item where term like ${PREFIX + "%"}`;
+    await admin`delete from vocab_set where title like ${PREFIX + "%"}`;
+    await admin.end();
+  });
+
+  test("anlegen, einfügen, korrigieren, löschen – und das Set löschen lässt die Vokabeln stehen", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+    if (!admin) throw new Error("MIGRATION_DATABASE_URL fehlt – siehe beforeAll.");
+
+    // Schreiben darf nur das Kind (ADR 0004 D4) – ohne Rollenwechsel bliebe
+    // die ganze Verwaltung unsichtbar.
+    await page.goto("/heute");
+    await page.getByLabel("Kind").selectOption({ label: "Mia" });
+    const kindButton = page.getByRole("button", { name: "Kind" });
+    await kindButton.click();
+    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
+
+    // --- Set anlegen ------------------------------------------------------
+    await page.goto("/faecher/vokabeln");
+    await page.getByRole("button", { name: "Neues Set anlegen" }).click();
+    await page.getByLabel("Name").fill(SET_TITLE);
+    await page.getByRole("button", { name: "Anlegen" }).click();
+
+    const setLink = page.getByRole("link", { name: new RegExp(SET_TITLE) });
+    await expect(setLink).toBeVisible({ timeout: 10_000 });
+    await setLink.click();
+    await expect(page.getByText("Noch keine Vokabeln in diesem Set.")).toBeVisible();
+
+    // --- Einfügen: alle vier Fälle in einem Text --------------------------
+    await page.getByRole("button", { name: "Einfügen" }).click();
+    await page.locator("textarea").fill(
+      [
+        `${ALPHA}\tgehen`, // neu
+        `${BETA}\tkommen`, // neu
+        `${ALPHA}\tgehen`, // dieselbe Zeile noch einmal → verknüpfen, nicht verdoppeln
+        `${BETA}\tfahren`, // gleiches Wort, andere Übersetzung → nicht zusammenführen (D4)
+        GAMMA, // kein Trennzeichen → als unfertige Zeile anlegen
+      ].join("\n"),
+    );
+    await page.getByRole("button", { name: "Übernehmen" }).click();
+
+    await expect(
+      page.getByText("2 neu, 1 schon vorhanden, nur verknüpft, 2 zu prüfen."),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Vier Einträge, nicht fünf: die Wiederholung wurde verknüpft.
+    const [{ count: itemCount }] = await admin<{ count: string }[]>`
+      select count(*)::text as count from vocab_item where term like ${PREFIX + "%"}`;
+    expect(Number(itemCount)).toBe(4);
+
+    // --- Was zu prüfen ist, steht oben (D2) -------------------------------
+    // Leeres Feld (gamma) plus zweimal dasselbe Wort mit verschiedenen
+    // Übersetzungen (beta) – beides abgeleitet, nicht gespeichert.
+    await expect(page.getByText("3 Zeilen solltest du prüfen.")).toBeVisible();
+    // `main` schließt die Fußleiste aus – die ist auch eine Liste.
+    const rows = page.getByRole("main").locator("ul > li");
+    await expect(rows.first().getByText("prüfen")).toBeVisible();
+
+    // --- Korrigieren: Lücke füllen ----------------------------------------
+    await page.getByRole("button", { name: new RegExp(GAMMA) }).click();
+    await page.getByLabel("Übersetzung").fill("die Katze");
+    await page.getByRole("button", { name: "Speichern" }).click();
+
+    await expect(page.getByText("2 Zeilen solltest du prüfen.")).toBeVisible({ timeout: 10_000 });
+
+    // --- Löschen: eine Zeile, die gar keine Vokabel ist --------------------
+    await page.getByRole("button", { name: new RegExp(GAMMA) }).click();
+    await page.getByRole("button", { name: "Das ist keine Vokabel – löschen" }).click();
+    await expect(page.getByRole("button", { name: new RegExp(GAMMA) })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+
+    // --- Set löschen: die Vokabeln bleiben --------------------------------
+    await page.goto("/faecher/vokabeln");
+    const row = page.getByRole("listitem").filter({ hasText: SET_TITLE });
+    await row.getByRole("button", { name: "Löschen" }).click();
+    await row.getByRole("button", { name: "Ja, löschen" }).click();
+    await expect(page.getByRole("link", { name: new RegExp(SET_TITLE) })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+
+    const [{ count: rest }] = await admin<{ count: string }[]>`
+      select count(*)::text as count from vocab_item where term like ${PREFIX + "%"}`;
+    expect(Number(rest)).toBe(3);
+  });
+});
