@@ -53,6 +53,18 @@ create policy student_read_for_parent_login on student
     )
   );
 
+-- Der Wiederherstellungslink vor dem Einlösen (F-06d): nur lesen, um „Hallo
+-- Mia" zu zeigen und die WebAuthn-Zeremonie mit dem richtigen Vornamen zu
+-- starten. Verbraucht den Token nicht – das übernimmt ausschließlich
+-- app.redeem_recovery_token() nach erfolgreicher Zeremonie.
+drop policy if exists student_recovery_lookup on student;
+create policy student_recovery_lookup on student
+  for select to tutr_app
+  using (
+    recovery_token_hash = app.recovery_token_hash()
+    and recovery_expires_at > now()
+  );
+
 -- --- parent_account -------------------------------------------------------
 alter table parent_account enable row level security;
 

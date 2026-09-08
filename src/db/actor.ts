@@ -57,26 +57,31 @@ export async function withActor<T>(actor: Actor, fn: (tx: Transaction) => Promis
 }
 
 /**
- * Die Anmeldeschleusen (ADR 0006 D3).
+ * Die Anmeldeschleusen (ADR 0006 D3, um eine vierte ergänzt in F-06d).
  *
  * Jeder Weg, der ohne Actor-Kontext auskommen muss, bekommt eine eigene
  * Session-Variable, zu der es genau eine `select`-Policy auf genau eine Zeile
- * gibt (`src/db/policies/0010-auth.sql`):
+ * gibt (`src/db/policies/0010-identity.sql`):
  *
- * | Variable                   | Tabelle              | Wofür              |
- * | -------------------------- | -------------------- | ------------------ |
- * | `tutr.auth_user_id`        | `parent_account`     | Eltern-Login       |
- * | `tutr.credential_id`       | `student_credential` | Passkey vorzeigen  |
- * | `tutr.session_token_hash`  | `student_session`    | Session prüfen     |
+ * | Variable                    | Tabelle              | Wofür              |
+ * | ---------------------------- | -------------------- | ------------------ |
+ * | `tutr.auth_user_id`         | `parent_account`     | Eltern-Login       |
+ * | `tutr.credential_id`        | `student_credential` | Passkey vorzeigen  |
+ * | `tutr.session_token_hash`   | `student_session`    | Session prüfen     |
+ * | `tutr.recovery_token_hash`  | `student`            | Wiederherstellung  |
  *
  * Ein Actor-Kontext entsteht dabei nicht: `app.student_id()` und
  * `app.actor_role()` bleiben leer, alle übrigen Policies greifen also ins
  * Leere. Erst nach dem Nachschlagen übernimmt `withActor()`.
  *
- * Sie bleiben ausdrücklich einzeln statt verallgemeinert – drei kurze
+ * Sie bleiben ausdrücklich einzeln statt verallgemeinert – vier kurze
  * Policies liest man, eine clevere nicht.
  */
-export type LoginKey = "tutr.auth_user_id" | "tutr.credential_id" | "tutr.session_token_hash";
+export type LoginKey =
+  | "tutr.auth_user_id"
+  | "tutr.credential_id"
+  | "tutr.session_token_hash"
+  | "tutr.recovery_token_hash";
 
 export async function runWithLoginKey<T>(
   database: Database,
@@ -117,4 +122,16 @@ export async function withSessionTokenHash<T>(
   fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
   return runWithLoginKey(getDb(), "tutr.session_token_hash", tokenHash, fn);
+}
+
+/**
+ * Nachschlagen eines Wiederherstellungslinks anhand des SHA-256 des Tokens
+ * (F-06d). Nur zum Lesen – verbraucht wird der Token ausschließlich über
+ * `app.redeem_recovery_token()`, siehe `src/lib/auth/recovery.ts`.
+ */
+export async function withRecoveryTokenHash<T>(
+  tokenHash: string,
+  fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return runWithLoginKey(getDb(), "tutr.recovery_token_hash", tokenHash, fn);
 }

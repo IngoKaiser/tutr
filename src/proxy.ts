@@ -78,7 +78,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Anmeldung, Auth-Rückweg und statische Dateien bleiben außen vor.
+  // `wiederherstellen` (F-06d) ausdrücklich mit: Wer hier ankommt, hat per
+  // Definition noch keine gültige Session – sonst bräuchte es den Link nicht.
   matcher: [
-    "/((?!anmelden|registrieren|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest).*)",
+    "/((?!anmelden|registrieren|wiederherstellen|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest).*)",
   ],
 };

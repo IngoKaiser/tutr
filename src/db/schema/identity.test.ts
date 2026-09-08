@@ -265,6 +265,105 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
     expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
+  // --- Wiederherstellung (F-06d) -------------------------------------------
+  // Getestet auf Ebene des Hashes, wie die Anwendung ihn nach hashToken()
+  // übergibt – der rohe Token selbst kommt in diesen Tests nie vor.
+
+  const RECOVERY_TOKEN_HASH = "recovery-test-token-hash";
+
+  test("student_recovery_lookup gibt genau eine Zeile frei, ohne den Token zu verbrauchen", async () => {
+    await admin.client`
+      update student set recovery_token_hash = ${RECOVERY_TOKEN_HASH}, recovery_expires_at = now() + interval '2 hours'
+      where id = ${S.mia}`;
+
+    const rows = await runWithLoginKey(
+      app.db,
+      "tutr.recovery_token_hash",
+      RECOVERY_TOKEN_HASH,
+      (tx) =>
+        tx.execute<{ id: string; first_name: string }>(sql`select id, first_name from student`),
+    );
+    expect(rows).toEqual([{ id: S.mia, first_name: "Mia" }]);
+
+    // Nicht verbraucht: derselbe Token findet dieselbe Zeile ein zweites Mal.
+    const again = await runWithLoginKey(
+      app.db,
+      "tutr.recovery_token_hash",
+      RECOVERY_TOKEN_HASH,
+      (tx) => tx.execute(sql`select 1 from student`),
+    );
+    expect(again).toHaveLength(1);
+
+    await admin.client`
+      update student set recovery_token_hash = null, recovery_expires_at = null where id = ${S.mia}`;
+  });
+
+  test("student_recovery_lookup ignoriert einen abgelaufenen Token", async () => {
+    await admin.client`
+      update student set recovery_token_hash = ${RECOVERY_TOKEN_HASH}, recovery_expires_at = now() - interval '1 minute'
+      where id = ${S.mia}`;
+
+    const rows = await runWithLoginKey(
+      app.db,
+      "tutr.recovery_token_hash",
+      RECOVERY_TOKEN_HASH,
+      (tx) => tx.execute(sql`select 1 from student`),
+    );
+    expect(rows).toHaveLength(0);
+
+    await admin.client`
+      update student set recovery_token_hash = null, recovery_expires_at = null where id = ${S.mia}`;
+  });
+
+  test("app.redeem_recovery_token prüft und löscht in einem Schritt", async () => {
+    await admin.client`
+      update student set recovery_token_hash = ${RECOVERY_TOKEN_HASH}, recovery_expires_at = now() + interval '2 hours'
+      where id = ${S.mia}`;
+
+    const [row] = await admin.client<{ id: string | null }[]>`
+      select app.redeem_recovery_token(${RECOVERY_TOKEN_HASH}) as id`;
+    expect(row!.id).toBe(S.mia);
+
+    const [nachher] = await admin.client<{ recovery_token_hash: string | null }[]>`
+      select recovery_token_hash from student where id = ${S.mia}`;
+    expect(nachher!.recovery_token_hash).toBeNull();
+  });
+
+  test("app.redeem_recovery_token liefert beim zweiten Versuch nichts mehr", async () => {
+    // Setzt direkt auf die Fortsetzung des vorigen Tests auf: der Token ist
+    // dort schon verbraucht worden – das ist der Punkt dieses Tests.
+    const [row] = await admin.client<{ id: string | null }[]>`
+      select app.redeem_recovery_token(${RECOVERY_TOKEN_HASH}) as id`;
+    expect(row!.id).toBeNull();
+  });
+
+  test("app.redeem_recovery_token liefert nichts für einen unbekannten Token", async () => {
+    const [row] = await admin.client<{ id: string | null }[]>`
+      select app.redeem_recovery_token('nie-vergeben') as id`;
+    expect(row!.id).toBeNull();
+  });
+
+  test("student_recovery_lookup öffnet keine andere Tabelle", async () => {
+    await admin.client`
+      update student set recovery_token_hash = ${RECOVERY_TOKEN_HASH}, recovery_expires_at = now() + interval '2 hours'
+      where id = ${S.mia}`;
+
+    const sicht = await runWithLoginKey(
+      app.db,
+      "tutr.recovery_token_hash",
+      RECOVERY_TOKEN_HASH,
+      async (tx) => ({
+        eltern: await tx.execute(sql`select 1 from parent_account`),
+        andereKinder: await tx.execute(sql`select 1 from student where id <> ${S.mia}`),
+      }),
+    );
+    expect(sicht.eltern).toHaveLength(0);
+    expect(sicht.andereKinder).toHaveLength(0);
+
+    await admin.client`
+      update student set recovery_token_hash = null, recovery_expires_at = null where id = ${S.mia}`;
+  });
+
   // --- Löschen (Vorbereitung F-06e) ---------------------------------------
 
   test("das Löschen eines Elternkontos lässt die Kinder stehen", async () => {

@@ -5,6 +5,7 @@ import { loginStatus } from "@/lib/auth/actor";
 
 import { loadDevices } from "./actions";
 import { DeviceRow } from "./device-row";
+import { RecoveryLink } from "./recovery-link";
 
 export const metadata = { title: "Einstellungen · tutr" };
 
@@ -60,6 +61,19 @@ export default async function SettingsPage() {
             </ul>
           )}
         </Block>
+
+        {currentStudent ? (
+          // Kein `trailing` hier: „von {Name}" steht schon im Passkeys-Block
+          // darüber – eine zweite gleichlautende Angabe wäre nicht nur
+          // redundant, sondern für Tests, die auf den Text zielen, doppeldeutig.
+          <Block title="Neues Gerät einrichten">
+            <Notice>
+              Passkey auf {currentStudent.firstName}s altem Gerät verloren oder ein neues Gerät
+              dazu? Hier entsteht ein Link zum Einrichten.
+            </Notice>
+            <RecoveryLink firstName={currentStudent.firstName} />
+          </Block>
+        ) : null}
 
         <Block title="Angemeldete Geräte">
           {!devices || devices.sessions.length === 0 ? (
