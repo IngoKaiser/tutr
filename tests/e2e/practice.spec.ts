@@ -36,7 +36,7 @@ test.describe("Übungssession", () => {
     await expect(page.getByText("Kommt mit V-04.")).toHaveCount(2);
   });
 
-  test("eine Karte beantworten bringt die Session sichtbar weiter", async ({
+  test("eine Karte beantworten zeigt eine Rückmeldung, 'Weiter' bringt sichtbar weiter", async ({
     page,
     browserName,
   }) => {
@@ -52,8 +52,8 @@ test.describe("Übungssession", () => {
       "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
     );
 
-    // "Session starten" gibt es nur für die Kind-Rolle (Vokabel-Policies:
-    // Kind schreibt, Eltern lesen) – ohne diesen Wechsel bliebe der Knopf
+    // "Loslegen" gibt es nur für die Kind-Rolle (Vokabel-Policies: Kind
+    // schreibt, Eltern lesen) – ohne diesen Wechsel bliebe der Knopf
     // unsichtbar, siehe der dritte Test unten.
     await page.goto("/heute");
     const kindButton = page.getByRole("button", { name: "Kind" });
@@ -63,7 +63,7 @@ test.describe("Übungssession", () => {
     await expect(kindButton).toHaveAttribute("aria-pressed", "true");
 
     await page.goto("/ueben");
-    const startButton = page.getByRole("button", { name: "Session starten" });
+    const startButton = page.getByRole("button", { name: "Loslegen" });
     const totalText = await page.getByText(/\d+ fällig/).textContent();
     test.skip(
       totalText === "0 fällig",
@@ -80,6 +80,13 @@ test.describe("Übungssession", () => {
 
     await options.first().click();
 
+    // Rückmeldung vor der nächsten Karte – ohne sie wäre Raten nicht von
+    // Wissen zu unterscheiden. "Weiter" ist der einzige Weg dorthin, kein
+    // Auto-Sprung nach einer Zeit (§15: keine unsichtbare Uhr, die drängt).
+    const weiter = page.getByRole("button", { name: "Weiter" });
+    await expect(weiter).toBeVisible({ timeout: 10_000 });
+    await weiter.click();
+
     // Danach entweder eine neue Frage (MC-Prompt oder Tippfeld) oder "fertig" –
     // beides beweist, dass die Antwort verarbeitet wurde, keine Blockade.
     await expect(
@@ -91,11 +98,39 @@ test.describe("Übungssession", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
+  test("aus einer laufenden Übung kommt man zurück zur Übersicht", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
+    );
+
+    await page.goto("/heute");
+    const kindButton = page.getByRole("button", { name: "Kind" });
+    await kindButton.click();
+    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
+
+    await page.goto("/ueben");
+    const totalText = await page.getByText(/\d+ fällig/).textContent();
+    test.skip(
+      totalText === "0 fällig",
+      "Keine fälligen Karten – npm run db:seed erneut ausführen.",
+    );
+
+    await page.getByRole("button", { name: "Loslegen" }).click();
+    await expect(page.locator("button.text-left").first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole("button", { name: "Zur Übersicht" }).click();
+    await expect(page.getByRole("button", { name: "Loslegen" })).toBeVisible();
+  });
+
   test("ein Elternteil sieht die Zahlen, aber keinen Startknopf", async ({ page }) => {
     // Ohne Kind-Rollenwechsel bleibt der Actor Elternteil (Standard des Bypasses).
     await page.goto("/ueben");
     await expect(page.getByText(/\d+ fällig/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Session starten" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Loslegen" })).toHaveCount(0);
     await expect(page.getByText(/hier siehst du nur den Stand/)).toBeVisible();
   });
 });
