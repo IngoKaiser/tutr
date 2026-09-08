@@ -1,0 +1,13 @@
+# Dateien, die Claude Code in jeden neu angelegten Worktree mitkopiert.
+#
+# Hier stehen nur Pfade, niemals Werte – die Dateien selbst bleiben durch
+# .gitignore (`.env*`) außen vor und landen nie in Git.
+#
+# Anlass (2026-09-08): Beim Recyceln eines Worktrees gingen .env.local und
+# .env.test.local verloren. Sie lagen ausschließlich in diesem Worktree, und
+# weil sie gitignoriert sind, gab es nirgends eine zweite Kopie – alle
+# Zugangsdaten mussten neu gesetzt werden. Die maßgebliche Kopie gehört ins
+# Hauptrepo (neben package.json), diese Liste versorgt jeden neuen Worktree
+# damit.
+.env.local
+.env.test.local
