@@ -29,7 +29,11 @@ export function VocabList({ detail, canManage }: { detail: SetDetail; canManage:
 
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader title={detail.title} trailing={detail.subjectName} />
+      <PageHeader
+        title={detail.title}
+        trailing={detail.subjectName}
+        back={{ href: "/faecher/vokabeln", label: "Vokabelsets" }}
+      />
 
       {unsichereAnzahl > 0 ? (
         <Notice>

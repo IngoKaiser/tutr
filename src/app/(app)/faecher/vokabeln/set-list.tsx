@@ -35,7 +35,7 @@ export function SetList({
 
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader title="Vokabeln" />
+      <PageHeader title="Vokabeln" back={{ href: "/faecher", label: "Fächer" }} />
 
       {canManage ? <CreateSetForm subjects={subjects} /> : null}
 

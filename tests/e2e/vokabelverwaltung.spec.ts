@@ -134,6 +134,21 @@ test.describe("Vokabelverwaltung", () => {
       timeout: 10_000,
     });
 
+    // --- Eine Ebene höher, ohne Umweg über die Fußleiste -------------------
+    // Die Fußleiste kennt nur die fünf Bereiche; ohne diesen Link käme man aus
+    // einer Unterseite nur über /faecher wieder heraus.
+    const inhalt = page.getByRole("main");
+    await inhalt.getByRole("link", { name: "Vokabelsets" }).click();
+    await expect(page.getByRole("link", { name: new RegExp(SET_TITLE) })).toBeVisible({
+      timeout: 10_000,
+    });
+    // `main` schließt die Fußleiste aus – die trägt auch einen „Fächer"-Link,
+    // und genau der Umweg soll hier ja nicht geprüft werden.
+    await inhalt.getByRole("link", { name: "Fächer" }).click();
+    await expect(page.getByRole("heading", { name: "Fächer", level: 1 })).toBeVisible({
+      timeout: 10_000,
+    });
+
     // --- Set löschen: die Vokabeln bleiben --------------------------------
     await page.goto("/faecher/vokabeln");
     const row = page.getByRole("listitem").filter({ hasText: SET_TITLE });

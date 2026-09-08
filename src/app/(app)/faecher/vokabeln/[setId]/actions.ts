@@ -159,9 +159,18 @@ export type AddSummary = { neu: number; verknuepft: number; zuPruefen: number };
 /**
  * Fügt Zeilen ein – aus dem Einfügefeld oder als eine manuelle Zeile.
  *
- * Duplikate werden gegen **alle** eigenen Vokabeln geprüft, nicht nur die
- * dieses Sets: Existiert „aller/gehen" schon in einem anderen Set, soll das
- * hier verknüpfen, nicht verdoppeln (ADR 0007 D4).
+ * Duplikate werden über **Set-Grenzen hinweg** geprüft, aber nur **innerhalb
+ * desselben Fachs** (ADR 0007 D4, gerahmt durch ADR 0008 D4). Existiert
+ * „aller/gehen" schon in einem anderen Französisch-Set, soll das hier
+ * verknüpfen statt verdoppeln – englisch `sport/Sport` und französisch
+ * `sport/Sport` sind dagegen zwei Vokabeln mit zwei Lernständen.
+ *
+ * Der Fachbezug kommt vorerst über die Sets, in denen eine Vokabel steckt.
+ * Eine Vokabel in gar keinem Set (möglich, seit `deleteSet()` die Vokabeln
+ * stehen lässt) hat damit kein ableitbares Fach und wird nicht als Duplikat
+ * erkannt – der Grund, warum ADR 0008 D1 `vocab_item.subject_id` als eigene
+ * Spalte vorschlägt. Bis V-05 ist das hier die richtige Näherung: lieber ein
+ * Duplikat zu viel als eine Vokabel im falschen Fach.
  */
 async function addRows(
   actor: Actor,
@@ -176,7 +185,11 @@ async function addRows(
     // im selben Einfügen zweimal angelegt – ein realistischer Fall, wenn ein
     // Wort auf der Buchseite in zwei Abschnitten steht.
     const existing = await tx.execute<ExistingVocabItem>(
-      sql`select id, term, translation from vocab_item`,
+      sql`select distinct vi.id, vi.term, vi.translation
+          from vocab_item vi
+          join vocab_set_item vsi on vsi.vocab_item_id = vi.id
+          join vocab_set vs on vs.id = vsi.vocab_set_id
+          where vs.subject_id = (select subject_id from vocab_set where id = ${setId})`,
     );
 
     const merken = (id: string, term: string, translation: string) => {
