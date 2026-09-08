@@ -140,13 +140,11 @@ export async function seed(sql: postgres.Sql): Promise<void> {
     insert into vocab_set (id, student_id, subject_id, chapter_id, unit, title)
     values (${SEED_IDS.vocabSetUnite3}, ${SEED_IDS.studentOne}, ${SEED_IDS.subjectFrench}, ${SEED_IDS.chapterUnite3}, '3.1', 'Unité 3 · Le quotidien')`;
 
-  // Jeder Wert als gebundener Parameter (`${...}`), keine SQL-Text-Literale –
-  // "s'habiller" und "d'abord" tragen ein Apostroph, das als Text-Literal
-  // erst escapet werden müsste. Zwölf Zeilen statt einer Bulk-Hilfsfunktion:
-  // `sql(rows, "spalte", …)` hat in dieser Paketversion eine bekannte
-  // Typisierungsschwäche (ein `readonly`-Array passt nicht auf die intern
-  // erwartete `any[]`) – lieber das bereits bewährte Muster wiederholen als
-  // sie mit `any` zu umgehen.
+  // Jeder Wert als gebundener Parameter, keine SQL-Text-Literale –
+  // "s'habiller" und "d'abord" tragen ein Apostroph. `sql(rows, [...])` –
+  // die Klammerform, nicht `sql(rows, "a", "b")` direkt in der Vorlage, die
+  // hat in dieser Paketversion eine Typisierungsschwäche (ein
+  // `readonly`-Array passt nicht auf die intern erwartete `any[]`).
   const VOCAB: [term: string, translation: string][] = [
     ["se lever", "aufstehen"],
     ["se laver", "sich waschen"],
@@ -175,19 +173,48 @@ export async function seed(sql: postgres.Sql): Promise<void> {
     state: 0,
   });
 
-  for (const [term, translation] of VOCAB) {
-    const [item] = await sql<{ id: string }[]>`
-      insert into vocab_item (student_id, term, translation)
-      values (${SEED_IDS.studentOne}, ${term}, ${translation})
-      returning id`;
-    await sql`
-      insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id)
-      values (${SEED_IDS.studentOne}, ${SEED_IDS.vocabSetUnite3}, ${item!.id})`;
-    await sql`
-      insert into card (student_id, vocab_item_id, direction, fsrs_state, due_at, state) values
-        (${SEED_IDS.studentOne}, ${item!.id}, 'vorwaerts', ${freshFsrsState}::jsonb, ${now}, 'neu'),
-        (${SEED_IDS.studentOne}, ${item!.id}, 'rueckwaerts', ${freshFsrsState}::jsonb, ${now}, 'neu')`;
-  }
+  // Drei Bulk-Inserts statt einer Schleife mit 3 × 12 Einzelabfragen: Gegen
+  // eine entfernte Datenbank (Supabase) hätten 36 sequenzielle Round-Trips
+  // in CI den Standard-Hook-Timeout von `seed.test.ts` (10 s) gesprengt –
+  // dort gefunden, lokal war die Verbindung schnell genug, es zu verdecken.
+  const vocabItemRows: { student_id: string; term: string; translation: string }[] = VOCAB.map(
+    ([term, translation]) => ({ student_id: SEED_IDS.studentOne, term, translation }),
+  );
+  // Kein `sql<{ id: string }[]>`-Generic auf dem Vorlagen-Aufruf – das
+  // schaltet eine engere Überladung ein, unter der `sql(rows, [...])` aus
+  // demselben Grund nicht mehr typprüft wie oben. Stattdessen das Ergebnis
+  // hinterher casten.
+  const items = (await sql`
+    insert into vocab_item ${sql(vocabItemRows, ["student_id", "term", "translation"])}
+    returning id`) as { id: string }[];
+
+  const setLinkRows: { student_id: string; vocab_set_id: string; vocab_item_id: string }[] =
+    items.map((item) => ({
+      student_id: SEED_IDS.studentOne,
+      vocab_set_id: SEED_IDS.vocabSetUnite3,
+      vocab_item_id: item.id,
+    }));
+  await sql`insert into vocab_set_item ${sql(setLinkRows, ["student_id", "vocab_set_id", "vocab_item_id"])}`;
+
+  const cardRows: {
+    student_id: string;
+    vocab_item_id: string;
+    direction: "vorwaerts" | "rueckwaerts";
+    fsrs_state: string;
+    due_at: string;
+    state: string;
+  }[] = items.flatMap((item) =>
+    (["vorwaerts", "rueckwaerts"] as const).map((direction) => ({
+      student_id: SEED_IDS.studentOne,
+      vocab_item_id: item.id,
+      direction,
+      fsrs_state: freshFsrsState,
+      due_at: now,
+      state: "neu",
+    })),
+  );
+  await sql`
+    insert into card ${sql(cardRows, ["student_id", "vocab_item_id", "direction", "fsrs_state", "due_at", "state"])}`;
 
   // --- Das unverknüpfte Kind: bewusst mager. Es beweist, dass ein Kind
   //     ohne Elternkonto funktioniert (ADR 0005). ---
