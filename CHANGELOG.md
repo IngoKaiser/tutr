@@ -6,6 +6,10 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- `docs/deploy.md`: Beim Prüfen des Mailwegs nie `@example.com` verwenden, sondern `delivered@resend.dev`. Resend weist `example.com` ausdrücklich ab – aber erst beim Senden der Nachricht, nicht schon bei der Empfängerprüfung, sodass ein Test dagegen wie ein kaputtes SMTP-Setup aussieht. Beim ersten Deploy hat genau das über eine Stunde Fehlersuche gekostet: Port, Passwort und Verschlüsselung wurden nacheinander verdächtigt, während nur die Testadresse falsch war
+
+### Added
+
 - Vercel Web Analytics (`@vercel/analytics`): aggregierte Seitenaufrufe ohne Cookies, ohne Bezug zu einem Kind-Profil oder Lernstand – eine grobe Antwort auf „wird die App benutzt", keine Kennung einzelner Personen
 - `docs/deploy.md`: Abschnitt zu Preview-Deployments. Vercel legt für jeden Branch/PR automatisch ein eigenes Deployment an – bisher zeigten sie auf dieselbe Datenbank wie Production, mit demselben Risiko wie vor F-13, nur eine Ebene höher. Preview bekommt jetzt eigene Werte, die auf das ohnehin vorhandene zweite (Test-)Supabase-Projekt zeigen
 - `docs/deploy.md`: Secret/Config-Typ je Variable dokumentiert. Die beiden `NEXT_PUBLIC_`-Werte sind öffentlich **by design** (ADR 0003: „öffentlich, im Client-Bundle, RLS greift") – Vercels Warnung ist zutreffend und harmlos, `Secret` brächte dort keinen Schutz, nähme aber die Möglichkeit nachzusehen

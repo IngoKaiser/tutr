@@ -164,6 +164,35 @@ schon verifiziert ist. Dashboard → Authentication → Emails → SMTP Settings
 Danach laufen beide Mails über dieselbe verifizierte Domain, ohne das enge
 Test-Limit. Vor F-06f (Wiederherstellung vom Anmeldebildschirm) ohnehin nötig.
 
+### Zum Testen nie `@example.com` verwenden
+
+Resend weist diese Domain ausdrücklich ab – aber erst beim Senden der
+Nachricht, nicht schon bei der Empfängerprüfung. Ein Test dagegen sieht
+deshalb wie ein kaputtes SMTP-Setup aus:
+
+```
+gomail: could not send email 1: 550 "Invalid `to` field.
+Please use our testing email address instead of domains like `example.com`."
+```
+
+**Richtig ist `delivered@resend.dev`** – Resends offizielle Testadresse: wird
+angenommen, zugestellt und erreicht keinen Menschen. Zum Prüfen des ganzen
+Wegs (Supabase → Resend → Zustellung):
+
+```bash
+curl -X POST "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/otp" \
+  -H "Content-Type: application/json" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+  -d '{"email":"delivered@resend.dev","create_user":true}'
+```
+
+`200 {}` heißt: Der Mailweg steht. Das Ergebnis lässt sich in Resend unter
+„Emails" nachsehen.
+
+Diese Zeile hat beim ersten Deploy über eine Stunde Fehlersuche gekostet –
+Port, Passwort und Verschlüsselung wurden nacheinander verdächtigt, während
+in Wahrheit nur die Testadresse falsch war.
+
 **Wenn das Auth-Log `535 "Authentication credentials invalid"` zeigt**, liegt
 es am Passwort, nicht am Port. Nachgemessen gegen `smtp.resend.com`: Mit
 gültigem API-Schlüssel antwortet der Server auf **beiden** Ports (465 mit
