@@ -223,6 +223,42 @@ Dann von Hand:
 6. Vokabelset anlegen, **Foto aus dem Vokabelheft** — der bisher ungetestete Fall
 7. Üben starten
 
+## 7a · Funktionsregion: Frankfurt, nicht irgendwo
+
+**Fund vom 9.9.:** Angemeldete Seiten brauchten 1–2 s, obwohl acht Datenbankrunden
+in derselben Region nur Millisekunden kosten sollten. Vercels Funktions-Logs
+zeigten die Ursache direkt:
+
+```
+Received in Frankfurt, Germany (fra1)
+### Fluid
+Routed to Washington, D.C., USA (iad1)     ← hier
+### Function Invocation
+Execution Duration: 951ms
+```
+
+Die Anfrage kam in Frankfurt an, die **Funktion lief aber in Washington** –
+Supabase steht in `eu-central-1`. Jede Datenbankrunde ging zweimal über den
+Atlantik, ~100 ms statt ~5 ms. Zwei Fixes gegen dieselbe Ursache, weil unklar
+ist, welchen Fluid Compute tatsächlich befolgt:
+
+- `vercel.json`: `"regions": ["fra1"]` – der projektweite Standardweg
+- `export const preferredRegion = "fra1"` im Root-Layout (`src/app/layout.tsx`)
+  – die Next.js-Routensegment-Angabe, die Vercels Adapter garantiert liest
+
+**Nach jedem Deploy prüfen** (Vercel Dashboard → Projekt → Logs, eine
+angemeldete Seite wie `/ueben` aufrufen, die Zeile aufklappen):
+
+```
+Received in Frankfurt, Germany (fra1)
+### Fluid
+Routed to Frankfurt, Germany (fra1)        ← muss übereinstimmen
+```
+
+Steht dort weiterhin `iad1` oder eine andere Region, hilft nur noch eine
+Einstellung im Vercel-Dashboard selbst (Project Settings → Functions →
+Function Region) – von hier aus nicht prüf- oder setzbar.
+
 ## 8 · Preview-Deployments: neue Features erst selbst prüfen (optional, aber empfohlen)
 
 Vercel legt für **jeden Branch und jeden Pull Request automatisch ein
