@@ -139,8 +139,8 @@ describe.skipIf(!testDbAvailable())(
     test("eine Vokabel steckt in mehreren Sets (n:m über vocab_set_item)", async () => {
       const ids = await runWithActor(app.db, student(A.studentId), async (tx) => {
         const [item] = await tx.execute<{ id: string }>(sql`
-          insert into vocab_item (student_id, term, translation)
-          values (${A.studentId}, 'aller', 'gehen') returning id`);
+          insert into vocab_item (student_id, subject_id, term, translation)
+          values (${A.studentId}, ${A.subject}, 'aller', 'gehen') returning id`);
         const [setEins] = await tx.execute<{ id: string }>(sql`
           insert into vocab_set (student_id, subject_id, title)
           values (${A.studentId}, ${A.subject}, 'Set eins') returning id`);
@@ -148,9 +148,9 @@ describe.skipIf(!testDbAvailable())(
           insert into vocab_set (student_id, subject_id, title)
           values (${A.studentId}, ${A.subject}, 'Set zwei') returning id`);
         await tx.execute(sql`
-          insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id) values
-            (${A.studentId}, ${setEins!.id}, ${item!.id}),
-            (${A.studentId}, ${setZwei!.id}, ${item!.id})`);
+          insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id, subject_id) values
+            (${A.studentId}, ${setEins!.id}, ${item!.id}, ${A.subject}),
+            (${A.studentId}, ${setZwei!.id}, ${item!.id}, ${A.subject})`);
         return { itemId: item!.id };
       });
 
@@ -159,6 +159,41 @@ describe.skipIf(!testDbAvailable())(
         join vocab_set vs on vs.id = vsi.vocab_set_id
         where vsi.vocab_item_id = ${ids.itemId} order by vs.title`;
       expect(sets.map((r) => r.title)).toEqual(["Set eins", "Set zwei"]);
+    });
+
+    // --- V-05, ADR 0008 D1/D2: Fachbindung von vocab_item/vocab_set_item ---
+
+    test("eine Vokabel lässt sich nicht ohne Fach anlegen", async () => {
+      const error = await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`
+          insert into vocab_item (student_id, term, translation)
+          values (${A.studentId}, 'partir', 'abfahren')`),
+      ).catch((err: unknown) => err);
+      expect(errorChain(error)).toMatch(/null value.*subject_id|not-null/i);
+    });
+
+    test("eine Vokabel eines Fachs lässt sich nicht in ein Set eines anderen Fachs hängen", async () => {
+      const mathe = "99990000-0000-4000-8000-0000000000fb";
+      await admin.client`
+        insert into subject (id, student_id, name) values (${mathe}, ${A.studentId}, 'Mathematik')`;
+
+      const error = await runWithActor(app.db, student(A.studentId), async (tx) => {
+        const [item] = await tx.execute<{ id: string }>(sql`
+          insert into vocab_item (student_id, subject_id, term, translation)
+          values (${A.studentId}, ${A.subject}, 'venir', 'kommen') returning id`);
+        const [mathSet] = await tx.execute<{ id: string }>(sql`
+          insert into vocab_set (student_id, subject_id, title)
+          values (${A.studentId}, ${mathe}, 'Bruchrechnung') returning id`);
+        // subject_id auf der Zeile stimmt mit dem Set überein (Mathematik),
+        // nicht mit der Vokabel (Französisch) – genau der Fall, den der
+        // zusammengesetzte Fremdschlüssel auf die Vokabel verhindern soll.
+        return tx.execute(sql`
+          insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id, subject_id)
+          values (${A.studentId}, ${mathSet!.id}, ${item!.id}, ${mathe})`);
+      }).catch((err: unknown) => err);
+      expect(errorChain(error)).toMatch(/vocab_set_item_item_fk|foreign key/i);
+
+      await admin.client`delete from subject where id = ${mathe}`;
     });
 
     test("card: eine Karte ohne Vokabel und ohne Lernziel scheitert am Check", async () => {
@@ -171,8 +206,8 @@ describe.skipIf(!testDbAvailable())(
 
     test("card: eine Karte mit Vokabel UND Lernziel scheitert am selben Check", async () => {
       const [item] = await admin.client<{ id: string }[]>`
-        insert into vocab_item (student_id, term, translation)
-        values (${A.studentId}, 'partir', 'abfahren') returning id`;
+        insert into vocab_item (student_id, subject_id, term, translation)
+        values (${A.studentId}, ${A.subject}, 'partir', 'abfahren') returning id`;
 
       const error = await runWithActor(app.db, student(A.studentId), (tx) =>
         tx.execute(sql`
@@ -184,8 +219,8 @@ describe.skipIf(!testDbAvailable())(
 
     test("card: eine Vokabelkarte ohne Richtung scheitert am zweiten Check", async () => {
       const [item] = await admin.client<{ id: string }[]>`
-        insert into vocab_item (student_id, term, translation)
-        values (${A.studentId}, 'venir', 'kommen') returning id`;
+        insert into vocab_item (student_id, subject_id, term, translation)
+        values (${A.studentId}, ${A.subject}, 'venir', 'kommen') returning id`;
 
       const error = await runWithActor(app.db, student(A.studentId), (tx) =>
         tx.execute(sql`
@@ -197,8 +232,8 @@ describe.skipIf(!testDbAvailable())(
 
     test("card: zwei Vokabelkarten (vorwärts + rückwärts) und eine Lernziel-Karte – beide Quellen funktionieren", async () => {
       const [item] = await admin.client<{ id: string }[]>`
-        insert into vocab_item (student_id, term, translation)
-        values (${A.studentId}, 'devoir', 'müssen') returning id`;
+        insert into vocab_item (student_id, subject_id, term, translation)
+        values (${A.studentId}, ${A.subject}, 'devoir', 'müssen') returning id`;
 
       const cards = await runWithActor(app.db, student(A.studentId), async (tx) => {
         await tx.execute(sql`
@@ -222,8 +257,8 @@ describe.skipIf(!testDbAvailable())(
 
     test("review hängt an einer Karte des eigenen Kindes und verschwindet mit ihr", async () => {
       const [item] = await admin.client<{ id: string }[]>`
-        insert into vocab_item (student_id, term, translation)
-        values (${A.studentId}, 'savoir', 'wissen') returning id`;
+        insert into vocab_item (student_id, subject_id, term, translation)
+        values (${A.studentId}, ${A.subject}, 'savoir', 'wissen') returning id`;
 
       const reviewId = await runWithActor(app.db, student(A.studentId), async (tx) => {
         const [c] = await tx.execute<{ id: string }>(sql`

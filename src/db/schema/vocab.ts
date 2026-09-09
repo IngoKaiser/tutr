@@ -36,6 +36,17 @@ import { chapter } from "./textbook";
  * RLS-Richtung (ADR 0004 D4, Zeile `card, review, vocab_*`): Kind liest und
  * schreibt, Eltern lesen nur – wie `topic`/`learning_objective`, aus
  * demselben Grund: Übungsfortschritt ist Tagesgeschäft des Kindes.
+ *
+ * **Fachbindung (V-05, ADR 0008 D1/D2):** Ein Fach ist der Raum, in dem
+ * geübt wird, kein abschaltbarer Filter – es gibt keinen Zustand „ohne
+ * Fach". Gespeichert wird das Fach nur dort, wo die Ableitung mehrdeutig
+ * wäre (n:m): `vocab_item.subjectId`. `vocab_set` trägt es schon (n:1 zu
+ * `subject`), `card` bekommt keine eigene Spalte – der Weg über
+ * `vocab_item` ist ein einzelner, indizierter Join, keine Spekulation auf
+ * eine Last wie bei `due_at`/`state`. `vocab_set_item` trägt das Fach
+ * ebenfalls und bindet beide Seiten dagegen (derselbe Kniff wie bei
+ * `student_id`, ADR 0004 D2): Eine Vokabel eines Fachs kann strukturell
+ * nicht in einem Set eines anderen Fachs landen, kein Anwendungscode nötig.
  */
 
 /** Card.state aus `ts-fsrs`, gespiegelt als deutscher ASCII-Wert (ADR 0006 D10). */
@@ -78,6 +89,9 @@ export const vocabSet = pgTable(
     // ein Kapitel kann kuratiert (student_id null) sein.
     foreignKey({ columns: [t.chapterId], foreignColumns: [chapter.id] }).onDelete("cascade"),
     unique("vocab_set_id_student_id_key").on(t.id, t.studentId),
+    // Anker für die Fachbindung von `vocab_set_item` (V-05) – dieselbe
+    // Spalte, nur als zusätzlicher Unique-Index erreichbar, kein neuer Wert.
+    unique("vocab_set_id_student_id_subject_id_key").on(t.id, t.studentId, t.subjectId),
   ],
 );
 
@@ -90,6 +104,10 @@ export const vocabItem = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     studentId: uuid("student_id").notNull(),
+    // Eigene Spalte, nicht abgeleitet (V-05, ADR 0008 D1): Der Weg über
+    // `vocab_set_item` ist n:m und wäre für ein Item ohne Set (möglich seit
+    // `deleteSet()`) gar nicht vorhanden.
+    subjectId: uuid("subject_id").notNull(),
     // Foto-Extraktion liefert laut §6 M4 genau diese Felder.
     term: text("term").notNull(),
     translation: text("translation").notNull(),
@@ -101,12 +119,25 @@ export const vocabItem = pgTable(
   },
   (t) => [
     foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
+    foreignKey({
+      name: "vocab_item_subject_fk",
+      columns: [t.subjectId, t.studentId],
+      foreignColumns: [subject.id, subject.studentId],
+      // Restrict wie bei vocab_set: ein gelöschtes Fach reißt keine Vokabeln mit.
+    }).onDelete("restrict"),
     unique("vocab_item_id_student_id_key").on(t.id, t.studentId),
+    unique("vocab_item_id_student_id_subject_id_key").on(t.id, t.studentId, t.subjectId),
   ],
 );
 
 // --- vocab_set_item -------------------------------------------------------
 // n:m zwischen Set und Vokabel (ADR 0004 D5 nennt diese Tabelle namentlich).
+//
+// `subjectId` steht hier zusätzlich zu Set und Vokabel, damit die beiden
+// zusammengesetzten Fremdschlüssel unten das Fach auf beiden Seiten gegen
+// dieselbe Spalte binden (V-05, ADR 0008 D2) – eine Vokabel eines Fachs
+// kann dadurch strukturell nicht in einem Set eines anderen Fachs landen,
+// ganz ohne Anwendungscode, der das prüfen müsste.
 
 export const vocabSetItem = pgTable(
   "vocab_set_item",
@@ -115,19 +146,20 @@ export const vocabSetItem = pgTable(
     studentId: uuid("student_id").notNull(),
     vocabSetId: uuid("vocab_set_id").notNull(),
     vocabItemId: uuid("vocab_item_id").notNull(),
+    subjectId: uuid("subject_id").notNull(),
     ...timestamps,
   },
   (t) => [
     foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     foreignKey({
       name: "vocab_set_item_set_fk",
-      columns: [t.vocabSetId, t.studentId],
-      foreignColumns: [vocabSet.id, vocabSet.studentId],
+      columns: [t.vocabSetId, t.studentId, t.subjectId],
+      foreignColumns: [vocabSet.id, vocabSet.studentId, vocabSet.subjectId],
     }).onDelete("cascade"),
     foreignKey({
       name: "vocab_set_item_item_fk",
-      columns: [t.vocabItemId, t.studentId],
-      foreignColumns: [vocabItem.id, vocabItem.studentId],
+      columns: [t.vocabItemId, t.studentId, t.subjectId],
+      foreignColumns: [vocabItem.id, vocabItem.studentId, vocabItem.subjectId],
     }).onDelete("cascade"),
     unique("vocab_set_item_pair_key").on(t.vocabSetId, t.vocabItemId),
   ],

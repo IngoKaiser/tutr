@@ -1,6 +1,6 @@
 # ADR 0008: Ein Fach ist ein Raum, kein Filter
 
-Status: **Vorschlag** · Datum: 2026-09-09 · Bezug: docs/konzept.md §6 M4, §10
+Status: **akzeptiert** · Datum: 2026-09-09 · Bezug: docs/konzept.md §6 M4, §10
 Schärft [ADR 0006](0006-student-als-mandant.md) D7 und setzt das Muster aus
 [ADR 0004](0004-datenmodell-rls.md) D2/D3 eine Ebene tiefer fort.
 
@@ -136,6 +136,31 @@ keine fachübergreifenden Übungswege an. Wo dort ein Fach nötig ist, wird es a
 - Ob ein Kind ein Fach umbenennen oder zusammenlegen kann (heute: nein, `subject` entsteht
   aus dem Seed). Gehört zu F-06c/L-01, nicht hierher.
 - Ob `card` später doch eine Spiegel-Spalte braucht. Erst messen, dann entscheiden.
+
+## Nachtrag beim Bauen (V-05)
+
+**D1 und D2 sind umgesetzt**, genau wie oben entworfen: `vocab_item.subject_id` (`not null`,
+FK gegen `subject`), `vocab_set_item.subject_id`, und die beiden zusammengesetzten
+Fremdschlüssel binden Set und Vokabel gegen dieselbe Fach-Spalte.
+
+Eine Abweichung von der reinen Lehre „Migrationen nur über `db:generate`": Eine
+`not null`-Spalte auf einer gefüllten Tabelle braucht drei Schritte (nullbar anlegen,
+befüllen, dann erst `set not null`), die `drizzle-kit generate` nicht von selbst erzeugt.
+Die generierte Migration wurde um den Backfill und die beiden Härte-Prüfungen ergänzt, mit
+Kommentar an der Stelle. Zusätzlich musste die Reihenfolge korrigiert werden: Die neuen
+Unique-Constraints (`vocab_item_id_student_id_subject_id_key`,
+`vocab_set_id_student_id_subject_id_key`) müssen vor den Fremdschlüsseln stehen, die auf sie
+zeigen – `drizzle-kit` erzeugt die Constraints in Schema-Reihenfolge, nicht in
+Abhängigkeitsreihenfolge, und die generierte Datei hätte mit „no unique constraint matching
+given keys" abgebrochen. Beim Testlauf gefunden, nicht angenommen.
+
+Nachgemessen gegen die echte Produktiv-DB, nicht nur die Test-DB: 14 Vokabeln, 0 ohne Set,
+0 mehrdeutig – der Backfill lief ohne die vorgesehenen Ausnahmen durch, und im Browser
+funktionierte die vereinfachte Duplikaterkennung (jetzt ein einzelner Vergleich auf
+`subject_id` statt eines Joins über `vocab_set_item`/`vocab_set`) unmittelbar danach.
+
+D3–D5 (fachgebundenes Üben, Duplikat-Rahmen in der Anwendung, Geltung für anderes
+Lernmaterial) folgen mit V-06 bzw. bei Bedarf.
 
 ## Abgelehnte Alternative
 

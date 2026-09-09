@@ -177,24 +177,39 @@ export async function seed(sql: postgres.Sql): Promise<void> {
   // eine entfernte Datenbank (Supabase) hätten 36 sequenzielle Round-Trips
   // in CI den Standard-Hook-Timeout von `seed.test.ts` (10 s) gesprengt –
   // dort gefunden, lokal war die Verbindung schnell genug, es zu verdecken.
-  const vocabItemRows: { student_id: string; term: string; translation: string }[] = VOCAB.map(
-    ([term, translation]) => ({ student_id: SEED_IDS.studentOne, term, translation }),
-  );
+  // subject_id auf beiden Tabellen (V-05, ADR 0008 D1/D2) – hier immer
+  // Französisch, weil das Set selbst schon an diesem Fach hängt.
+  const vocabItemRows: {
+    student_id: string;
+    subject_id: string;
+    term: string;
+    translation: string;
+  }[] = VOCAB.map(([term, translation]) => ({
+    student_id: SEED_IDS.studentOne,
+    subject_id: SEED_IDS.subjectFrench,
+    term,
+    translation,
+  }));
   // Kein `sql<{ id: string }[]>`-Generic auf dem Vorlagen-Aufruf – das
   // schaltet eine engere Überladung ein, unter der `sql(rows, [...])` aus
   // demselben Grund nicht mehr typprüft wie oben. Stattdessen das Ergebnis
   // hinterher casten.
   const items = (await sql`
-    insert into vocab_item ${sql(vocabItemRows, ["student_id", "term", "translation"])}
+    insert into vocab_item ${sql(vocabItemRows, ["student_id", "subject_id", "term", "translation"])}
     returning id`) as { id: string }[];
 
-  const setLinkRows: { student_id: string; vocab_set_id: string; vocab_item_id: string }[] =
-    items.map((item) => ({
-      student_id: SEED_IDS.studentOne,
-      vocab_set_id: SEED_IDS.vocabSetUnite3,
-      vocab_item_id: item.id,
-    }));
-  await sql`insert into vocab_set_item ${sql(setLinkRows, ["student_id", "vocab_set_id", "vocab_item_id"])}`;
+  const setLinkRows: {
+    student_id: string;
+    vocab_set_id: string;
+    vocab_item_id: string;
+    subject_id: string;
+  }[] = items.map((item) => ({
+    student_id: SEED_IDS.studentOne,
+    vocab_set_id: SEED_IDS.vocabSetUnite3,
+    vocab_item_id: item.id,
+    subject_id: SEED_IDS.subjectFrench,
+  }));
+  await sql`insert into vocab_set_item ${sql(setLinkRows, ["student_id", "vocab_set_id", "vocab_item_id", "subject_id"])}`;
 
   const cardRows: {
     student_id: string;
