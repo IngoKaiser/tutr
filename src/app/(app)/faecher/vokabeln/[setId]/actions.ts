@@ -111,22 +111,28 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
 /**
  * Legt eine neue Vokabel an: leeres Wort, zwei Karten (vorwärts/rückwärts,
  * frisch aus `newCardColumns()`) und die Set-Mitgliedschaft.
+ *
+ * `subjectId` kommt vom aufrufenden Set (V-05, ADR 0008 D1) – `vocab_item`
+ * trägt es als eigene, nicht ableitbare Spalte, `vocab_set_item` trägt es
+ * zusätzlich, damit sein zusammengesetzter Fremdschlüssel das Fach gegen
+ * beide Seiten (Set und Vokabel) bindet.
  */
 async function insertNewItem(
   tx: Transaction,
   studentId: string,
   setId: string,
+  subjectId: string,
   term: string,
   translation: string,
 ): Promise<string> {
   const [item] = await tx.execute<{ id: string }>(
-    sql`insert into vocab_item (student_id, term, translation)
-        values (${studentId}, ${term}, ${translation})
+    sql`insert into vocab_item (student_id, subject_id, term, translation)
+        values (${studentId}, ${subjectId}, ${term}, ${translation})
         returning id`,
   );
   await tx.execute(
-    sql`insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id)
-        values (${studentId}, ${setId}, ${item!.id})`,
+    sql`insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id, subject_id)
+        values (${studentId}, ${setId}, ${item!.id}, ${subjectId})`,
   );
 
   for (const direction of ["vorwaerts", "rueckwaerts"] as const) {
@@ -145,11 +151,12 @@ async function linkExistingItem(
   tx: Transaction,
   studentId: string,
   setId: string,
+  subjectId: string,
   itemId: string,
 ): Promise<void> {
   await tx.execute(
-    sql`insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id)
-        values (${studentId}, ${setId}, ${itemId})
+    sql`insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id, subject_id)
+        values (${studentId}, ${setId}, ${itemId}, ${subjectId})
         on conflict (vocab_set_id, vocab_item_id) do nothing`,
   );
 }
@@ -165,12 +172,12 @@ export type AddSummary = { neu: number; verknuepft: number; zuPruefen: number };
  * verknüpfen statt verdoppeln – englisch `sport/Sport` und französisch
  * `sport/Sport` sind dagegen zwei Vokabeln mit zwei Lernständen.
  *
- * Der Fachbezug kommt vorerst über die Sets, in denen eine Vokabel steckt.
- * Eine Vokabel in gar keinem Set (möglich, seit `deleteSet()` die Vokabeln
- * stehen lässt) hat damit kein ableitbares Fach und wird nicht als Duplikat
- * erkannt – der Grund, warum ADR 0008 D1 `vocab_item.subject_id` als eigene
- * Spalte vorschlägt. Bis V-05 ist das hier die richtige Näherung: lieber ein
- * Duplikat zu viel als eine Vokabel im falschen Fach.
+ * Seit V-05 (ADR 0008 D1) trägt `vocab_item` das Fach selbst statt es über
+ * die Sets abzuleiten, in denen sie steckt – die Abfrage unten ist dadurch
+ * ein einzelner Vergleich, kein Join mehr über `vocab_set_item`/`vocab_set`.
+ * Das schließt auch die Lücke, die die alte Ableitung hatte: Eine Vokabel in
+ * keinem Set (möglich seit `deleteSet()`) hat jetzt trotzdem ein Fach und
+ * wird als Duplikat gefunden.
  */
 async function addRows(
   actor: Actor,
@@ -181,15 +188,17 @@ async function addRows(
   if (rows.length === 0) return summary;
 
   await withActor(actor, async (tx) => {
+    const [set] = await tx.execute<{ subject_id: string }>(
+      sql`select subject_id from vocab_set where id = ${setId}`,
+    );
+    if (!set) return;
+    const subjectId = set.subject_id;
+
     // Wächst während des Durchlaufs mit: Sonst würde dieselbe Zeile zweimal
     // im selben Einfügen zweimal angelegt – ein realistischer Fall, wenn ein
     // Wort auf der Buchseite in zwei Abschnitten steht.
     const existing = await tx.execute<ExistingVocabItem>(
-      sql`select distinct vi.id, vi.term, vi.translation
-          from vocab_item vi
-          join vocab_set_item vsi on vsi.vocab_item_id = vi.id
-          join vocab_set vs on vs.id = vsi.vocab_set_id
-          where vs.subject_id = (select subject_id from vocab_set where id = ${setId})`,
+      sql`select id, term, translation from vocab_item where subject_id = ${subjectId}`,
     );
 
     const merken = (id: string, term: string, translation: string) => {
@@ -200,7 +209,14 @@ async function addRows(
       if (row.unsicher) {
         // Kein Trennzeichen erkannt – als eigene Zeile anlegen, damit sie in
         // der Liste auftaucht und dort vervollständigt werden kann.
-        const id = await insertNewItem(tx, actor.studentId, setId, row.term, row.translation);
+        const id = await insertNewItem(
+          tx,
+          actor.studentId,
+          setId,
+          subjectId,
+          row.term,
+          row.translation,
+        );
         merken(id, row.term, row.translation);
         summary.zuPruefen++;
         continue;
@@ -208,17 +224,31 @@ async function addRows(
 
       const { classification, match } = classifyDuplicate(row, existing);
       if (classification === "exakt" && match) {
-        await linkExistingItem(tx, actor.studentId, setId, match.id);
+        await linkExistingItem(tx, actor.studentId, setId, subjectId, match.id);
         summary.verknuepft++;
       } else if (classification === "abweichend") {
         // Nicht automatisch zusammenführen (D4) – als eigene Zeile anlegen,
         // sie erscheint als "unsicher", weil sich das Wort in diesem Set
         // wiederholt, sobald beide im selben Set stehen.
-        const id = await insertNewItem(tx, actor.studentId, setId, row.term, row.translation);
+        const id = await insertNewItem(
+          tx,
+          actor.studentId,
+          setId,
+          subjectId,
+          row.term,
+          row.translation,
+        );
         merken(id, row.term, row.translation);
         summary.zuPruefen++;
       } else {
-        const id = await insertNewItem(tx, actor.studentId, setId, row.term, row.translation);
+        const id = await insertNewItem(
+          tx,
+          actor.studentId,
+          setId,
+          subjectId,
+          row.term,
+          row.translation,
+        );
         merken(id, row.term, row.translation);
         summary.neu++;
       }

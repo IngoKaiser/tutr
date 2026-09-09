@@ -6,6 +6,16 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- Fachbindung im Vokabelmodell (V-05, ADR 0008 D1/D2): `vocab_item.subject_id` (`not null`, FK gegen `subject`) statt einer Ableitung über die Sets, in denen eine Vokabel steckt – die Ableitung war über n:m mehrdeutig und für eine Vokabel ohne Set (seit `deleteSet()` möglich) gar nicht vorhanden. `vocab_set_item.subject_id` bindet zusätzlich beide Seiten (Set und Vokabel) gegen dieselbe Fach-Spalte, mit demselben Kniff wie bei `student_id`: Eine französische Vokabel in einem spanischen Set ist damit strukturell unmöglich, kein Anwendungscode nötig, der das prüfen müsste
+- Die Duplikaterkennung beim Einfügen (V-03a) ist dadurch ein einzelner Vergleich auf `subject_id` statt eines Joins über `vocab_set_item`/`vocab_set` – und findet jetzt auch Vokabeln, die in keinem Set mehr stecken
+- Migration mit hartem Backfill: bricht ab, statt zu raten, wenn eine Vokabel in Sets verschiedener Fächer steckt oder in gar keinem Set. Nachgemessen gegen die echte Produktiv-DB: 14 Vokabeln, 0 ohne Set, 0 fachübergreifend – der Backfill lief ohne eine der beiden Ausnahmen durch
+- ADR 0008 auf **akzeptiert** gesetzt; D1/D2 sind mit V-05 umgesetzt, D3 (fachgebundenes Üben) folgt mit V-06
+
+### Fixed
+
+- `drizzle-kit generate` hatte die neue `subject_id`-Spalte direkt als `not null` erzeugt – auf einer gefüllten Tabelle wäre das am ersten Bestandsschutz gescheitert. Die Migration wurde um Backfill und zwei Härte-Prüfungen ergänzt
+- Dieselbe generierte Migration hätte mit „no unique constraint matching given keys" abgebrochen: Die neuen Unique-Constraints, auf die die zusammengesetzten Fremdschlüssel zeigen, standen nach den Fremdschlüsseln selbst. Beim Testlauf gegen die Test-DB gefunden (die Migration wurde dafür einmal zurückgesetzt und mit korrigierter Reihenfolge erneut angewendet), nicht angenommen
+
 - Rücklink im `PageHeader` – jede Seite unterhalb eines Fußleisten-Bereichs trägt jetzt einen Weg eine Ebene höher („‹ Vokabelsets", „‹ Fächer"). Die Fußleiste kennt nur die fünf Bereiche und keine Tiefe darunter; aus der Vokabelliste kam man vorher nur über den Umweg /faecher wieder heraus. Ein echter Link auf die Elternseite, kein Browser-Zurück: In der installierten PWA gibt es keine Browserleiste, und der Link benennt das Ziel, nicht die Richtung. Die Regel steht am Baustein selbst, weil sie zweimal vergessen worden ist (erst der Ausstieg aus der Übung, dann dieser)
 - ADR 0008 (Vorschlag): **Ein Fach ist ein Raum, kein Filter.** Kein fachübergreifendes Üben – nicht als Voreinstellung, sondern als Unmöglichkeit. Das Fach wird abgeleitet, wo die Ableitung eindeutig ist (n:1), und gespeichert, wo sie es nicht ist (n:m); das ergibt genau eine neue Spalte (`vocab_item.subject_id`) und schärft ADR 0006 D7, statt ihm zu widersprechen. Tickets V-05 (Fachbindung im Modell) und V-06 (fachgebundenes Üben) geschnitten
 
