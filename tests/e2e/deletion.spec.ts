@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import postgres from "postgres";
+import type postgres from "postgres";
+
+import { adminClient } from "./test-db";
 
 /**
  * Kontolöschung (F-06e, ADR 0006 D5/D6).
@@ -75,14 +77,10 @@ test.describe("Löschen: Konsequenz für ein Gerät, das nichts davon weiß", ()
   let admin: postgres.Sql | undefined;
 
   test.beforeAll(() => {
-    try {
-      process.loadEnvFile(".env.local");
-    } catch {
-      // Kein .env.local – dann bleibt admin undefined, der Test überspringt sich selbst.
-    }
-    if (process.env.MIGRATION_DATABASE_URL) {
-      admin = postgres(process.env.MIGRATION_DATABASE_URL, { prepare: false, max: 1 });
-    }
+    // Immer die Test-Datenbank, nie die Produktive (F-13) – siehe test-db.ts.
+    // `undefined`, wenn keine konfiguriert ist: Dann überspringt sich der
+    // Test selbst, statt auf eine andere Datenbank auszuweichen.
+    admin = adminClient();
   });
 
   test.afterAll(async () => {
@@ -94,7 +92,7 @@ test.describe("Löschen: Konsequenz für ein Gerät, das nichts davon weiß", ()
     browserName,
   }) => {
     test.skip(browserName !== "chromium", "Virtuelle Authenticators nur über CDP.");
-    if (!admin) throw new Error("MIGRATION_DATABASE_URL fehlt – siehe beforeAll.");
+    if (!admin) throw new Error("TEST_MIGRATION_DATABASE_URL fehlt – siehe test-db.ts.");
 
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("WebAuthn.enable");
