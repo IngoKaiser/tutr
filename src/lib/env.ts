@@ -29,6 +29,10 @@ const authSchema = z.object({
   AUTH_COOKIE_SECRET: z.string().min(32),
 });
 
+const aiSchema = z.object({
+  ANTHROPIC_API_KEY: z.string().min(1),
+});
+
 const mailSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   // Ohne verifizierte Domain akzeptiert Resend nur onboarding@resend.dev.
@@ -105,6 +109,23 @@ export function authEnv() {
   return skip
     ? (process.env as unknown as z.infer<typeof authSchema>)
     : authSchema.parse(process.env);
+}
+
+/**
+ * Ist ein Anthropic-Schlüssel konfiguriert? Analog zu `databaseConfigured()`:
+ * Der Foto-Import (V-03b) ist der einzige Weg, der ihn braucht – ohne ihn
+ * soll die Oberfläche das ehrlich sagen, statt einen Knopf anzubieten, der
+ * ins Leere läuft. In CI-E2E fehlt der Schlüssel absichtlich.
+ */
+export function anthropicConfigured(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+export function aiEnv() {
+  if (typeof window !== "undefined") {
+    throw new Error("aiEnv() darf nicht im Browser aufgerufen werden.");
+  }
+  return skip ? (process.env as unknown as z.infer<typeof aiSchema>) : aiSchema.parse(process.env);
 }
 
 export function mailEnv() {

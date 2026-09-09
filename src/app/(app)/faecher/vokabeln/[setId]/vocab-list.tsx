@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
+import { prepareImageForUpload } from "@/lib/vocab/image";
 
 import {
   addFromPaste,
+  addFromPhoto,
   addManualItem,
   deleteItem,
   updateItem,
+  type AddSummary,
   type SetDetail,
   type VocabRow,
 } from "./actions";
@@ -24,7 +27,15 @@ const FIELD =
  * Bearbeiten auf. Dieselbe Ansicht dient dem Import-Tag wie der Korrektur
  * drei Wochen später – ein Denkmodell.
  */
-export function VocabList({ detail, canManage }: { detail: SetDetail; canManage: boolean }) {
+export function VocabList({
+  detail,
+  canManage,
+  photoAvailable,
+}: {
+  detail: SetDetail;
+  canManage: boolean;
+  photoAvailable: boolean;
+}) {
   const unsichereAnzahl = detail.items.filter((item) => item.unsicher).length;
 
   return (
@@ -43,7 +54,7 @@ export function VocabList({ detail, canManage }: { detail: SetDetail; canManage:
         </Notice>
       ) : null}
 
-      {canManage ? <AddArea setId={detail.id} /> : null}
+      {canManage ? <AddArea setId={detail.id} photoAvailable={photoAvailable} /> : null}
 
       {detail.items.length === 0 ? (
         <Notice>Noch keine Vokabeln in diesem Set.</Notice>
@@ -60,12 +71,16 @@ export function VocabList({ detail, canManage }: { detail: SetDetail; canManage:
   );
 }
 
-function AddArea({ setId }: { setId: string }) {
-  const [mode, setMode] = useState<"geschlossen" | "einfuegen" | "manuell">("geschlossen");
+function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boolean }) {
+  const [mode, setMode] = useState<"geschlossen" | "einfuegen" | "manuell" | "foto">("geschlossen");
   const [pasteText, setPasteText] = useState("");
   const [manualTerm, setManualTerm] = useState("");
   const [manualTranslation, setManualTranslation] = useState("");
   const [summary, setSummary] = useState<string | null>(null);
+  const [photoStep, setPhotoStep] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const galerieRef = useRef<HTMLInputElement>(null);
+  const kameraRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
 
   function submitPaste() {
@@ -87,15 +102,141 @@ function AddArea({ setId }: { setId: string }) {
     });
   }
 
+  /**
+   * Fotos nacheinander, nicht alle auf einmal (V-03b).
+   *
+   * Jeder Schritt wird erst angesagt, wenn er wirklich beginnt – CLAUDE.md
+   * verlangt für KI-Läufe über 3 s benannte, *wahre* Schritte statt eines
+   * Spinners. Deshalb auch ein Bild je Server-Aufruf: Nur so stimmt
+   * „Bild 2 von 3".
+   */
+  async function submitPhotos(files: File[]) {
+    setPhotoError(null);
+    setSummary(null);
+    const gesamt: AddSummary = { neu: 0, verknuepft: 0, zuPruefen: 0 };
+    let erkannt = 0;
+
+    for (const [index, file] of files.entries()) {
+      const wo = files.length > 1 ? `Bild ${index + 1} von ${files.length}: ` : "";
+      try {
+        setPhotoStep(`${wo}Bild wird verkleinert …`);
+        const image = await prepareImageForUpload(file);
+
+        setPhotoStep(`${wo}Vokabeln werden gelesen …`);
+        const result = await addFromPhoto(setId, image);
+
+        if (!result) {
+          setPhotoError("Dafür fehlt die Berechtigung.");
+          setPhotoStep(null);
+          return;
+        }
+        if (!result.ok) {
+          setPhotoError(result.fehler);
+          setPhotoStep(null);
+          return;
+        }
+
+        gesamt.neu += result.summary.neu;
+        gesamt.verknuepft += result.summary.verknuepft;
+        gesamt.zuPruefen += result.summary.zuPruefen;
+        erkannt += result.erkannt;
+      } catch {
+        setPhotoError("Das Bild ließ sich nicht lesen. Versuch ein anderes Foto.");
+        setPhotoStep(null);
+        return;
+      }
+    }
+
+    setPhotoStep(null);
+    setMode("geschlossen");
+    setSummary(erkannt > 0 ? summarize(gesamt) : "Nichts erkannt.");
+  }
+
   if (mode === "geschlossen") {
     return (
-      <div className="flex gap-2">
-        <Button onClick={() => setMode("einfuegen")}>Einfügen</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => setMode("foto")}>Foto</Button>
+        <Button quiet onClick={() => setMode("einfuegen")}>
+          Einfügen
+        </Button>
         <Button quiet onClick={() => setMode("manuell")}>
           Von Hand
         </Button>
         {summary ? <Notice>{summary}</Notice> : null}
       </div>
+    );
+  }
+
+  if (mode === "foto") {
+    const laeuft = photoStep !== null;
+    return (
+      <Block title="Vokabeln abfotografieren">
+        {photoAvailable ? (
+          <>
+            <Notice>
+              Buchseite, Arbeitsblatt oder Vokabelheft. Mehrere Bilder auf einmal gehen – eine
+              Vokabelliste läuft oft über eine Doppelseite. Das Foto wird nicht gespeichert.
+            </Notice>
+
+            {/* Ein Eingabefeld, zwei Knöpfe (ADR 0007 D1): dasselbe `accept`,
+                einmal mit und einmal ohne `capture`. Am Handy öffnet das eine
+                die Kamera, das andere die Mediathek; am Rechner ist `capture`
+                wirkungslos und beide führen zur Dateiauswahl. */}
+            <input
+              ref={kameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])];
+                e.target.value = "";
+                if (files.length > 0) void submitPhotos(files);
+              }}
+            />
+            <input
+              ref={galerieRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])];
+                e.target.value = "";
+                if (files.length > 0) void submitPhotos(files);
+              }}
+            />
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => kameraRef.current?.click()} disabled={laeuft}>
+                Kamera
+              </Button>
+              <Button quiet onClick={() => galerieRef.current?.click()} disabled={laeuft}>
+                Bild auswählen
+              </Button>
+              <Button quiet onClick={() => setMode("geschlossen")} disabled={laeuft}>
+                Abbrechen
+              </Button>
+            </div>
+
+            {/* Benannte, wahre Schritte statt Spinner (CLAUDE.md, >3 s). Jeder
+                Text erscheint erst, wenn der Schritt wirklich läuft. */}
+            {photoStep ? <Notice>{photoStep}</Notice> : null}
+            {photoError ? <Notice>{photoError}</Notice> : null}
+          </>
+        ) : (
+          <>
+            <Notice>
+              Die Bilderkennung ist auf diesem Gerät nicht eingerichtet. Einfügen und Tippen
+              funktionieren weiterhin.
+            </Notice>
+            <Button quiet onClick={() => setMode("geschlossen")}>
+              Zurück
+            </Button>
+          </>
+        )}
+      </Block>
     );
   }
 

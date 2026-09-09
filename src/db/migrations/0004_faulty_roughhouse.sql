@@ -1,0 +1,1 @@
+ALTER TABLE "vocab_item" ADD COLUMN "recognition_uncertain" boolean DEFAULT false NOT NULL;
