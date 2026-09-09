@@ -16,7 +16,9 @@ Vercel liest das von selbst.
 ## 2 · Umgebungsvariablen setzen
 
 Alle für **Production**, **Preview** und **Development** setzen, sonst
-scheitern Vorschau-Deployments an der Zod-Prüfung in `src/lib/env.ts`.
+scheitern Vorschau-Deployments an der Zod-Prüfung in `src/lib/env.ts`. Für
+den ersten Deploy reicht das mit denselben Werten überall — **Schritt 8**
+trennt Preview später auf eine eigene Datenbank.
 
 | Variable                               | Quelle                                            |
 | -------------------------------------- | ------------------------------------------------- |
@@ -27,6 +29,27 @@ scheitern Vorschau-Deployments an der Zod-Prüfung in `src/lib/env.ts`.
 | `ANTHROPIC_API_KEY`                    | wie in `.env.local`                               |
 | `AUTH_COOKIE_SECRET`                   | wie in `.env.local`                               |
 | `RESEND_API_KEY`, `RESEND_FROM`        | optional, siehe Schritt 6                         |
+
+**Secret oder Config?** Vercel fragt beim Anlegen nach dem Typ. `Secret`
+lässt sich nach dem Speichern nie wieder anzeigen, `Config` schon:
+
+| Variable                               | Typ    | Warum                                                                         |
+| -------------------------------------- | ------ | ----------------------------------------------------------------------------- |
+| `DATABASE_URL`                         | Secret | enthält das Passwort der Rolle `tutr_app`                                     |
+| `SUPABASE_SECRET_KEY`                  | Secret | umgeht RLS – der mächtigste Wert in dieser Liste                              |
+| `ANTHROPIC_API_KEY`                    | Secret | kostet Geld, wenn er abhandenkommt                                            |
+| `AUTH_COOKIE_SECRET`                   | Secret | signiert die Anmelde-Cookies                                                  |
+| `RESEND_API_KEY`                       | Secret | erlaubt Mailversand über die Domain                                           |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Config | steckt ohnehin im Browser-Bundle                                              |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Config | öffentlich **by design** (ADR 0003) – RLS ist der Schutz, nicht der Schlüssel |
+| `RESEND_FROM`                          | Config | nur eine Absenderadresse                                                      |
+
+Vercel warnt bei den beiden `NEXT_PUBLIC_`-Variablen, dass ihr Wert im
+Browser landet. Das ist richtig und beabsichtigt: Next.js ersetzt
+`NEXT_PUBLIC_*` zur Bauzeit im Client-Bundle, sie sind per Definition
+öffentlich. „Mark as Safe" ist hier die korrekte Antwort. Sie als `Secret`
+zu hinterlegen bringt keinen Schutz, kostet aber die Möglichkeit,
+nachzusehen, was eingetragen ist.
 
 **Zwei Werte gehören ausdrücklich NICHT nach Vercel:**
 `MIGRATION_DATABASE_URL` und `TUTR_APP_DB_PASSWORD`. Das sind die
@@ -102,21 +125,53 @@ Themen hängen per Kaskade an `student` und gehen mit.
 **Danach `npm run db:seed` nie wieder gegen die Produktivdatenbank ausführen.**
 Es legt die Attrappen erneut an. Für die Test-Datenbank bleibt es richtig.
 
-## 6 · E-Mail (kann warten)
+## 6 · E-Mail: zwei getrennte Wege, ein gemeinsamer Fix
 
-Zwei verschiedene Wege, nicht verwechseln:
+Nicht verwechseln — zwei verschiedene Systeme verschicken zwei verschiedene Mails:
 
-| Mail                     | Verschickt von | Zustand                                                            |
-| ------------------------ | -------------- | ------------------------------------------------------------------ |
-| Eltern-Anmeldelink       | Supabase Auth  | funktioniert sofort, aber knappe Rate-Limits (ein paar pro Stunde) |
-| Einwilligungsmail (F-06) | Resend         | ohne verifizierte Domain nur an die Adresse deines Resend-Kontos   |
+| Mail                     | Verschickt von | Zustand                                                                     |
+| ------------------------ | -------------- | --------------------------------------------------------------------------- |
+| Eltern-Anmeldelink       | Supabase Auth  | **bricht ab**, sobald der eingebaute Mailversand sein Stundenlimit erreicht |
+| Einwilligungsmail (F-06) | Resend         | funktioniert, sobald die Domain verifiziert ist (Schritt oben erledigt)     |
 
-Für den ersten Test reicht beides. Eine verifizierte Resend-Domain brauchst
-du erst, wenn die Einwilligungsmail an eine andere Adresse gehen soll — und
-für F-06f (Wiederherstellung vom Anmeldebildschirm).
+Ohne eigene Konfiguration verschickt Supabase Auth über einen eingebauten
+Mailversand mit einem sehr niedrigen Stundenlimit — ausdrücklich nur zum
+Ausprobieren gedacht. Reproduzierbar mit:
 
-Wenn Supabase' Rate-Limit stört: eigenen SMTP-Anbieter unter
-Authentication → Emails hinterlegen.
+```bash
+curl -X POST "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/otp" \
+  -H "Content-Type: application/json" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+  -d '{"email":"test@example.com","create_user":true}'
+```
+
+Antwort im Fehlerfall: `500 { "error_code": "unexpected_failure", "msg": "Error
+sending confirmation email" }` — unabhängig von der App, unabhängig von Resend.
+
+**Der Fix ersetzt den eingebauten Mailversand durch Resend**, das ohnehin
+schon verifiziert ist. Dashboard → Authentication → Emails → SMTP Settings →
+„Enable Custom SMTP":
+
+| Feld         | Wert                      |
+| ------------ | ------------------------- |
+| Host         | `smtp.resend.com`         |
+| Port         | `465` (SSL)               |
+| Username     | `resend`                  |
+| Password     | der `RESEND_API_KEY`-Wert |
+| Sender email | `noreply@mytutr.de`       |
+| Sender name  | `tutr`                    |
+
+Danach laufen beide Mails über dieselbe verifizierte Domain, ohne das enge
+Test-Limit. Vor F-06f (Wiederherstellung vom Anmeldebildschirm) ohnehin nötig.
+
+**Wenn das Auth-Log `535 "Authentication credentials invalid"` zeigt**, liegt
+es am Passwort, nicht am Port. Nachgemessen gegen `smtp.resend.com`: Mit
+gültigem API-Schlüssel antwortet der Server auf **beiden** Ports (465 mit
+TLS, 587 mit STARTTLS) mit `235` – Anmeldung angenommen. Genau dasselbe
+`535` erscheint reproduzierbar, sobald das Passwort nicht stimmt. Also: den
+Schlüssel neu einsetzen, nicht am Port drehen.
+
+Der Benutzername ist wörtlich `resend`, nicht die Absenderadresse.
 
 ## 7 · Nach dem Deploy prüfen
 
@@ -138,6 +193,54 @@ Dann von Hand:
 5. Einwilligungsmail prüfen, bestätigen → Elternkonto sieht das Kind
 6. Vokabelset anlegen, **Foto aus dem Vokabelheft** — der bisher ungetestete Fall
 7. Üben starten
+
+## 8 · Preview-Deployments: neue Features erst selbst prüfen (optional, aber empfohlen)
+
+Vercel legt für **jeden Branch und jeden Pull Request automatisch ein
+eigenes Deployment** mit eigener URL an, ohne Zusatzarbeit — das passt genau
+zu unserem Ablauf, weil wir ohnehin immer über Branch + PR arbeiten. `main`
+→ Production auf `mytutr.de`; jeder offene PR → ein Preview-Deployment, auf
+dem sich ein neues Feature anschauen lässt, bevor es gemergt wird.
+
+**Ohne weitere Änderung zeigen Preview-Deployments auf dieselbe Datenbank
+wie Production** — Schritt 2 hat die Variablen für Production _und_ Preview
+mit denselben Werten gesetzt. Ein Klick auf einer Preview-URL schreibt dann
+in die echten Daten. Genau der Fehler, den F-13 für die lokalen Tests
+behoben hat, nur eine Ebene höher.
+
+**Der Fix nutzt, was schon da ist:** das zweite, leere Supabase-Projekt, das
+sonst nur `npm run db:test` bedient. Für die Umgebung **Preview** dieselben
+vier Variablen auf dieses Projekt umbiegen:
+
+| Variable                               | Quelle                                             |
+| -------------------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`                         | Wert von `TEST_DATABASE_URL` aus `.env.test.local` |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Test-Projekt → Settings → API                      |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Test-Projekt → API Keys                            |
+| `SUPABASE_SECRET_KEY`                  | Test-Projekt → API Keys                            |
+
+Die drei Supabase-Werte des Test-Projekts liegen noch nirgends bei uns —
+bisher brauchte es dort nur die Datenbank, keine Anmeldung. Einmalig aus dem
+Dashboard des zweiten Projekts holen.
+
+`ANTHROPIC_API_KEY`, `AUTH_COOKIE_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`
+können in beiden Umgebungen gleich bleiben.
+
+**So geht das in Vercel** (Settings → Environment Variables): Vercel erlaubt
+nicht, einer Variable unterschiedliche Werte je Umgebung mitzugeben — es
+erlaubt stattdessen **mehrere Einträge mit demselben Namen**, jeder auf eine
+eigene Umgebung begrenzt. Für jede der vier Variablen:
+
+1. Den bestehenden Eintrag öffnen, den Haken bei **Preview** entfernen (er
+   bleibt nur für **Production** gesetzt)
+2. Einen **neuen** Eintrag mit demselben Namen anlegen, nur **Preview**
+   angehakt, mit dem Test-Projekt-Wert
+
+**Ein bekannter Nebeneffekt, keine neue Einschränkung:** Preview-Deployments
+haben eigene Hosts (`tutr-git-<branch>-<team>.vercel.app`), also eigene
+Passkeys — dieselbe Regel wie in Schritt 3. Zum Durchklicken registriert man
+dort ein Wegwerf-Kind; die echten Passkeys von `mytutr.de` funktionieren auf
+einer Preview-URL nicht, und umgekehrt.
 
 ## Was bewusst offen bleibt
 
