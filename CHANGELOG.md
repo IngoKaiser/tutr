@@ -4,6 +4,18 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Changed
+
+- **Ladezeiten der angemeldeten Seiten.** Ein Aufbau von `/faecher/vokabeln` kostete über
+  **dreißig Netzwerkrunden** zur Datenbank. Zwei Ursachen, beide behoben:
+  `loginStatus()` lief viermal je Seite (Layout, Seite und zwei Loader mit je
+  `requireActor()`) – jetzt einmal, dedupliziert über Reacts `cache()` innerhalb einer
+  Anfrage. Und jede Transaktion begann mit vier einzelnen Anweisungen (`set local role`
+  plus dreimal `set_config`), jede eine eigene Runde – jetzt eine einzige Anweisung.
+  Gegen die Produktivdatenbank gemessen: 167 ms → 103 ms je `withActor()`-Aufruf, die
+  Abfragefolge einer Seite 493 ms → 202 ms. `set_config('role', …)` ist gleichbedeutend
+  mit `set local role`; dass RLS unverändert greift, belegen die 96 Policy-Tests
+
 ### Added
 
 - **F-16a: Fächerverwaltung.** Der Blocker aus `docs/roadmap.md` Stufe 0 ist behoben – ein Kind

@@ -41,12 +41,23 @@ export async function runWithActor<T>(
   fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
   return database.transaction(async (tx) => {
-    await tx.execute(sql`set local role tutr_app`);
-    // Werte immer als gebundene Parameter – niemals in den SQL-Text interpolieren.
-    await tx.execute(sql`select set_config('tutr.student_id', ${actor.studentId}, true)`);
-    await tx.execute(sql`select set_config('tutr.actor_role', ${actor.role}, true)`);
+    // **Eine** Anweisung für die ganze Präambel, nicht vier. Jede einzelne
+    // wäre eine eigene Netzwerkrunde zur Datenbank, und die summieren sich:
+    // Eine Seite wie `/faecher/vokabeln` kam vorher auf über dreißig Runden
+    // je Aufbau. Gemessen gegen die Produktivdatenbank: 167 ms → 103 ms je
+    // `withActor()`-Aufruf (F-16a-Nachtrag, Ladezeiten).
+    //
+    // `set_config('role', …)` ist gleichbedeutend mit `set local role` –
+    // `role` ist ein gewöhnlicher GUC-Parameter. Gegen die echte Datenbank
+    // geprüft: identische Sichtbarkeit unter RLS, nicht angenommen.
+    //
+    // Werte immer als gebundene Parameter – niemals in den SQL-Text
+    // interpolieren.
     await tx.execute(
-      sql`select set_config('tutr.parent_id', ${actor.role === "parent" ? actor.parentId : ""}, true)`,
+      sql`select set_config('role', 'tutr_app', true),
+                 set_config('tutr.student_id', ${actor.studentId}, true),
+                 set_config('tutr.actor_role', ${actor.role}, true),
+                 set_config('tutr.parent_id', ${actor.role === "parent" ? actor.parentId : ""}, true)`,
     );
     return fn(tx);
   });
@@ -91,9 +102,11 @@ export async function runWithLoginKey<T>(
   fn: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
   return database.transaction(async (tx) => {
-    await tx.execute(sql`set local role tutr_app`);
+    // Eine Anweisung statt zwei, aus demselben Grund wie in `runWithActor()`.
     // Der Variablenname ist ein Literal aus dem Union-Typ oben, nie Eingabe.
-    await tx.execute(sql`select set_config(${variable}, ${wert}, true)`);
+    await tx.execute(
+      sql`select set_config('role', 'tutr_app', true), set_config(${variable}, ${wert}, true)`,
+    );
     return fn(tx);
   });
 }
