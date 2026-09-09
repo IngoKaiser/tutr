@@ -25,13 +25,21 @@ function abonniereNichts(): () => void {
  * jemand ohne Profil nicht gehen kann, und die aussehen, als sei etwas
  * kaputt. Ob ein Passkey existiert, lässt sich nicht abfragen (WebAuthn
  * verrät das absichtlich nie), deshalb entscheidet die Gerätenotiz aus
- * `passkey-hint.ts` – mit sichtbarem Ausweg für den Fall, dass sie irrt.
+ * `passkey-hint.ts`.
+ *
+ * **Der Knopf bleibt dabei immer stehen** – die Notiz steuert, was ein Druck
+ * darauf *auslöst*, nicht was gerendert wird. Ein erster Versuch tauschte
+ * den Knopf gegen „Profil anlegen" aus; weil `localStorage` auf dem Server
+ * nicht existiert, geschah das erst nach der Hydration, und die Seite sprang
+ * sichtbar um. Ein E2E-Test hat es gefangen: Er fand den Knopf mal, mal
+ * nicht, je nachdem ob er der Umschaltung zuvorkam.
  */
 export function PasskeyLogin() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [trotzdem, setTrotzdem] = useState(false);
+  const [keinProfil, setKeinProfil] = useState(false);
   // `useSyncExternalStore` statt Effekt: `localStorage` gibt es auf dem
   // Server nicht, und die Server-Momentaufnahme (`true`) verhindert, dass
   // jemand mit Passkey beim Laden kurz den falschen Text sieht.
@@ -41,8 +49,27 @@ export function PasskeyLogin() {
     () => true,
   );
 
-  async function handleLogin() {
+  /**
+   * `ignoriereNotiz` kommt vom Ausweg „Ich habe hier schon einen Passkey".
+   * Als Parameter, nicht über `trotzdem`: Ein `setState` wirkt erst im
+   * nächsten Rendern, die Zeremonie muss aber im selben Klick starten –
+   * Browser lassen `navigator.credentials.get()` nur direkt aus einer
+   * Nutzergeste zu.
+   */
+  async function handleLogin({ ignoriereNotiz = false } = {}) {
     setError(null);
+
+    // Kennt dieser Browser keinen Passkey, wird die Zeremonie gar nicht erst
+    // gestartet (F-14) – der Systemdialog mit QR-Code und
+    // Sicherheitsschlüssel führt ohne Profil nirgendwohin. Die Entscheidung
+    // fällt hier beim Klick und nicht beim Rendern, damit die Seite nach der
+    // Hydration nicht umspringt.
+    if (!kenntGeraet && !trotzdem && !ignoriereNotiz) {
+      setKeinProfil(true);
+      return;
+    }
+
+    setKeinProfil(false);
     setSubmitting(true);
     try {
       const start = await startLogin();
@@ -86,53 +113,50 @@ export function PasskeyLogin() {
     }
   }
 
-  // Auf einem Gerät, von dem wir keinen Passkey kennen, führt der erste
-  // Weg zur Registrierung – nicht in den Systemdialog des Betriebssystems.
-  if (!kenntGeraet && !trotzdem) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Link
-          href="/registrieren"
-          className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau rounded-[9px] px-4 py-2.5 text-center text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
-        >
-          Profil anlegen
-        </Link>
-        <p className="text-tinte-weich text-[0.8125rem] leading-normal">
-          Auf diesem Gerät ist noch kein Zugang eingerichtet. Leg dir ein Profil an – das dauert
-          keine Minute und braucht kein Passwort.
-        </p>
-        {/* Der Ausweg für den Fall, dass die Gerätenotiz irrt – etwa nach
-            gelöschten Browserdaten. Klein, aber sichtbar: Die Notiz darf
-            sich irren, sie darf niemanden aussperren. */}
-        <button
-          type="button"
-          onClick={() => setTrotzdem(true)}
-          className="text-tinte-leise hover:text-tinte self-start text-[0.8125rem] underline underline-offset-2"
-        >
-          Ich habe hier schon einen Passkey
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-2">
       <button
         type="button"
-        onClick={handleLogin}
+        onClick={() => handleLogin()}
         disabled={submitting}
         className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau rounded-[9px] px-4 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60"
       >
         {submitting ? "Einen Moment …" : "Mit Face ID anmelden"}
       </button>
 
-      <p className="text-tinte-leise text-[0.8125rem] leading-normal">
-        Zum ersten Mal hier?{" "}
-        <Link href="/registrieren" className="text-koenigsblau underline underline-offset-2">
-          Profil anlegen
-        </Link>
-        .
-      </p>
+      {keinProfil ? (
+        <div className="flex flex-col gap-1">
+          <p role="alert" className="text-tinte text-[0.8125rem] leading-normal">
+            Auf diesem Gerät ist noch kein Zugang eingerichtet.{" "}
+            <Link href="/registrieren" className="text-koenigsblau underline underline-offset-2">
+              Leg dir ein Profil an
+            </Link>{" "}
+            – das dauert keine Minute und braucht kein Passwort.
+          </p>
+          {/* Der Ausweg für den Fall, dass die Gerätenotiz irrt – etwa nach
+              gelöschten Browserdaten. Klein, aber sichtbar: Die Notiz darf
+              sich irren, sie darf niemanden aussperren. */}
+          <button
+            type="button"
+            onClick={() => {
+              setTrotzdem(true);
+              setKeinProfil(false);
+              void handleLogin({ ignoriereNotiz: true });
+            }}
+            className="text-tinte-leise hover:text-tinte self-start text-[0.8125rem] underline underline-offset-2"
+          >
+            Ich habe hier schon einen Passkey
+          </button>
+        </div>
+      ) : (
+        <p className="text-tinte-leise text-[0.8125rem] leading-normal">
+          Zum ersten Mal hier?{" "}
+          <Link href="/registrieren" className="text-koenigsblau underline underline-offset-2">
+            Profil anlegen
+          </Link>
+          .
+        </p>
+      )}
 
       {error ? (
         <div className="flex flex-col gap-1">
