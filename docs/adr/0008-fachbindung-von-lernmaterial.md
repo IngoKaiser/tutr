@@ -162,6 +162,35 @@ funktionierte die vereinfachte Duplikaterkennung (jetzt ein einzelner Vergleich 
 D3–D5 (fachgebundenes Üben, Duplikat-Rahmen in der Anwendung, Geltung für anderes
 Lernmaterial) folgen mit V-06 bzw. bei Bedarf.
 
+## Nachtrag beim Bauen (V-06)
+
+**D3 ist umgesetzt.** `/ueben` zeigt einen Block je Fach statt einer Zahl über alles;
+`loadSessionCards()` filtert auf `subject_id`, eine Session lädt also nie Karten aus zwei
+Fächern. Die Falschantworten für Multiple Choice ziehen unverändert aus dem Vorrat der
+Session (`distractors.ts`) – **keine eigene Fach-Regel dort nötig**, weil der Vorrat selbst
+längst einsprachig ist. Genau die Vereinfachung, die D3 oben versprochen hat.
+
+`card` selbst bekam dabei keine Spalte, wie in D1 festgelegt: `loadDueBySubject()` leitet
+das Fach über `coalesce(vocab_item.subject_id, topic.subject_id)` ab – für Vokabelkarten
+über V-05, für Karten aus Lernzielen (M-03, noch nicht gebaut) über
+`learning_objective → topic → subject`. Beide sind n:1, `card_exactly_one_source`
+garantiert, dass nie beide Joins gleichzeitig treffen. Die Abfrage ist damit schon richtig,
+bevor M-03 existiert.
+
+**Kein eigener Auswahl-Bildschirm vor der Session**, entgegen der in D3 genannten Kosten:
+Bei realistisch ein bis drei Fächern mit fälligen Karten steht „Französisch · 12 fällig"
+direkt neben dem Knopf, der es übt – ein Zwischenschritt hätte nichts hinzugefügt. Diese
+Abwägung gilt für den heutigen Umfang; V-04 (Modi) darf sie neu stellen, falls mehr Fächer
+gleichzeitig fällig werden, als auf einen Bildschirm passen.
+
+Ein Fund beim Testen, keiner an der Anwendung: Der bestehende E2E-Test wählte das Kind
+(„Mia") über eine `<select>`, deren Änderung eine Server Action hinter `useTransition`
+auslöst – `selectOption()` wartet darauf nicht, eine anschließende Navigation konnte also
+vor dem Setzen des Cookies passieren. Vorher unauffällig, weil „0 fällig" (Bens leerer
+Stand, das Cookie-Fallback-Kind) ebenfalls auf `/\d+ fällig/` passte. Seit D3 zeigt ein Fach
+ganz ohne fällige Karten gar keinen Block mehr – der Fehlgriff wurde dadurch sichtbar und
+im Test behoben (auf das tatsächliche Setzen des Cookies warten, nicht nur auf den Klick).
+
 ## Abgelehnte Alternative
 
 **Das Fach rein ableiten, ohne Spalte.** Wäre die reinere Lesart von ADR 0006 D7 und
