@@ -28,6 +28,22 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "tutr", statusBarStyle: "default" },
 };
 
+/**
+ * Ladezeiten-Fund (9.9.2026): Die Funktion lief in Washington D.C., die
+ * Datenbank steht in Frankfurt – jede Datenbankrunde ging zweimal über den
+ * Atlantik, ~100 ms statt ~5 ms. Gemessen an `/einstellungen` (12 Runden):
+ * 1368 ms, praktisch vollständig Datenbankzeit (`[db] withActor` in den
+ * Vercel-Logs).
+ *
+ * `preferredRegion` auf dem Root-Layout gilt für jede Route darunter, sofern
+ * sie es nicht selbst überschreibt (Next.js Routing-Segment-Konfiguration) –
+ * das ist der Weg, den Vercels Next.js-Adapter garantiert liest. Steht neben
+ * `vercel.json`s `regions` (Projekt-Standard), weil unklar ist, welche der
+ * beiden Fluid Compute tatsächlich befolgt – von hier nicht prüfbar, siehe
+ * `docs/deploy.md`.
+ */
+export const preferredRegion = "fra1";
+
 export const viewport: Viewport = {
   // Königsblau, passend zur Designsprache – hell und dunkel getrennt.
   themeColor: [
