@@ -128,6 +128,37 @@ Foto zehn Sekunden.
   `card` und `review` aus V-01 aus. Die Konfidenz-Markierung aus D2 ist ein Zustand der
   Ansicht nach dem Import, keine Spalte — sie wäre nach der ersten Durchsicht ohnehin
   wertlos (ADR 0006 D7: was sich ableiten lässt, wird nicht gespeichert).
+  **→ Dieser Punkt war falsch, siehe Nachtrag zu V-03b.**
+
+## Nachtrag beim Bauen (V-03b): die Konfidenz braucht doch eine Spalte
+
+Die Konsequenz oben behauptet, die Konfidenz-Markierung sei ableitbar und deshalb keine
+Spalte wert. Das stimmt nicht, und ein Testlauf gegen die echte Bilderkennung hat es
+gezeigt.
+
+Ein Bild mit vier Zeilen, zwei davon absichtlich kaputt: eine mit überkritzelter
+Übersetzung, eine mit am Blattrand abgeschnittener. Die Erkennung hat beide korrekt als
+unsicher gemeldet. In der Liste war danach nur **eine** markiert:
+
+| Zeile                    | Erkennung | abgeleitet aus der Zeile    |
+| ------------------------ | --------- | --------------------------- |
+| `le cartable` / (leer)   | `niedrig` | unsicher (leeres Feld) ✓    |
+| `la trousse` / `das Fed` | `niedrig` | **sieht vollständig aus** ✗ |
+
+`das Fed` ist ein abgeschnittenes Wort, aber ein gefülltes Feld ohne Dublette — aus der
+gespeicherten Zeile lässt sich nicht mehr erkennen, dass die Erkennung dort unsicher war.
+**Niedrige Konfidenz ist eine Tatsache aus dem Moment des Imports, keine Eigenschaft der
+Zeile.** ADR 0006 D7 verbietet, Ableitbares zu speichern — dieser Wert ist nicht
+ableitbar, D7 begründet die Ausnahme also, statt ihr entgegenzustehen.
+
+Deshalb trägt `vocab_item` seit V-03b `recognition_uncertain` (boolean, Vorgabe `false`).
+Die beiden anderen Gründe aus D2 — leeres Feld, gleiches Wort mit anderer Übersetzung —
+werden weiterhin beim Lesen abgeleitet.
+
+Die ursprüngliche Beobachtung („nach der ersten Durchsicht wertlos") bleibt richtig und
+steht jetzt im Code: `updateItem()` setzt das Flag zurück. Wer die Zeile aufklappt und
+speichert, hat daraufgeschaut — genau das war der Zweck der Markierung.
+
 - **Bewusst nicht gebaut:** Vokabeln zwischen Sets verschieben, Massen-Bearbeitung
   einzelner Felder, Datei-Import. Alle drei sind nachrüstbar, wenn sich zeigt, dass sie
   fehlen; keiner von ihnen hat heute einen Abnehmer.

@@ -90,6 +90,21 @@ test.describe("Vokabelverwaltung", () => {
     await setLink.click();
     await expect(page.getByText("Noch keine Vokabeln in diesem Set.")).toBeVisible();
 
+    // --- Der Foto-Weg ist da (V-03b) ---------------------------------------
+    // Der Vision-Aufruf selbst läuft hier nicht: In CI fehlt der
+    // ANTHROPIC_API_KEY absichtlich, und ein echtes Bild durch die API zu
+    // schicken wäre ein Test der Erkennung, nicht der Anwendung. Geprüft
+    // wird, dass der Weg existiert, beide Eingaben anbietet (ADR 0007 D1:
+    // ein Feld, mit und ohne `capture`) und die Zusage aus D6 sichtbar
+    // macht. Dass Erkennung, Konfidenz-Markierung und Einfügen zusammen
+    // funktionieren, ist von Hand gegen die echte API geprüft.
+    await page.getByRole("button", { name: "Foto" }).click();
+    await expect(page.getByText(/Das Foto wird nicht gespeichert/)).toBeVisible();
+    const dateifelder = page.locator('input[type="file"]');
+    await expect(dateifelder).toHaveCount(2);
+    await expect(page.locator('input[type="file"][capture]')).toHaveCount(1);
+    await page.getByRole("button", { name: "Abbrechen" }).click();
+
     // --- Einfügen: alle vier Fälle in einem Text --------------------------
     await page.getByRole("button", { name: "Einfügen" }).click();
     await page.locator("textarea").fill(

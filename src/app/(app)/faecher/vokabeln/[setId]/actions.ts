@@ -3,20 +3,25 @@
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { extractVocabularyFromImage } from "@/ai/client";
 import { withActor, type Actor, type Transaction } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { classifyDuplicate, type ExistingVocabItem } from "@/lib/vocab/duplicates";
-import { databaseConfigured } from "@/lib/env";
+import { anthropicConfigured, databaseConfigured } from "@/lib/env";
 import { newCardColumns } from "@/lib/vocab/fsrs";
 import { parsePastedVocabulary } from "@/lib/vocab/paste";
+import { extractedRowsToPastedRows } from "@/lib/vocab/photo";
 
 /**
  * Die Vokabelliste eines Sets (V-03a, ADR 0007 D2–D4).
  *
- * „Unsicher" ist keine Spalte (ADR 0006 D7: was sich ableiten lässt, wird
- * nicht gespeichert): leeres Feld, oder gleiches Wort mit anderer
- * Übersetzung im selben Set – beides beim Lesen berechnet, nicht beim
- * Schreiben markiert.
+ * „Unsicher" ist **fast** keine Spalte (ADR 0006 D7: was sich ableiten
+ * lässt, wird nicht gespeichert). Zwei der drei Gründe aus ADR 0007 D2
+ * werden beim Lesen berechnet – leeres Feld, gleiches Wort mit anderer
+ * Übersetzung im selben Set. Der dritte, niedrige Konfidenz der
+ * Bilderkennung, steht als `recognition_uncertain` an `vocab_item`: Er ist
+ * nicht ableitbar, sondern eine Tatsache aus dem Moment des Imports
+ * (V-03b). Siehe `withDerivedUnsicher()`.
  *
  * Eine Korrektur an Wort/Übersetzung rührt den Lernstand nicht an (D3) –
  * `updateItem()` fasst `card`/`review` nie an. Die dort genannte Ausnahme
@@ -59,8 +64,18 @@ function sortForReview(items: VocabRow[]): VocabRow[] {
   });
 }
 
+/**
+ * Die drei Gründe aus ADR 0007 D2, warum eine Zeile „prüfen" trägt.
+ *
+ * Zwei davon werden hier **abgeleitet** (ADR 0006 D7): ein leeres Feld und
+ * dasselbe Wort mit verschiedenen Übersetzungen im Set. Der dritte –
+ * niedrige Konfidenz der Erkennung – kommt als gespeicherte Spalte dazu:
+ * Er ist eine Tatsache aus dem Moment des Imports, die sich später aus der
+ * Zeile nicht mehr ablesen lässt („la trousse / das Fed" sieht vollständig
+ * aus). Gefunden beim Testen von V-03b gegen die echte Bilderkennung.
+ */
 function withDerivedUnsicher(
-  rows: { id: string; term: string; translation: string }[],
+  rows: { id: string; term: string; translation: string; recognition_uncertain: boolean }[],
 ): VocabRow[] {
   const termCounts = new Map<string, Set<string>>();
   for (const row of rows) {
@@ -69,11 +84,11 @@ function withDerivedUnsicher(
     translations.add(row.translation.trim().toLowerCase());
     termCounts.set(key, translations);
   }
-  return rows.map((row) => {
+  return rows.map(({ recognition_uncertain, ...row }) => {
     const key = row.term.trim().toLowerCase();
     const leer = row.term.trim() === "" || row.translation.trim() === "";
     const uneinig = (termCounts.get(key)?.size ?? 0) > 1;
-    return { ...row, unsicher: leer || uneinig };
+    return { ...row, unsicher: leer || uneinig || recognition_uncertain };
   });
 }
 
@@ -82,7 +97,12 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
   if (!actor) return null;
 
   type Row = { title: string; subject_name: string };
-  type ItemRow = { id: string; term: string; translation: string };
+  type ItemRow = {
+    id: string;
+    term: string;
+    translation: string;
+    recognition_uncertain: boolean;
+  };
 
   return withActor(actor, async (tx) => {
     const [set] = await tx.execute<Row>(
@@ -93,7 +113,7 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
     if (!set) return null;
 
     const items = await tx.execute<ItemRow>(
-      sql`select vi.id, vi.term, vi.translation
+      sql`select vi.id, vi.term, vi.translation, vi.recognition_uncertain
           from vocab_set_item vsi
           join vocab_item vi on vi.id = vsi.vocab_item_id
           where vsi.vocab_set_id = ${setId}`,
@@ -124,10 +144,11 @@ async function insertNewItem(
   subjectId: string,
   term: string,
   translation: string,
+  recognitionUncertain: boolean,
 ): Promise<string> {
   const [item] = await tx.execute<{ id: string }>(
-    sql`insert into vocab_item (student_id, subject_id, term, translation)
-        values (${studentId}, ${subjectId}, ${term}, ${translation})
+    sql`insert into vocab_item (student_id, subject_id, term, translation, recognition_uncertain)
+        values (${studentId}, ${subjectId}, ${term}, ${translation}, ${recognitionUncertain})
         returning id`,
   );
   await tx.execute(
@@ -216,6 +237,7 @@ async function addRows(
           subjectId,
           row.term,
           row.translation,
+          row.unsicher,
         );
         merken(id, row.term, row.translation);
         summary.zuPruefen++;
@@ -237,6 +259,7 @@ async function addRows(
           subjectId,
           row.term,
           row.translation,
+          row.unsicher,
         );
         merken(id, row.term, row.translation);
         summary.zuPruefen++;
@@ -248,6 +271,7 @@ async function addRows(
           subjectId,
           row.term,
           row.translation,
+          row.unsicher,
         );
         merken(id, row.term, row.translation);
         summary.neu++;
@@ -264,6 +288,78 @@ export async function addFromPaste(setId: string, text: string): Promise<AddSumm
   const actor = await requireStudentActor();
   if (!actor) return null;
   return addRows(actor, setId, parsePastedVocabulary(text));
+}
+
+export type PhotoImportResult =
+  { ok: true; summary: AddSummary; erkannt: number } | { ok: false; fehler: string };
+
+/**
+ * Ein Foto einlesen (V-03b, ADR 0007 D1/D6).
+ *
+ * **Ein Bild je Aufruf, absichtlich.** Mehrere Fotos schickt der Client
+ * nacheinander – nur so kann er „Bild 2 von 3" anzeigen und meinen, was er
+ * sagt (CLAUDE.md: benannte, wahre Schritte statt Spinner). Ein Aufruf über
+ * alle Bilder könnte nur einen Spinner zeigen.
+ *
+ * **Das Bild wird nirgends gespeichert** (D6): kein Storage, keine Spalte,
+ * keine Datei. Es lebt für die Dauer dieses Aufrufs im Speicher und ist
+ * danach fort. Deshalb steht hier auch kein Logging des Inhalts.
+ *
+ * Das Fach kommt aus dem Set – der Prompt braucht es, um „links steht die
+ * Fremdsprache" nicht raten zu müssen.
+ *
+ * Der Rückgabewert ist bewusst ein Ergebnis-Typ statt eines geworfenen
+ * Fehlers: Ein abgelehnter Bildtyp oder eine ausgefallene Erkennung ist für
+ * die Nutzerin ein normaler Ausgang, kein Absturz, und die Oberfläche soll
+ * einen deutschen Satz zeigen können.
+ */
+export async function addFromPhoto(
+  setId: string,
+  image: { base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" },
+): Promise<PhotoImportResult | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+
+  if (!anthropicConfigured()) {
+    return { ok: false, fehler: "Die Bilderkennung ist auf diesem Gerät nicht eingerichtet." };
+  }
+  if (!image.base64) {
+    return { ok: false, fehler: "Das Bild kam nicht vollständig an. Versuch es noch einmal." };
+  }
+
+  const subjectName = await withActor(actor, async (tx) => {
+    const [row] = await tx.execute<{ name: string }>(
+      sql`select s.name from vocab_set vs join subject s on s.id = vs.subject_id
+          where vs.id = ${setId}`,
+    );
+    return row?.name ?? null;
+  });
+  if (!subjectName) {
+    return { ok: false, fehler: "Dieses Set gibt es nicht mehr." };
+  }
+
+  let rows;
+  try {
+    const extraction = await extractVocabularyFromImage(image, { subjectName });
+    rows = extractedRowsToPastedRows(extraction.rows);
+  } catch {
+    // Der ursprüngliche Fehler kann Bild- oder Schlüsseldetails tragen – er
+    // gehört ins Serverlog, nicht in die Oberfläche.
+    return {
+      ok: false,
+      fehler: "Die Bilderkennung hat nicht geklappt. Versuch es noch einmal oder tippe die Zeilen.",
+    };
+  }
+
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      fehler: "Auf dem Bild waren keine Vokabeln zu erkennen. Vielleicht hilft ein näheres Foto.",
+    };
+  }
+
+  const summary = await addRows(actor, setId, rows);
+  return { ok: true, summary, erkannt: rows.length };
 }
 
 export async function addManualItem(
@@ -298,7 +394,13 @@ export async function updateItem(
 
   await withActor(actor, (tx) =>
     tx.execute(
-      sql`update vocab_item set term = ${term.trim()}, translation = ${translation.trim()}
+      // `recognition_uncertain` fällt beim Bearbeiten weg: Wer die Zeile
+      // aufgeklappt und gespeichert hat, hat daraufgeschaut – und genau das
+      // war der Zweck der Markierung (V-03b, ADR 0007 D2). Der Lernstand
+      // bleibt davon unberührt, `card`/`review` fasst diese Abfrage nicht an.
+      sql`update vocab_item
+          set term = ${term.trim()}, translation = ${translation.trim()},
+              recognition_uncertain = false
           where id = ${itemId}`,
     ),
   );

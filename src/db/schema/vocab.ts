@@ -1,4 +1,5 @@
 import {
+  boolean,
   check,
   foreignKey,
   integer,
@@ -111,6 +112,20 @@ export const vocabItem = pgTable(
     // Foto-Extraktion liefert laut §6 M4 genau diese Felder.
     term: text("term").notNull(),
     translation: text("translation").notNull(),
+    /**
+     * Die Erkennung war sich bei dieser Zeile unsicher (V-03b, ADR 0007 D2).
+     *
+     * Die einzige der drei Unsicherheits-Ursachen, die **gespeichert** werden
+     * muss: „leeres Feld" und „gleiches Wort, andere Übersetzung" lassen sich
+     * beim Lesen ableiten, niedrige Konfidenz nicht – sie ist eine Tatsache
+     * aus dem Moment des Imports, die keine spätere Abfrage rekonstruieren
+     * kann. ADR 0006 D7 („was sich ableiten lässt, wird nicht gespeichert")
+     * steht dem nicht entgegen, sondern begründet genau diese Ausnahme.
+     *
+     * Wird zurückgesetzt, sobald jemand die Zeile bearbeitet: Dann hat ein
+     * Mensch daraufgeschaut, und darum ging es.
+     */
+    recognitionUncertain: boolean("recognition_uncertain").notNull().default(false),
     partOfSpeech: text("part_of_speech"),
     example: text("example"),
     hint: text("hint"),
