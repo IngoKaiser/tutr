@@ -6,6 +6,22 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **V-03c: Foto-Import als Minigalerie.** Mehrere fotografierte Seiten stehen jetzt als Kacheln
+  nebeneinander, jede mit eigenem Zustand (wartet · wird verkleinert · wird gelesen · fertig ·
+  nicht geklappt) statt eines gemeinsamen Fortschrittstexts für alle Bilder. Scheitert eins,
+  bleiben die anderen mit ihrer Bilanz stehen und lassen sich einzeln über „Nochmal" wiederholen –
+  vorher warf ein `return` in der Bildschleife die Bilanz bereits erfolgreicher Bilder weg, sobald
+  ein späteres scheiterte. Ausgangspunkt: ein echter Doppelseiten-Import aus einem Englisch-Lehrwerk,
+  bei dem 60 von 114 Vokabeln sauber in der Datenbank standen, die Oberfläche aber nur „nicht
+  geklappt" zeigte, ohne zu sagen, welche Seite gemeint war oder warum
+- `classifyPhotoImportError()` (`src/lib/vocab/photo.ts`): ordnet einen gescheiterten
+  Bilderkennungs-Aufruf einer verständlichen, nach Ursache unterschiedenen Meldung zu
+  (Zeitüberschreitung, Verbindungsabbruch, Rate Limit, Server- vs. Anfragefehler). Vorher stand in
+  `addFromPhoto()` ein `catch {}` **ohne Bindung** mit dem Kommentar „gehört ins Serverlog" – es
+  wurde nirgends geloggt, und als ein echter Import zur Hälfte scheiterte, ließ sich die Ursache
+  im Nachhinein nicht mehr rekonstruieren. Jetzt geht die Ursache ins Serverlog, eine passende
+  deutsche Meldung auf den Bildschirm
+
 - `docs/roadmap.md`: Arbeitsreihenfolge in die Breite statt in die Tiefe – von jedem Bereich (Tutor, Hausaufgabe, Kalender, Material, Prüfen, Heute) erst eine schmale, aber echte Fassung, dann Runde für Runde vertiefen. Ordnet Konzept §12 neu, ohne der Spezifikation zu widersprechen. Trägt jetzt, weil der prüfungskritische Weg (Vokabeln) fertig ist. Enthält je Bereich eine Reifeleiter in drei Stufen und benennt ausdrücklich, **was sich nicht reduzieren lässt** – Hinweisleiter vor jeder Lösung, Sprachwächter, RLS auf `tutor_sessions`, Kontext-Chip, Quellenangabe, Rate Limits: Regeln, die zur ersten Fassung eines Bereichs gehören, nicht zu einer Härtungsrunde danach
 - **F-16** als Blocker aufgenommen: `insert into subject` steht heute nur im Seed-Skript, `school_year` ebenso. Nach der Registrierung ist die Fachauswahl deshalb leer – kein Set, keine Vokabeln, kein Üben, kein Termin, kein Thema. Muss vor allem Weiteren kommen
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
 import { prepareImageForUpload } from "@/lib/vocab/image";
@@ -71,17 +71,45 @@ export function VocabList({
   );
 }
 
-function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boolean }) {
+/** Zustand eines einzelnen Fotos in der Galerie (V-03c). */
+type FotoStatus = "wartet" | "verkleinert" | "liest" | "fertig" | "fehler";
+
+type FotoEintrag = {
+  id: string;
+  file: File;
+  /** Objekt-URL fürs Vorschaubild – lebt nur im Tab, wird beim Schließen widerrufen. */
+  vorschauUrl: string;
+  status: FotoStatus;
+  fehler: string | null;
+  ergebnis: AddSummary | null;
+};
+
+/** Exportiert nur für den Komponententest der Foto-Galerie (V-03c). */
+export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boolean }) {
   const [mode, setMode] = useState<"geschlossen" | "einfuegen" | "manuell" | "foto">("geschlossen");
   const [pasteText, setPasteText] = useState("");
   const [manualTerm, setManualTerm] = useState("");
   const [manualTranslation, setManualTranslation] = useState("");
   const [summary, setSummary] = useState<string | null>(null);
-  const [photoStep, setPhotoStep] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [fotos, setFotos] = useState<FotoEintrag[]>([]);
   const galerieRef = useRef<HTMLInputElement>(null);
   const kameraRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
+
+  // Widerruft Vorschau-URLs, wenn die Seite verlassen wird, ohne dass
+  // "Fertig" gedrückt wurde – sonst bliebe der Speicher bis zum Reload
+  // belegt. `fotosRef` trägt den letzten Stand, weil ein Unmount-Effekt nur
+  // einmal läuft und dabei den aktuellen Wert braucht, nicht den vom ersten
+  // Rendern.
+  const fotosRef = useRef(fotos);
+  useEffect(() => {
+    fotosRef.current = fotos;
+  }, [fotos]);
+  useEffect(() => {
+    return () => {
+      for (const f of fotosRef.current) URL.revokeObjectURL(f.vorschauUrl);
+    };
+  }, []);
 
   function submitPaste() {
     if (!pasteText.trim()) return;
@@ -102,55 +130,91 @@ function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boo
     });
   }
 
+  function aktualisiereFoto(id: string, patch: Partial<FotoEintrag>) {
+    setFotos((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  }
+
   /**
-   * Fotos nacheinander, nicht alle auf einmal (V-03b).
+   * Ein Foto lesen und einspielen (V-03b/V-03c).
    *
-   * Jeder Schritt wird erst angesagt, wenn er wirklich beginnt – CLAUDE.md
-   * verlangt für KI-Läufe über 3 s benannte, *wahre* Schritte statt eines
-   * Spinners. Deshalb auch ein Bild je Server-Aufruf: Nur so stimmt
-   * „Bild 2 von 3".
+   * **Scheitert unabhängig von den anderen** – ein Bild trägt nur seinen
+   * eigenen Zustand, kein `return` verwirft mehr die Bilanz der übrigen.
+   * Genau das war der Fehler, der einen echten Doppelseiten-Import als
+   * „gescheitert" erscheinen ließ, obwohl 60 von 114 Vokabeln längst in der
+   * Datenbank standen: Ein `if (!result.ok) return` in der alten Schleife
+   * warf die Bilanz des ersten, erfolgreichen Bildes weg, sobald das zweite
+   * scheiterte.
+   *
+   * Direkt aufrufbar für „Nochmal" – dieselbe Funktion, kein eigener
+   * Retry-Pfad, weil ein wiederholter Versuch fachlich derselbe Vorgang ist.
    */
-  async function submitPhotos(files: File[]) {
-    setPhotoError(null);
-    setSummary(null);
-    const gesamt: AddSummary = { neu: 0, verknuepft: 0, zuPruefen: 0 };
-    let erkannt = 0;
+  async function verarbeiteFoto(id: string, file: File) {
+    aktualisiereFoto(id, { status: "verkleinert", fehler: null, ergebnis: null });
+    try {
+      const image = await prepareImageForUpload(file);
+      aktualisiereFoto(id, { status: "liest" });
+      const result = await addFromPhoto(setId, image);
 
-    for (const [index, file] of files.entries()) {
-      const wo = files.length > 1 ? `Bild ${index + 1} von ${files.length}: ` : "";
-      try {
-        setPhotoStep(`${wo}Bild wird verkleinert …`);
-        const image = await prepareImageForUpload(file);
-
-        setPhotoStep(`${wo}Vokabeln werden gelesen …`);
-        const result = await addFromPhoto(setId, image);
-
-        if (!result) {
-          setPhotoError("Dafür fehlt die Berechtigung.");
-          setPhotoStep(null);
-          return;
-        }
-        if (!result.ok) {
-          setPhotoError(result.fehler);
-          setPhotoStep(null);
-          return;
-        }
-
-        gesamt.neu += result.summary.neu;
-        gesamt.verknuepft += result.summary.verknuepft;
-        gesamt.zuPruefen += result.summary.zuPruefen;
-        erkannt += result.erkannt;
-      } catch {
-        setPhotoError("Das Bild ließ sich nicht lesen. Versuch ein anderes Foto.");
-        setPhotoStep(null);
+      if (!result) {
+        aktualisiereFoto(id, { status: "fehler", fehler: "Dafür fehlt die Berechtigung." });
         return;
       }
+      if (!result.ok) {
+        aktualisiereFoto(id, { status: "fehler", fehler: result.fehler });
+        return;
+      }
+      aktualisiereFoto(id, { status: "fertig", ergebnis: result.summary });
+    } catch {
+      aktualisiereFoto(id, {
+        status: "fehler",
+        fehler: "Das Bild ließ sich nicht lesen. Versuch es noch einmal.",
+      });
     }
-
-    setPhotoStep(null);
-    setMode("geschlossen");
-    setSummary(erkannt > 0 ? summarize(gesamt) : "Nichts erkannt.");
   }
+
+  /** Neu ausgewählte Bilder nacheinander verarbeiten – ein Server-Aufruf je Bild (V-03b). */
+  async function verarbeiteNeueFotos(eintraege: FotoEintrag[]) {
+    for (const eintrag of eintraege) await verarbeiteFoto(eintrag.id, eintrag.file);
+  }
+
+  function fotosAusgewaehlt(files: File[]) {
+    if (files.length === 0) return;
+    const neu: FotoEintrag[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      vorschauUrl: URL.createObjectURL(file),
+      status: "wartet",
+      fehler: null,
+      ergebnis: null,
+    }));
+    setFotos((prev) => [...prev, ...neu]);
+    void verarbeiteNeueFotos(neu);
+  }
+
+  /**
+   * Galerie schließen: Bilanz über alle erfolgreichen Bilder, Vorschauen
+   * widerrufen (ADR 0007 D6 – die Fotos werden nirgends aufgehoben). Fotos,
+   * die noch verarbeitet werden, bleiben nicht liegen: Wer schließt, während
+   * eins noch läuft, sieht dessen Ergebnis nicht mehr – das Feld ist bewusst
+   * deaktiviert, solange `verarbeitungLaeuft` gilt (siehe unten).
+   */
+  function fotosSchliessen() {
+    const erfolge = fotos.filter((f) => f.ergebnis !== null);
+    const gesamt = erfolge.reduce<AddSummary>(
+      (acc, f) => ({
+        neu: acc.neu + (f.ergebnis?.neu ?? 0),
+        verknuepft: acc.verknuepft + (f.ergebnis?.verknuepft ?? 0),
+        zuPruefen: acc.zuPruefen + (f.ergebnis?.zuPruefen ?? 0),
+      }),
+      { neu: 0, verknuepft: 0, zuPruefen: 0 },
+    );
+    for (const f of fotos) URL.revokeObjectURL(f.vorschauUrl);
+    setFotos([]);
+    setSummary(erfolge.length > 0 ? summarize(gesamt) : null);
+    setMode("geschlossen");
+  }
+
+  const verarbeitungLaeuft = fotos.some((f) => f.status === "verkleinert" || f.status === "liest");
 
   if (mode === "geschlossen") {
     return (
@@ -168,14 +232,15 @@ function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boo
   }
 
   if (mode === "foto") {
-    const laeuft = photoStep !== null;
     return (
       <Block title="Vokabeln abfotografieren">
         {photoAvailable ? (
           <>
             <Notice>
               Buchseite, Arbeitsblatt oder Vokabelheft. Mehrere Bilder auf einmal gehen – eine
-              Vokabelliste läuft oft über eine Doppelseite. Das Foto wird nicht gespeichert.
+              Vokabelliste läuft oft über eine Doppelseite. Jedes Bild zählt für sich: Scheitert
+              eins, bleiben die anderen und lassen sich einzeln wiederholen. Die Fotos werden nicht
+              gespeichert.
             </Notice>
 
             {/* Ein Eingabefeld, zwei Knöpfe (ADR 0007 D1): dasselbe `accept`,
@@ -192,7 +257,7 @@ function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boo
               onChange={(e) => {
                 const files = [...(e.target.files ?? [])];
                 e.target.value = "";
-                if (files.length > 0) void submitPhotos(files);
+                fotosAusgewaehlt(files);
               }}
             />
             <input
@@ -204,26 +269,38 @@ function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boo
               onChange={(e) => {
                 const files = [...(e.target.files ?? [])];
                 e.target.value = "";
-                if (files.length > 0) void submitPhotos(files);
+                fotosAusgewaehlt(files);
               }}
             />
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => kameraRef.current?.click()} disabled={laeuft}>
+              <Button onClick={() => kameraRef.current?.click()} disabled={verarbeitungLaeuft}>
                 Kamera
               </Button>
-              <Button quiet onClick={() => galerieRef.current?.click()} disabled={laeuft}>
+              <Button
+                quiet
+                onClick={() => galerieRef.current?.click()}
+                disabled={verarbeitungLaeuft}
+              >
                 Bild auswählen
               </Button>
-              <Button quiet onClick={() => setMode("geschlossen")} disabled={laeuft}>
-                Abbrechen
+              <Button quiet onClick={fotosSchliessen} disabled={verarbeitungLaeuft}>
+                {fotos.length > 0 ? "Fertig" : "Abbrechen"}
               </Button>
             </div>
 
-            {/* Benannte, wahre Schritte statt Spinner (CLAUDE.md, >3 s). Jeder
-                Text erscheint erst, wenn der Schritt wirklich läuft. */}
-            {photoStep ? <Notice>{photoStep}</Notice> : null}
-            {photoError ? <Notice>{photoError}</Notice> : null}
+            {fotos.length > 0 ? (
+              <ul className="flex flex-col gap-2">
+                {fotos.map((foto, index) => (
+                  <FotoZeile
+                    key={foto.id}
+                    nummer={index + 1}
+                    foto={foto}
+                    onNochmal={() => void verarbeiteFoto(foto.id, foto.file)}
+                  />
+                ))}
+              </ul>
+            ) : null}
           </>
         ) : (
           <>
@@ -312,6 +389,85 @@ function summarize(result: { neu: number; verknuepft: number; zuPruefen: number 
   if (result.verknuepft > 0) teile.push(`${result.verknuepft} schon vorhanden, nur verknüpft`);
   if (result.zuPruefen > 0) teile.push(`${result.zuPruefen} zu prüfen`);
   return teile.length > 0 ? teile.join(", ") + "." : "Nichts übernommen.";
+}
+
+/** Der Text unter der Miniatur – der Zustand ist immer benannt, nie ein Spinner allein. */
+function fotoStatusText(foto: FotoEintrag): string {
+  switch (foto.status) {
+    case "wartet":
+      return "wartet …";
+    case "verkleinert":
+      return "Bild wird verkleinert …";
+    case "liest":
+      return "Vokabeln werden gelesen …";
+    case "fertig":
+      return foto.ergebnis ? summarize(foto.ergebnis) : "Nichts übernommen.";
+    case "fehler":
+      return foto.fehler ?? "Das hat nicht geklappt.";
+  }
+}
+
+/**
+ * Eine Kachel je Foto (V-03c) – die Minigalerie aus der Auswertung des
+ * Doppelseiten-Imports vom 9. September. Trägt ihren eigenen Zustand, damit
+ * sichtbar bleibt, welches Bild schon ausgewertet ist und welches noch
+ * einen Versuch braucht, statt eines einzigen Fortschrittstexts für alle
+ * Bilder zusammen.
+ */
+function FotoZeile({
+  nummer,
+  foto,
+  onNochmal,
+}: {
+  nummer: number;
+  foto: FotoEintrag;
+  onNochmal: () => void;
+}) {
+  const istFehler = foto.status === "fehler";
+  const istFertig = foto.status === "fertig";
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-[9px] border px-3 py-2.5 ${
+        istFehler ? "border-offen bg-offen-hell" : "border-linie bg-papier"
+      }`}
+    >
+      {/* Objekt-URL im Speicher des Tabs – dasselbe Bild, das an die
+          Bilderkennung ging, nie das Original in voller Größe (`image.ts`
+          verkleinert vor dem Hochladen, hier zeigt die Vorschau die
+          Originaldatei, weil das für eine Miniatur ohnehin reicht). */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- Objekt-URL aus lokaler Datei, kein Next-Bildoptimierer nötig */}
+      <img
+        src={foto.vorschauUrl}
+        alt=""
+        className="border-linie h-12 w-12 shrink-0 rounded-md border object-cover"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-tinte-leise text-[0.6875rem] font-semibold tracking-wide uppercase">
+          Bild {nummer}
+        </span>
+        <span
+          className={`text-[0.8125rem] ${
+            istFehler
+              ? "text-offen font-medium"
+              : istFertig
+                ? "text-sicher font-medium"
+                : "text-tinte-weich"
+          }`}
+        >
+          {fotoStatusText(foto)}
+        </span>
+      </div>
+      {istFehler ? (
+        <button
+          type="button"
+          onClick={onNochmal}
+          className="text-koenigsblau shrink-0 text-[0.8125rem] font-medium underline underline-offset-2"
+        >
+          Nochmal
+        </button>
+      ) : null}
+    </li>
+  );
 }
 
 function VocabRowItem({
