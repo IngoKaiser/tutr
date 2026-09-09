@@ -30,6 +30,27 @@ trennt Preview später auf eine eigene Datenbank.
 | `AUTH_COOKIE_SECRET`                   | wie in `.env.local`                               |
 | `RESEND_API_KEY`, `RESEND_FROM`        | optional, siehe Schritt 6                         |
 
+**Secret oder Config?** Vercel fragt beim Anlegen nach dem Typ. `Secret`
+lässt sich nach dem Speichern nie wieder anzeigen, `Config` schon:
+
+| Variable                               | Typ    | Warum                                                                         |
+| -------------------------------------- | ------ | ----------------------------------------------------------------------------- |
+| `DATABASE_URL`                         | Secret | enthält das Passwort der Rolle `tutr_app`                                     |
+| `SUPABASE_SECRET_KEY`                  | Secret | umgeht RLS – der mächtigste Wert in dieser Liste                              |
+| `ANTHROPIC_API_KEY`                    | Secret | kostet Geld, wenn er abhandenkommt                                            |
+| `AUTH_COOKIE_SECRET`                   | Secret | signiert die Anmelde-Cookies                                                  |
+| `RESEND_API_KEY`                       | Secret | erlaubt Mailversand über die Domain                                           |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Config | steckt ohnehin im Browser-Bundle                                              |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Config | öffentlich **by design** (ADR 0003) – RLS ist der Schutz, nicht der Schlüssel |
+| `RESEND_FROM`                          | Config | nur eine Absenderadresse                                                      |
+
+Vercel warnt bei den beiden `NEXT_PUBLIC_`-Variablen, dass ihr Wert im
+Browser landet. Das ist richtig und beabsichtigt: Next.js ersetzt
+`NEXT_PUBLIC_*` zur Bauzeit im Client-Bundle, sie sind per Definition
+öffentlich. „Mark as Safe" ist hier die korrekte Antwort. Sie als `Secret`
+zu hinterlegen bringt keinen Schutz, kostet aber die Möglichkeit,
+nachzusehen, was eingetragen ist.
+
 **Zwei Werte gehören ausdrücklich NICHT nach Vercel:**
 `MIGRATION_DATABASE_URL` und `TUTR_APP_DB_PASSWORD`. Das sind die
 Zugangsdaten der Rolle `postgres`, die RLS umgeht. Migrationen laufen von
@@ -142,6 +163,15 @@ schon verifiziert ist. Dashboard → Authentication → Emails → SMTP Settings
 
 Danach laufen beide Mails über dieselbe verifizierte Domain, ohne das enge
 Test-Limit. Vor F-06f (Wiederherstellung vom Anmeldebildschirm) ohnehin nötig.
+
+**Wenn das Auth-Log `535 "Authentication credentials invalid"` zeigt**, liegt
+es am Passwort, nicht am Port. Nachgemessen gegen `smtp.resend.com`: Mit
+gültigem API-Schlüssel antwortet der Server auf **beiden** Ports (465 mit
+TLS, 587 mit STARTTLS) mit `235` – Anmeldung angenommen. Genau dasselbe
+`535` erscheint reproduzierbar, sobald das Passwort nicht stimmt. Also: den
+Schlüssel neu einsetzen, nicht am Port drehen.
+
+Der Benutzername ist wörtlich `resend`, nicht die Absenderadresse.
 
 ## 7 · Nach dem Deploy prüfen
 

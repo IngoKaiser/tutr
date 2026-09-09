@@ -7,6 +7,8 @@ import { useState } from "react";
 
 import { CONSENT_NOTICE } from "@/lib/mail/consent";
 
+import { merkePasskeyAufDiesemGeraet } from "@/lib/auth/passkey-hint";
+
 import { completeRegistration, startRegistration as startRegistrationAction } from "./actions";
 
 const FIELD =
@@ -44,6 +46,9 @@ export function RegistrationForm() {
         return;
       }
 
+      // Dieser Browser hat jetzt einen Passkey – beim nächsten Besuch führt
+      // /anmelden direkt zur Anmeldung statt zur Registrierung (F-14).
+      merkePasskeyAufDiesemGeraet();
       router.push("/heute");
     } catch (problem) {
       // Abbruch im Face-ID-Dialog ist der häufigste Fall und kein Fehler des

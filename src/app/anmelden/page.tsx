@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { LoginError } from "./login-error";
 import { MagicLinkForm } from "./magic-link-form";
 import { PasskeyLogin } from "./passkey-login";
@@ -23,16 +21,11 @@ export default function LoginPage() {
 
       <LoginError />
 
-      <div className="flex flex-col gap-3">
-        <PasskeyLogin />
-        <p className="text-tinte-leise text-[0.8125rem] leading-normal">
-          Zum ersten Mal hier?{" "}
-          <Link href="/registrieren" className="text-koenigsblau underline underline-offset-2">
-            Profil anlegen
-          </Link>
-          .
-        </p>
-      </div>
+      {/* Der „Zum ersten Mal hier?"-Hinweis steckt in `PasskeyLogin` und
+          erscheint nur, wenn dort auch der Passkey-Knopf steht: Auf einem
+          Gerät ohne bekannten Passkey ist „Profil anlegen" schon die
+          Hauptaktion, ein zweiter Hinweis darauf wäre Doppelung (F-14). */}
+      <PasskeyLogin />
 
       <div className="border-linie flex items-center gap-3 border-t pt-6">
         <div className="flex w-full flex-col gap-3">
