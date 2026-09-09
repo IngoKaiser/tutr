@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import type postgres from "postgres";
+
+import { adminClient } from "./test-db";
 
 /**
  * Die vollständige Passkey-Zeremonie über einen virtuellen Authenticator.
@@ -23,6 +26,26 @@ const WITH_DB = process.env.RUN_DB_TESTS === "1";
 test.describe("Passkey-Zeremonie", () => {
   test.skip(!WITH_DB, "Braucht eine Datenbank – mit RUN_DB_TESTS=1 ausführen.");
 
+  // Der Lauf legt ein echtes Kind mit echtem Passkey an – und hat es früher
+  // liegen lassen. Zwölf „Testkind…"-Zeilen samt Passkeys und Sitzungen sind
+  // so aufgelaufen, bis der erste Deploy sie sichtbar machte (F-13).
+  // Aufgeräumt wird über die Namen, die dieser Lauf selbst erzeugt hat, und
+  // per `afterAll` – damit auch dann, wenn der Test vorher scheitert.
+  let admin: postgres.Sql | undefined;
+  const angelegt: string[] = [];
+
+  test.beforeAll(() => {
+    admin = adminClient();
+  });
+
+  test.afterAll(async () => {
+    if (admin && angelegt.length > 0) {
+      // `student` kaskadiert auf Passkey, Sitzung und alles Weitere.
+      await admin`delete from student where first_name in ${admin(angelegt)}`;
+    }
+    await admin?.end();
+  });
+
   test("anlegen und danach ohne Kennung wiederkommen", async ({ page, browserName }) => {
     test.skip(browserName !== "chromium", "Virtuelle Authenticators nur über CDP.");
 
@@ -43,6 +66,7 @@ test.describe("Passkey-Zeremonie", () => {
     });
 
     const firstName = `Testkind${Date.now().toString().slice(-6)}`;
+    angelegt.push(firstName);
 
     await page.goto("/registrieren");
     await page.getByLabel("Vorname").fill(firstName);

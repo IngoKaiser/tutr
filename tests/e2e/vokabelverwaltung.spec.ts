@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import postgres from "postgres";
+import type postgres from "postgres";
+
+import { adminClient } from "./test-db";
 
 /**
  * Sets und Vokabelverwaltung (V-03a, ADR 0007 D2–D4).
@@ -44,14 +46,10 @@ test.describe("Vokabelverwaltung", () => {
   let admin: postgres.Sql | undefined;
 
   test.beforeAll(() => {
-    try {
-      process.loadEnvFile(".env.local");
-    } catch {
-      // Kein .env.local – dann bleibt admin undefined und der Test bricht unten sichtbar ab.
-    }
-    if (process.env.MIGRATION_DATABASE_URL) {
-      admin = postgres(process.env.MIGRATION_DATABASE_URL, { prepare: false, max: 1 });
-    }
+    // Immer die Test-Datenbank, nie die Produktive (F-13) – siehe test-db.ts.
+    // `undefined`, wenn keine konfiguriert ist: Dann überspringt sich der
+    // Test selbst, statt auf eine andere Datenbank auszuweichen.
+    admin = adminClient();
   });
 
   test.afterAll(async () => {
@@ -69,7 +67,7 @@ test.describe("Vokabelverwaltung", () => {
     browserName,
   }) => {
     test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
-    if (!admin) throw new Error("MIGRATION_DATABASE_URL fehlt – siehe beforeAll.");
+    if (!admin) throw new Error("TEST_MIGRATION_DATABASE_URL fehlt – siehe test-db.ts.");
 
     // Schreiben darf nur das Kind (ADR 0004 D4) – ohne Rollenwechsel bliebe
     // die ganze Verwaltung unsichtbar.

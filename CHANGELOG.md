@@ -19,6 +19,12 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Fixed
 
+- **E2E lief gegen die Produktivdatenbank** (F-13). `playwright.config.ts` reichte kein `DATABASE_URL` an den Testserver durch, also lud `next dev` die `.env.local` – und damit die echte Datenbank. Jeder lokale Testlauf schrieb dorthin. Aufgefallen erst nach dem ersten Deploy auf `mytutr.de`: zwölf „Testkind…"-Zeilen aus `passkey.spec.ts` lagen samt Passkeys und Sitzungen neben den echten Daten. Die Tests waren nie falsch – sie zeigten auf die falsche Datenbank
+- `TEST_DATABASE_URL` wird jetzt aus `.env.test.local` an den Testserver durchgereicht. Next.js überschreibt bereits gesetzte Umgebungsvariablen nicht mit Werten aus `.env`-Dateien, der Wert gewinnt also gegen `.env.local`. Ist keine Test-Datenbank konfiguriert, bleibt er leer – dann überspringen sich die DB-Specs selbst, statt still auf die echte Datenbank auszuweichen
+- `tests/e2e/test-db.ts`: eine Stelle, an der steht, mit welcher Datenbank die Tests reden. Vorher lud jede Spec für sich `.env.local` und griff auf `MIGRATION_DATABASE_URL` zu – dreimal dieselbe Entscheidung, dreimal die falsche
+- `passkey.spec.ts` räumt die angelegten Kinder per `afterAll` wieder ab, auch wenn der Test vorher scheitert; `student` kaskadiert auf Passkey und Sitzung. Es war die einzige Spec ohne Aufräumen – `recovery.spec.ts`, `deletion.spec.ts` und `vokabelverwaltung.spec.ts` taten das schon
+- Nachgemessen statt angenommen: voller E2E-Lauf (68 grün), danach Produktivdatenbank auf 0 in allen geprüften Tabellen, Test-Datenbank nur mit Seed-Daten, 0 Testkind-Reste
+
 - **ADR 0007 hatte behauptet, die Konfidenz-Markierung brauche keine Spalte** („ein Zustand der Ansicht nach dem Import"). Ein Testlauf gegen die echte Bilderkennung zeigt das Gegenteil: Bei einer Zeile mit am Blattrand abgeschnittener Übersetzung (`la trousse` / `das Fed`) meldete die Erkennung korrekt „niedrig", aber die Liste konnte das nicht mehr sehen – das Feld ist gefüllt, es gibt keine Dublette, die Zeile sieht vollständig aus. Niedrige Konfidenz ist eine Tatsache aus dem Moment des Imports, keine Eigenschaft der Zeile. Nachtrag im ADR, Spalte ergänzt; die Zusammenfassung („2 zu prüfen") und der Zähler in der Liste stimmen jetzt überein
 - Gegen die echte API gefunden: `output_format` wird mit 400 abgewiesen („This field is deprecated"), richtig ist `output_config.format`. Die Doc-Kommentare im SDK zeigen an mehreren Stellen noch das alte Feld – deshalb steht der Grund als Kommentar an der Aufrufstelle
 

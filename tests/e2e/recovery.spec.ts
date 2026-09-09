@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 
 import { expect, test } from "@playwright/test";
-import postgres from "postgres";
+import type postgres from "postgres";
+
+import { adminClient } from "./test-db";
 
 /**
  * Wiederherstellung nach Passkey-Verlust (F-06d, ADR 0006 D4).
@@ -53,14 +55,10 @@ test.describe("Wiederherstellung: Zeremonie", () => {
   let studentId: string | undefined;
 
   test.beforeAll(() => {
-    try {
-      process.loadEnvFile(".env.local");
-    } catch {
-      // Kein .env.local – dann bleibt admin undefined, die Tests überspringen sich selbst.
-    }
-    if (process.env.MIGRATION_DATABASE_URL) {
-      admin = postgres(process.env.MIGRATION_DATABASE_URL, { prepare: false, max: 1 });
-    }
+    // Immer die Test-Datenbank, nie die Produktive (F-13) – siehe test-db.ts.
+    // `undefined`, wenn keine konfiguriert ist: Dann überspringt sich der
+    // Test selbst, statt auf eine andere Datenbank auszuweichen.
+    admin = adminClient();
   });
 
   test.afterAll(async () => {
@@ -70,7 +68,7 @@ test.describe("Wiederherstellung: Zeremonie", () => {
 
   /** Ein Token direkt in der Datenbank, ohne die an den Bypass gebundene Oberfläche. */
   async function issueTokenForFreshStudent(): Promise<string> {
-    if (!admin) throw new Error("MIGRATION_DATABASE_URL fehlt – siehe beforeAll.");
+    if (!admin) throw new Error("TEST_MIGRATION_DATABASE_URL fehlt – siehe test-db.ts.");
 
     const token = "test-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
     const [row] = await admin<{ id: string }[]>`
