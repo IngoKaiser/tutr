@@ -10,7 +10,7 @@ import { classifyDuplicate, type ExistingVocabItem } from "@/lib/vocab/duplicate
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
 import { newCardColumns } from "@/lib/vocab/fsrs";
 import { parsePastedVocabulary } from "@/lib/vocab/paste";
-import { extractedRowsToPastedRows } from "@/lib/vocab/photo";
+import { classifyPhotoImportError, extractedRowsToPastedRows } from "@/lib/vocab/photo";
 
 /**
  * Die Vokabelliste eines Sets (V-03a, ADR 0007 D2–D4).
@@ -342,13 +342,15 @@ export async function addFromPhoto(
   try {
     const extraction = await extractVocabularyFromImage(image, { subjectName });
     rows = extractedRowsToPastedRows(extraction.rows);
-  } catch {
+  } catch (problem) {
     // Der ursprüngliche Fehler kann Bild- oder Schlüsseldetails tragen – er
-    // gehört ins Serverlog, nicht in die Oberfläche.
-    return {
-      ok: false,
-      fehler: "Die Bilderkennung hat nicht geklappt. Versuch es noch einmal oder tippe die Zeilen.",
-    };
+    // gehört ins Serverlog, nicht in die Oberfläche (V-03c). Vorher stand
+    // hier ein `catch {}` ohne Bindung: Der Fehler war weg, sobald er
+    // auftrat, und ein zur Hälfte gescheiterter Import ließ sich im
+    // Nachhinein nicht mehr erklären.
+    const { fehler, ursache } = classifyPhotoImportError(problem);
+    console.error(`Foto-Import gescheitert (Set ${setId}): ${ursache}`);
+    return { ok: false, fehler };
   }
 
   if (rows.length === 0) {
