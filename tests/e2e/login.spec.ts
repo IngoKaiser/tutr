@@ -25,6 +25,40 @@ test.describe("Anmeldeseite", () => {
     expect(passkeyTop).toBeLessThan(parentTop);
   });
 
+  /**
+   * F-14: Auf einem Browser ohne Gerätenotiz wird die WebAuthn-Zeremonie
+   * nicht gestartet – der Systemdialog mit QR-Code und
+   * Sicherheitsschlüssel führt ohne Profil nirgendwohin.
+   *
+   * Der Knopf verschwindet dabei **nicht**. Ein erster Anlauf tauschte ihn
+   * schon beim Rendern gegen einen Link aus; weil `localStorage` erst nach
+   * der Hydration lesbar ist, sprang die Seite sichtbar um – und der Test
+   * oben fand den Knopf mal, mal nicht. Deshalb hier beides geprüft: dass
+   * der Knopf steht und dass ein Druck darauf zur Selbstanlage weist.
+   */
+  test("schickt ohne Passkey auf diesem Gerät zur Selbstanlage statt in den Systemdialog", async ({
+    page,
+  }) => {
+    await page.goto("/anmelden");
+
+    await page.getByRole("button", { name: /Face ID/i }).click();
+
+    await expect(page.getByText(/noch kein Zugang eingerichtet/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Leg dir ein Profil an" })).toBeVisible();
+    await expect(page).toHaveURL(/\/anmelden$/);
+  });
+
+  test("lässt den Weg trotzdem frei, wenn die Gerätenotiz irrt", async ({ page }) => {
+    await page.goto("/anmelden");
+    await page.getByRole("button", { name: /Face ID/i }).click();
+
+    // Browserdaten gelöscht, Passkey aber noch im Schlüsselbund: Die Notiz
+    // darf sich irren, sie darf niemanden aussperren.
+    await page.getByRole("button", { name: "Ich habe hier schon einen Passkey" }).click();
+
+    await expect(page.getByText(/noch kein Zugang eingerichtet/i)).toHaveCount(0);
+  });
+
   test("führt zur Selbstanlage", async ({ page }) => {
     await page.goto("/anmelden");
     await page.getByRole("link", { name: "Profil anlegen" }).click();
