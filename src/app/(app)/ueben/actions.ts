@@ -45,7 +45,6 @@ async function requireStudentActor(): Promise<Actor | null> {
 }
 
 export type DueOverview = {
-  total: number;
   /** Grober Ausblick aus dem FSRS-Zustand, nicht die Session selbst –
    *  die Stapel entstehen erst beim Üben (siehe `session.ts`). */
   wiederholen: number;
@@ -53,25 +52,63 @@ export type DueOverview = {
   erneutLernen: number;
 };
 
-/** Zahlen für den „Fällig heute"-Block. `null`, wenn nicht angemeldet oder ohne DB (CI-E2E). */
-export async function loadDueOverview(): Promise<DueOverview | null> {
+export type DueBySubject = {
+  subjectId: string;
+  subjectName: string;
+  total: number;
+} & DueOverview;
+
+/**
+ * Fällige Karten je Fach (V-06, ADR 0008 D3) – **nie** eine Zahl über alles.
+ * Niemand übt Französisch- und Spanischvokabeln in derselben Runde; eine
+ * Übungssession läuft immer in genau einem Fach.
+ *
+ * Das Fach kommt für beide Kartenquellen aus derselben Herkunft: Bei
+ * Vokabelkarten über `vocab_item.subject_id` (n:1, V-05), bei Karten aus
+ * Lernzielen (M-03, noch nicht gebaut) über `learning_objective → topic →
+ * subject_id` (ebenfalls n:1) – nirgends eine eigene Spalte auf `card`
+ * selbst (ADR 0008 D1). `coalesce` genügt, weil `card_exactly_one_source`
+ * garantiert, dass nie beide Joins gleichzeitig treffen.
+ *
+ * `null`, wenn nicht angemeldet oder ohne DB (CI-E2E). Ein leeres Array
+ * heißt: nichts fällig, kein Fach zeigt einen Block.
+ */
+export async function loadDueBySubject(): Promise<DueBySubject[] | null> {
   const actor = await requireActor();
   if (!actor) return null;
 
+  type Row = { subject_id: string; subject_name: string; state: CardStateValue; n: string };
+
   return withActor(actor, async (tx) => {
-    const rows = await tx.execute<{ state: CardStateValue; n: string }>(
-      sql`select state, count(*)::text as n
-          from card
-          where due_at <= now()
-          group by state`,
+    const rows = await tx.execute<Row>(
+      sql`select s.id as subject_id, s.name as subject_name, c.state, count(*)::text as n
+          from card c
+          left join vocab_item vi on vi.id = c.vocab_item_id
+          left join learning_objective lo on lo.id = c.objective_id
+          left join topic t on t.id = lo.topic_id
+          join subject s on s.id = coalesce(vi.subject_id, t.subject_id)
+          where c.due_at <= now()
+          group by s.id, s.name, c.state`,
     );
-    const byState = Object.fromEntries(rows.map((r) => [r.state, Number(r.n)]));
-    return {
-      total: rows.reduce((sum, r) => sum + Number(r.n), 0),
-      wiederholen: byState.wiederholen ?? 0,
-      neu: (byState.neu ?? 0) + (byState.lernen ?? 0),
-      erneutLernen: byState.erneut_lernen ?? 0,
-    };
+
+    const bySubject = new Map<string, DueBySubject>();
+    for (const row of rows) {
+      const entry = bySubject.get(row.subject_id) ?? {
+        subjectId: row.subject_id,
+        subjectName: row.subject_name,
+        total: 0,
+        wiederholen: 0,
+        neu: 0,
+        erneutLernen: 0,
+      };
+      const n = Number(row.n);
+      entry.total += n;
+      if (row.state === "wiederholen") entry.wiederholen += n;
+      else if (row.state === "neu" || row.state === "lernen") entry.neu += n;
+      else if (row.state === "erneut_lernen") entry.erneutLernen += n;
+      bySubject.set(row.subject_id, entry);
+    }
+    return [...bySubject.values()].sort((a, b) => a.subjectName.localeCompare(b.subjectName, "de"));
   });
 }
 
@@ -87,10 +124,17 @@ export type SessionCardContent = {
 };
 
 /**
- * Fällige Karten für eine Session, inhaltlich angereichert. `direction`
- * filtert nach ADR 0007 D5 – `null` heißt gemischt (die Voreinstellung).
+ * Fällige Karten für eine Session, inhaltlich angereichert. Läuft immer in
+ * genau einem Fach (V-06, ADR 0008 D3) – `subjectId` ist deshalb Pflicht,
+ * nicht optional wie `direction`. Der Vorrat ist dadurch von selbst
+ * einsprachig: `buildMultipleChoiceOptions()` zieht die Falschantworten aus
+ * genau diesen Karten, eine eigene Fach-Regel dort ist nicht nötig.
+ *
+ * `direction` filtert zusätzlich nach ADR 0007 D5 – `null` heißt gemischt
+ * (die Voreinstellung).
  */
 export async function loadSessionCards(
+  subjectId: string,
   direction: Direction | null,
 ): Promise<SessionCardContent[] | null> {
   const actor = await requireStudentActor();
@@ -110,11 +154,11 @@ export async function loadSessionCards(
       direction
         ? sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
               from card c join vocab_item vi on vi.id = c.vocab_item_id
-              where c.due_at <= now() and c.direction = ${direction}
+              where c.due_at <= now() and c.direction = ${direction} and vi.subject_id = ${subjectId}
               order by c.due_at`
         : sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
               from card c join vocab_item vi on vi.id = c.vocab_item_id
-              where c.due_at <= now()
+              where c.due_at <= now() and vi.subject_id = ${subjectId}
               order by c.due_at`,
     );
     return rows.map((r) => ({

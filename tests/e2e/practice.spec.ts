@@ -25,13 +25,26 @@ test.describe("Übungssession", () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto("/heute");
-    await page.getByLabel("Kind").selectOption({ label: "Mia" });
+    const kindSelect = page.getByLabel("Kind");
+    const miaId = await kindSelect.locator("option", { hasText: "Mia" }).getAttribute("value");
+    await kindSelect.selectOption({ label: "Mia" });
+    // `setSelectedStudent()` ist eine Server Action hinter `useTransition` –
+    // `selectOption()` löst sie nur aus, wartet aber nicht auf sie. Ohne
+    // diese Zusicherung könnte eine anschließende Navigation vor dem Setzen
+    // des Cookies passieren; die Seite zeigt dann Bens Stand (kein Vokabelset,
+    // 0 fällig) statt Mias. Vorher unauffällig, weil "0 fällig" ebenfalls auf
+    // /\d+ fällig/ passte – seit V-06 zeigt ein Fach ohne fällige Karten gar
+    // keinen Block mehr, und der Fehlgriff wurde sichtbar.
+    await expect(kindSelect).toHaveValue(miaId!);
   });
 
-  test("zeigt echte Zahlen statt der Attrappe, und V-04-Blöcke sagen ehrlich, dass sie fehlen", async ({
+  test("zeigt echte Zahlen je Fach statt der Attrappe, und V-04-Blöcke sagen ehrlich, dass sie fehlen", async ({
     page,
   }) => {
     await page.goto("/ueben");
+    // Ein Block je Fach (V-06, ADR 0008 D3), nicht eine Zahl über alles –
+    // die Seed-Daten haben fällige Vokabeln nur in Französisch.
+    await expect(page.getByRole("heading", { name: "Französisch" })).toBeVisible();
     await expect(page.getByText(/\d+ fällig/)).toBeVisible();
     await expect(page.getByText("Kommt mit V-04.")).toHaveCount(2);
   });
@@ -64,11 +77,12 @@ test.describe("Übungssession", () => {
 
     await page.goto("/ueben");
     const startButton = page.getByRole("button", { name: "Loslegen" });
-    const totalText = await page.getByText(/\d+ fällig/).textContent();
-    test.skip(
-      totalText === "0 fällig",
-      "Keine fälligen Karten – npm run db:seed erneut ausführen.",
-    );
+    // Kein Fach mit fälligen Karten mehr zeigt gar kein "N fällig" – dann
+    // steht stattdessen die "Nichts fällig"-Notiz.
+    const nichtsFaellig = await page
+      .getByText("Nichts fällig. Schau später wieder vorbei.")
+      .count();
+    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
 
     await startButton.click();
 
@@ -94,7 +108,7 @@ test.describe("Übungssession", () => {
         .locator("button.text-left")
         .first()
         .or(page.locator("input[autocomplete='off']"))
-        .or(page.getByText("Alle fälligen Karten sind einmal gesessen.")),
+        .or(page.getByText(/Alle fälligen Karten in .+ sind einmal gesessen/)),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -113,11 +127,10 @@ test.describe("Übungssession", () => {
     await expect(kindButton).toHaveAttribute("aria-pressed", "true");
 
     await page.goto("/ueben");
-    const totalText = await page.getByText(/\d+ fällig/).textContent();
-    test.skip(
-      totalText === "0 fällig",
-      "Keine fälligen Karten – npm run db:seed erneut ausführen.",
-    );
+    const nichtsFaellig = await page
+      .getByText("Nichts fällig. Schau später wieder vorbei.")
+      .count();
+    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
 
     await page.getByRole("button", { name: "Loslegen" }).click();
     await expect(page.locator("button.text-left").first()).toBeVisible({ timeout: 10_000 });

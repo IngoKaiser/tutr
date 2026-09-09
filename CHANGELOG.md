@@ -6,6 +6,14 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- Fachgebundenes Üben (V-06, ADR 0008 D3): `/ueben` zeigt einen Block je Fach mit fälligen Karten statt einer Zahl über alles – kein fachübergreifendes Üben mehr, weder als Voreinstellung noch als Möglichkeit. Kein eigener Auswahl-Bildschirm davor: Bei realistisch ein bis drei fälligen Fächern steht der Startknopf direkt neben der Zahl
+- `loadDueBySubject()` leitet das Fach für **beide** Kartenquellen ab, nicht nur für Vokabeln: `coalesce(vocab_item.subject_id, topic.subject_id)` – für Vokabelkarten über V-05, für Karten aus Lernzielen (M-03, noch nicht gebaut) über `learning_objective → topic → subject`. `card` bekommt dafür keine eigene Spalte (ADR 0008 D1), die Abfrage ist schon richtig, bevor M-03 existiert
+- Die Falschantworten für Multiple Choice brauchten am Ende keine eigene Fach-Regel: `loadSessionCards()` filtert jetzt auf `subjectId`, der Vorrat einer Session ist dadurch von selbst einsprachig – genau die Vereinfachung, die ADR 0008 D3 versprochen hat
+
+### Fixed
+
+- Ein Fund beim Testen, keiner an der Anwendung: `practice.spec.ts` wählte das Kind („Mia") über eine `<select>`, deren Änderung eine Server Action hinter `useTransition` auslöst – `selectOption()` wartet darauf nicht, eine anschließende Navigation konnte also vor dem Setzen des Cookies passieren und zeigte Bens leeren Stand statt Mias. Vorher unauffällig, weil „0 fällig" ebenfalls auf die Prüfung `/\d+ fällig/` passte; seit dem Block je Fach zeigt ein leeres Fach gar keinen Block mehr, und der Fehlgriff wurde sichtbar. Der Test wartet jetzt auf das tatsächliche Setzen des Cookies, nicht nur auf den Klick
+
 - Fachbindung im Vokabelmodell (V-05, ADR 0008 D1/D2): `vocab_item.subject_id` (`not null`, FK gegen `subject`) statt einer Ableitung über die Sets, in denen eine Vokabel steckt – die Ableitung war über n:m mehrdeutig und für eine Vokabel ohne Set (seit `deleteSet()` möglich) gar nicht vorhanden. `vocab_set_item.subject_id` bindet zusätzlich beide Seiten (Set und Vokabel) gegen dieselbe Fach-Spalte, mit demselben Kniff wie bei `student_id`: Eine französische Vokabel in einem spanischen Set ist damit strukturell unmöglich, kein Anwendungscode nötig, der das prüfen müsste
 - Die Duplikaterkennung beim Einfügen (V-03a) ist dadurch ein einzelner Vergleich auf `subject_id` statt eines Joins über `vocab_set_item`/`vocab_set` – und findet jetzt auch Vokabeln, die in keinem Set mehr stecken
 - Migration mit hartem Backfill: bricht ab, statt zu raten, wenn eine Vokabel in Sets verschiedener Fächer steckt oder in gar keinem Set. Nachgemessen gegen die echte Produktiv-DB: 14 Vokabeln, 0 ohne Set, 0 fachübergreifend – der Backfill lief ohne eine der beiden Ausnahmen durch

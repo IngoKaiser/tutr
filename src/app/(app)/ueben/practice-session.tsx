@@ -16,7 +16,7 @@ import {
 import {
   loadSessionCards,
   submitAnswer,
-  type DueOverview,
+  type DueBySubject,
   type SessionCardContent,
 } from "./actions";
 
@@ -24,14 +24,21 @@ type Phase = "wahl" | "uebung" | "fertig";
 type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
 
 /**
- * Übungssession (V-02). Ein Client-Baustein statt einer eigenen Route –
- * es gibt nichts, worauf man tief verlinken müsste, und der Zustand
- * (Übersicht → Üben → Fertig) ist rein clientseitig.
+ * Übungssession (V-02, fachgebunden seit V-06). Ein Client-Baustein statt
+ * einer eigenen Route – es gibt nichts, worauf man tief verlinken müsste,
+ * und der Zustand (Übersicht → Üben → Fertig) ist rein clientseitig.
  *
- * `PageHeader` lebt hier, nicht in `page.tsx`: Die Kopfzeile zeigt in der
- * Übersicht die fälligen Karten, während des Übens den Fortschritt dieser
- * Runde – zwei verschiedene Zahlen, die eine serverseitig eingefrorene
- * Kopfzeile nicht beide zeigen könnte.
+ * **Ein Block je Fach, kein eigener Auswahl-Bildschirm davor** (ADR 0008
+ * D3): Bei realistisch ein bis drei Fächern mit fälligen Karten steht
+ * „Französisch · 12 fällig" direkt neben dem Knopf, der es übt. Jeder Block
+ * (`SubjectBlock`) lädt für sich; eine laufende Session gehört immer zu
+ * genau einem Fach, `cards` enthält deshalb nie mehr als ein Fach – die
+ * Falschantworten in `ActiveCard` brauchen dadurch keine eigene Fach-Regel,
+ * sie ziehen aus genau diesem Vorrat.
+ *
+ * `PageHeader` lebt hier, nicht in `page.tsx`: Die Kopfzeile zeigt während
+ * des Übens den Fortschritt dieser Runde – eine serverseitig eingefrorene
+ * Kopfzeile könnte das nicht.
  *
  * Treibt `session.ts` (die reine Warteschlange) mit echten Server-Aktionen:
  * Laden holt die fälligen Karten, jede Antwort geht einzeln an
@@ -43,39 +50,30 @@ type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
  * die zur Eile drängt (§15).
  */
 export function PracticeSession({
-  overview,
+  bySubject,
   canStart,
 }: {
-  overview: DueOverview | null;
+  bySubject: DueBySubject[] | null;
   canStart: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>("wahl");
-  const [direction, setDirection] = useState<DirectionChoice>("gemischt");
+  const [activeSubjectName, setActiveSubjectName] = useState("");
   const [cards, setCards] = useState<SessionCardContent[]>([]);
   const [session, setSession] = useState<SessionState | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [loadError, setLoadError] = useState(false);
 
-  function start() {
-    setLoadError(false);
-    startTransition(async () => {
-      const loaded = await loadSessionCards(direction === "gemischt" ? null : direction);
-      if (!loaded || loaded.length === 0) {
-        setLoadError(true);
-        return;
-      }
-      setCards(loaded);
-      setSession(
-        buildSession(
-          loaded.map((c) => ({
-            cardId: c.cardId,
-            vocabItemId: c.vocabItemId,
-            direction: c.direction,
-          })),
-        ),
-      );
-      setPhase("uebung");
-    });
+  function startSession(subjectName: string, loaded: SessionCardContent[]) {
+    setActiveSubjectName(subjectName);
+    setCards(loaded);
+    setSession(
+      buildSession(
+        loaded.map((c) => ({
+          cardId: c.cardId,
+          vocabItemId: c.vocabItemId,
+          direction: c.direction,
+        })),
+      ),
+    );
+    setPhase("uebung");
   }
 
   function backToOverview() {
@@ -89,7 +87,10 @@ export function PracticeSession({
       <>
         <PageHeader title="Üben" trailing="Geschafft" />
         <Block title="Geschafft" emphasized>
-          <Notice>Alle fälligen Karten sind einmal gesessen. Bis zur nächsten Fälligkeit.</Notice>
+          <Notice>
+            Alle fälligen Karten in {activeSubjectName} sind einmal gesessen. Bis zur nächsten
+            Fälligkeit.
+          </Notice>
           <Button onClick={backToOverview}>Zur Übersicht</Button>
         </Block>
       </>
@@ -100,7 +101,7 @@ export function PracticeSession({
     const done = session.graduated.size;
     return (
       <>
-        <PageHeader title="Üben" trailing={`${done} von ${session.total}`} />
+        <PageHeader title="Üben" trailing={`${activeSubjectName} · ${done} von ${session.total}`} />
         <ActiveCard
           // Neu gemountet bei jeder Karte statt per Effekt zurückgesetzt –
           // `shownAt` und das Tippfeld starten so garantiert frisch, ohne
@@ -120,43 +121,32 @@ export function PracticeSession({
 
   return (
     <>
-      <PageHeader title="Üben" trailing={overview ? `${overview.total} fällig` : undefined} />
+      <PageHeader title="Üben" />
 
       <div className="flex flex-col gap-3">
-        <Block title="Fällig heute" trailing="setübergreifend">
-          {overview ? (
-            <>
-              <Stack
-                confident={overview.wiederholen}
-                practicing={overview.neu}
-                again={overview.erneutLernen}
-              />
-              {canStart ? (
-                <>
-                  <DirectionPicker value={direction} onChange={setDirection} />
-                  <Button onClick={start} disabled={pending || overview.total === 0}>
-                    {pending ? "Einen Moment …" : "Loslegen"}
-                  </Button>
-                  {loadError ? (
-                    <Notice>
-                      Gerade nichts zu laden – vielleicht ist in der Zwischenzeit alles erledigt.
-                    </Notice>
-                  ) : null}
-                  {overview.total === 0 ? (
-                    <Notice>Nichts fällig. Schau später wieder vorbei.</Notice>
-                  ) : null}
-                </>
-              ) : (
-                <Notice>
-                  Nur {overview.total === 1 ? "das Kind übt" : "Kinder üben"} selbst – hier siehst
-                  du nur den Stand.
-                </Notice>
-              )}
-            </>
-          ) : (
+        {bySubject === null ? (
+          <Block title="Fällig heute">
             <Notice>Zahlen sind gerade nicht verfügbar.</Notice>
-          )}
-        </Block>
+          </Block>
+        ) : bySubject.length === 0 ? (
+          <Block title="Fällig heute">
+            <Notice>Nichts fällig. Schau später wieder vorbei.</Notice>
+          </Block>
+        ) : (
+          <>
+            {!canStart ? (
+              <Notice>Nur das Kind übt selbst – hier siehst du nur den Stand.</Notice>
+            ) : null}
+            {bySubject.map((subject) => (
+              <SubjectBlock
+                key={subject.subjectId}
+                subject={subject}
+                canStart={canStart}
+                onStart={startSession}
+              />
+            ))}
+          </>
+        )}
 
         <Block title="Prüfungsmodus">
           <Notice>Kommt mit V-04.</Notice>
@@ -167,6 +157,62 @@ export function PracticeSession({
         </Block>
       </div>
     </>
+  );
+}
+
+/**
+ * Ein Fach, für sich ladend. `subject.total` ist immer > 0 – nur Fächer mit
+ * fälligen Karten stehen überhaupt in `bySubject` (siehe `loadDueBySubject()`).
+ */
+function SubjectBlock({
+  subject,
+  canStart,
+  onStart,
+}: {
+  subject: DueBySubject;
+  canStart: boolean;
+  onStart: (subjectName: string, cards: SessionCardContent[]) => void;
+}) {
+  const [direction, setDirection] = useState<DirectionChoice>("gemischt");
+  const [pending, startTransition] = useTransition();
+  const [loadError, setLoadError] = useState(false);
+
+  function start() {
+    setLoadError(false);
+    startTransition(async () => {
+      const loaded = await loadSessionCards(
+        subject.subjectId,
+        direction === "gemischt" ? null : direction,
+      );
+      if (!loaded || loaded.length === 0) {
+        setLoadError(true);
+        return;
+      }
+      onStart(subject.subjectName, loaded);
+    });
+  }
+
+  return (
+    <Block title={subject.subjectName} trailing={`${subject.total} fällig`}>
+      <Stack
+        confident={subject.wiederholen}
+        practicing={subject.neu}
+        again={subject.erneutLernen}
+      />
+      {canStart ? (
+        <>
+          <DirectionPicker value={direction} onChange={setDirection} />
+          <Button onClick={start} disabled={pending}>
+            {pending ? "Einen Moment …" : "Loslegen"}
+          </Button>
+          {loadError ? (
+            <Notice>
+              Gerade nichts zu laden – vielleicht ist in der Zwischenzeit alles erledigt.
+            </Notice>
+          ) : null}
+        </>
+      ) : null}
+    </Block>
   );
 }
 
