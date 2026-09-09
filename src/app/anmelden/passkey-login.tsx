@@ -2,6 +2,7 @@
 
 import { startAuthentication } from "@simplewebauthn/browser";
 import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -38,10 +39,19 @@ export function PasskeyLogin() {
 
       router.push("/heute");
     } catch (problem) {
+      // `NotAllowedError` heißt beides: „bewusst abgebrochen" UND „kein
+      // passender Passkey da, das Betriebssystem hat den Dialog trotzdem
+      // gezeigt (QR-Code, Sicherheitsschlüssel) und der Rückweg lief über
+      // Abbrechen". WebAuthn unterscheidet die beiden Fälle absichtlich
+      // nicht – aus Datenschutzgründen darf eine Seite nie erfahren, ob
+      // *irgendein* Passkey existiert. Vorher stand hier „Abgebrochen." für
+      // beide Fälle, und genau im zweiten – häufigeren – Fall war das
+      // irreführend: Es klang nach einem eigenen Fehler, nicht nach „du hast
+      // hier noch kein Profil". Gefunden beim Testen auf mytutr.de.
       const name = problem instanceof Error ? problem.name : "";
       setError(
         name === "NotAllowedError"
-          ? "Abgebrochen."
+          ? "Keine Anmeldung zustande gekommen."
           : "Auf diesem Gerät ist kein Passkey für tutr hinterlegt.",
       );
     } finally {
@@ -61,9 +71,22 @@ export function PasskeyLogin() {
       </button>
 
       {error ? (
-        <p role="alert" className="text-offen text-[0.8125rem]">
-          {error}
-        </p>
+        <div className="flex flex-col gap-1">
+          <p role="alert" className="text-offen text-[0.8125rem]">
+            {error}
+          </p>
+          {/* Direkt unter dem Fehler, nicht nur als kleiner Hinweis weiter
+              oben: Genau hier merkt jemand, dass es noch kein Profil gibt –
+              der nächste Schritt soll an dieser Stelle stehen, nicht
+              gesucht werden müssen. */}
+          <p className="text-tinte-leise text-[0.8125rem] leading-normal">
+            Noch kein Profil?{" "}
+            <Link href="/registrieren" className="text-koenigsblau underline underline-offset-2">
+              Jetzt anlegen
+            </Link>
+            .
+          </p>
+        </div>
       ) : null}
     </div>
   );

@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Newsreader } from "next/font/google";
 
@@ -38,10 +39,25 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/**
+ * Vercel Web Analytics: aggregierte Seitenaufrufe ohne Cookies und ohne
+ * personenbezogene Kennung – zählt Besuche, nicht Personen. Verwechselt
+ * keinen Besuch mit einem Kind-Profil, kein Bezug zu Lernstand oder
+ * Vokabeln. Gedacht für eine grobe Antwort auf „wird die App überhaupt
+ * benutzt", nicht für „von wem" – dafür bräuchte es echte Lernzahlen aus
+ * `review`/`card`, kein Tracking-Werkzeug.
+ *
+ * Nur in Produktion sinnvoll: `<Analytics />` selbst sendet ohnehin nichts
+ * außerhalb von Vercel-Deployments, steht aber trotzdem einmal, nicht in
+ * jeder Route einzeln.
+ */
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="de" className={`${familjen.variable} ${newsreader.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

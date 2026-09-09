@@ -71,19 +71,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ) : null}
             {switcher ? <ActorSwitch current={view} /> : null}
             {email ? (
-              <>
-                <span className="text-tinte-leise max-w-[10rem] truncate text-xs" title={email}>
-                  {email}
-                </span>
-                <form action={logoutAndRedirect}>
-                  <button
-                    type="submit"
-                    className="border-linie-stark bg-flaeche text-tinte-weich hover:text-tinte focus-visible:outline-koenigsblau rounded-md border px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1"
-                  >
-                    Abmelden
-                  </button>
-                </form>
-              </>
+              <span className="text-tinte-leise max-w-[10rem] truncate text-xs" title={email}>
+                {email}
+              </span>
+            ) : null}
+            {/* Unabhängig von `email`, nicht daran gekoppelt: `email` bleibt
+                für die Kind-Rolle immer leer (nur Eltern melden sich über
+                Supabase an), ein Kind hatte deshalb hier gar keinen Weg,
+                sich abzumelden – nur „Konto löschen" unter /einstellungen,
+                das ist unwiderruflich und kein Ersatz. Gefunden beim
+                Testen auf mytutr.de. */}
+            {actor ? (
+              <form action={logoutAndRedirect}>
+                <button
+                  type="submit"
+                  className="border-linie-stark bg-flaeche text-tinte-weich hover:text-tinte focus-visible:outline-koenigsblau rounded-md border px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1"
+                >
+                  Abmelden
+                </button>
+              </form>
             ) : null}
           </div>
         </div>
