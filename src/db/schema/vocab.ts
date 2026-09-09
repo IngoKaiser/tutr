@@ -14,7 +14,7 @@ import {
 import { sql } from "drizzle-orm";
 
 import { timestamps } from "./columns";
-import { learningObjective, subject } from "./curriculum";
+import { learningObjective, schoolYear, subject } from "./curriculum";
 import { student } from "./student";
 import { chapter } from "./textbook";
 
@@ -48,6 +48,13 @@ import { chapter } from "./textbook";
  * ebenfalls und bindet beide Seiten dagegen (derselbe Kniff wie bei
  * `student_id`, ADR 0004 D2): Eine Vokabel eines Fachs kann strukturell
  * nicht in einem Set eines anderen Fachs landen, kein Anwendungscode nötig.
+ *
+ * **Jahresbindung (F-16a, ADR 0009 D4):** `vocab_set` trägt zusätzlich
+ * `schoolYearId` – ein Set ist eine Ordnungshilfe ohne eigenen Lernstand und
+ * darf deshalb jahresgebunden sein. `vocab_item`, `card`, `review` bleiben
+ * ausdrücklich ohne diese Spalte (ADR 0004 D6, dort geschärft): Was gelernt
+ * wurde, bleibt zeitlos, auch wenn das Set, über das es hereinkam, aus dem
+ * Sichtfenster fällt.
  */
 
 /** Card.state aus `ts-fsrs`, gespiegelt als deutscher ASCII-Wert (ADR 0006 D10). */
@@ -70,6 +77,12 @@ export const vocabSet = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     studentId: uuid("student_id").notNull(),
     subjectId: uuid("subject_id").notNull(),
+    // Der Behälter ist jahresgebunden, der Lernstand nicht (ADR 0009 D4):
+    // Ein Set ist eine Ordnungshilfe ohne eigenen FSRS-Zustand – anders als
+    // `vocab_item`/`card`/`review`, die absichtlich **keine** Spalte dieser
+    // Art tragen (ADR 0004 D6). Restrict wie bei `topic`: ein gelöschtes
+    // Schuljahr reißt die Sets nicht mit, sie müssten erst einzeln weg.
+    schoolYearId: uuid("school_year_id").notNull(),
     // Freitext statt Fremdschlüssel auf `chapter.units` (text[]) – Arrays
     // können kein FK-Ziel sein, siehe Kommentar dort.
     chapterId: uuid("chapter_id"),
@@ -85,6 +98,11 @@ export const vocabSet = pgTable(
       foreignColumns: [subject.id, subject.studentId],
       // Restrict wie topic → school_year: Vokabelsets sollen ein gelöschtes
       // Fach nicht stillschweigend mitreißen.
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "vocab_set_school_year_fk",
+      columns: [t.schoolYearId, t.studentId],
+      foreignColumns: [schoolYear.id, schoolYear.studentId],
     }).onDelete("restrict"),
     // Einfacher FK wie chapter → textbook (dieselbe „Bekannte Restlücke"):
     // ein Kapitel kann kuratiert (student_id null) sein.

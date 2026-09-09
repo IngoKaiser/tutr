@@ -97,7 +97,9 @@ test.describe("Vokabelverwaltung", () => {
     // macht. Dass Erkennung, Konfidenz-Markierung und Einfügen zusammen
     // funktionieren, ist von Hand gegen die echte API geprüft.
     await page.getByRole("button", { name: "Foto" }).click();
-    await expect(page.getByText(/Das Foto wird nicht gespeichert/)).toBeVisible();
+    // Wortlaut seit V-03c (Minigalerie, #41): „Die Fotos" (Mehrzahl) – mehrere
+    // Bilder zählen jetzt einzeln, siehe vocab-list.tsx.
+    await expect(page.getByText(/Fotos werden nicht gespeichert/)).toBeVisible();
     const dateifelder = page.locator('input[type="file"]');
     await expect(dateifelder).toHaveCount(2);
     await expect(page.locator('input[type="file"][capture]')).toHaveCount(1);

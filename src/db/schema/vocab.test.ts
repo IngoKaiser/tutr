@@ -100,8 +100,8 @@ describe.skipIf(!testDbAvailable())(
     test("ein Kind legt ein Set mit Fach- und Kapitelbindung an, das Elternteil sieht es nur", async () => {
       const [set] = await runWithActor(app.db, student(A.studentId), (tx) =>
         tx.execute<{ id: string }>(sql`
-          insert into vocab_set (student_id, subject_id, chapter_id, unit, title)
-          values (${A.studentId}, ${A.subject}, ${A.chapter}, '3A', 'Unité 3A')
+          insert into vocab_set (student_id, subject_id, school_year_id, chapter_id, unit, title)
+          values (${A.studentId}, ${A.subject}, ${A.schoolYear}, ${A.chapter}, '3A', 'Unité 3A')
           returning id`),
       );
       expect(set?.id).toBeTruthy();
@@ -128,12 +128,28 @@ describe.skipIf(!testDbAvailable())(
 
       const error = await runWithActor(app.db, student(A.studentId), (tx) =>
         tx.execute(sql`
-          insert into vocab_set (student_id, subject_id, title)
-          values (${A.studentId}, ${fremdesFach}, 'Fremdes Fach')`),
+          insert into vocab_set (student_id, subject_id, school_year_id, title)
+          values (${A.studentId}, ${fremdesFach}, ${A.schoolYear}, 'Fremdes Fach')`),
       ).catch((err: unknown) => err);
       expect(errorChain(error)).toMatch(/vocab_set_subject_fk|foreign key/i);
 
       await admin.client`delete from subject where id = ${fremdesFach}`;
+    });
+
+    test("ein Vokabelset an ein fremdes Schuljahr scheitert (F-16a, ADR 0009 D4)", async () => {
+      const fremdesJahr = "99990000-0000-4000-8000-0000000000fc";
+      await admin.client`
+        insert into school_year (id, student_id, label, grade_level, start_date, end_date, status)
+        values (${fremdesJahr}, ${B.studentId}, '2026/27', 8, '2026-08-01', '2027-07-31', 'aktiv')`;
+
+      const error = await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`
+          insert into vocab_set (student_id, subject_id, school_year_id, title)
+          values (${A.studentId}, ${A.subject}, ${fremdesJahr}, 'Fremdes Jahr')`),
+      ).catch((err: unknown) => err);
+      expect(errorChain(error)).toMatch(/vocab_set_school_year_fk|foreign key/i);
+
+      await admin.client`delete from school_year where id = ${fremdesJahr}`;
     });
 
     test("eine Vokabel steckt in mehreren Sets (n:m über vocab_set_item)", async () => {
@@ -142,11 +158,11 @@ describe.skipIf(!testDbAvailable())(
           insert into vocab_item (student_id, subject_id, term, translation)
           values (${A.studentId}, ${A.subject}, 'aller', 'gehen') returning id`);
         const [setEins] = await tx.execute<{ id: string }>(sql`
-          insert into vocab_set (student_id, subject_id, title)
-          values (${A.studentId}, ${A.subject}, 'Set eins') returning id`);
+          insert into vocab_set (student_id, subject_id, school_year_id, title)
+          values (${A.studentId}, ${A.subject}, ${A.schoolYear}, 'Set eins') returning id`);
         const [setZwei] = await tx.execute<{ id: string }>(sql`
-          insert into vocab_set (student_id, subject_id, title)
-          values (${A.studentId}, ${A.subject}, 'Set zwei') returning id`);
+          insert into vocab_set (student_id, subject_id, school_year_id, title)
+          values (${A.studentId}, ${A.subject}, ${A.schoolYear}, 'Set zwei') returning id`);
         await tx.execute(sql`
           insert into vocab_set_item (student_id, vocab_set_id, vocab_item_id, subject_id) values
             (${A.studentId}, ${setEins!.id}, ${item!.id}, ${A.subject}),
@@ -182,8 +198,8 @@ describe.skipIf(!testDbAvailable())(
           insert into vocab_item (student_id, subject_id, term, translation)
           values (${A.studentId}, ${A.subject}, 'venir', 'kommen') returning id`);
         const [mathSet] = await tx.execute<{ id: string }>(sql`
-          insert into vocab_set (student_id, subject_id, title)
-          values (${A.studentId}, ${mathe}, 'Bruchrechnung') returning id`);
+          insert into vocab_set (student_id, subject_id, school_year_id, title)
+          values (${A.studentId}, ${mathe}, ${A.schoolYear}, 'Bruchrechnung') returning id`);
         // subject_id auf der Zeile stimmt mit dem Set überein (Mathematik),
         // nicht mit der Vokabel (Französisch) – genau der Fall, den der
         // zusammengesetzte Fremdschlüssel auf die Vokabel verhindern soll.

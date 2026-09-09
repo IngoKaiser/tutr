@@ -107,12 +107,52 @@ export const subject = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     studentId: uuid("student_id").notNull(),
     name: text("name").notNull(),
+    // ISO-639-1 der Zielsprache (`en`, `fr`, `la`, …), `null` heißt: kein
+    // Sprachfach (ADR 0009). Steuert ab V-06a die Richtungswahl beim Üben –
+    // ein Frage-Antwort-Fach wie Geschichte hat keine Rückrichtung. Kommt
+    // schon mit F-16a mit, weil das Anlege-Formular hier entsteht und ein
+    // zweites Mal zu bauen teurer wäre als eine nullbare Spalte.
+    language: text("language"),
     ...timestamps,
   },
   (t) => [
     foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
     unique("subject_id_student_id_key").on(t.id, t.studentId),
     unique("subject_student_id_name_key").on(t.studentId, t.name),
+  ],
+);
+
+// --- school_year_subject ---------------------------------------------------
+// Welche Fächer in einem Schuljahr laufen (ADR 0009 D2). Das Fach selbst
+// bleibt zeitlos (Französisch ist über Jahre dieselbe Zeile, die Vokabeln
+// hängen daran, ADR 0004 D6) – diese Tabelle sagt nur, welche Fächer *dieses
+// Jahr* aktiv sind. Kein eigener Anwendungscode nötig, um ein Fach eines
+// fremden Kindes zuzuordnen: Beide Fremdschlüssel binden gegen `student_id`.
+//
+// Keine eigene `id` (wie `objective_prerequisite`) – eine reine n:m-Zuordnung
+// ohne Verbraucher, der auf eine einzelne Zeile verweisen müsste.
+
+export const schoolYearSubject = pgTable(
+  "school_year_subject",
+  {
+    studentId: uuid("student_id").notNull(),
+    schoolYearId: uuid("school_year_id").notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
+    foreignKey({
+      name: "school_year_subject_year_fk",
+      columns: [t.schoolYearId, t.studentId],
+      foreignColumns: [schoolYear.id, schoolYear.studentId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "school_year_subject_subject_fk",
+      columns: [t.subjectId, t.studentId],
+      foreignColumns: [subject.id, subject.studentId],
+    }).onDelete("cascade"),
+    unique("school_year_subject_pair_key").on(t.schoolYearId, t.subjectId),
   ],
 );
 

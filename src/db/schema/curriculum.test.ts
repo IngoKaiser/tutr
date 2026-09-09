@@ -183,5 +183,77 @@ describe.skipIf(!testDbAvailable())(
       );
       expect(rows.map((r) => r.name)).toEqual(["Mathematik"]);
     });
+
+    // --- ADR 0009 D1: das Kind legt Fach und Schuljahr selbst an ---
+
+    test("Kind legt eigenes Fach und Schuljahr selbst an – ohne Elternteil (ADR 0009 D1)", async () => {
+      const angelegt = await runWithActor(app.db, student(A.studentId), async (tx) => {
+        const [jahr] = await tx.execute<{ id: string }>(sql`
+          insert into school_year (student_id, label, grade_level, start_date, end_date, status)
+          values (${A.studentId}, '2027/28 (Kind-Anlage)', 9, '2027-08-01', '2028-07-31', 'geplant')
+          returning id`);
+        const [fach] = await tx.execute<{ id: string }>(sql`
+          insert into subject (student_id, name) values (${A.studentId}, 'Spanisch')
+          returning id`);
+        return { jahrId: jahr!.id, fachId: fach!.id };
+      });
+      expect(angelegt.jahrId).toBeTruthy();
+      expect(angelegt.fachId).toBeTruthy();
+
+      // Aufräumen, damit der partielle Unique-Index (nur ein 'aktiv') und
+      // die übrigen Tests unberührt bleiben – afterAll räumt erst am Ende.
+      await admin.client`delete from school_year where id = ${angelegt.jahrId}`;
+      await admin.client`delete from subject where id = ${angelegt.fachId}`;
+    });
+
+    test("Ein Kind kann kein Fach für ein fremdes Kind anlegen", async () => {
+      const error = await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(
+          sql`insert into subject (student_id, name) values (${B.studentId}, 'Fremdes Fach')`,
+        ),
+      ).catch((err: unknown) => err);
+      expect(error).toBeDefined();
+    });
+
+    test("Ein Elternteil legt weiterhin ein Fach an – ADR 0009 D1 ändert nur die Kind-Richtung", async () => {
+      const [fach] = await runWithActor(app.db, parent(A.studentId), (tx) =>
+        tx.execute<{ id: string }>(sql`
+          insert into subject (student_id, name) values (${A.studentId}, 'Kunst') returning id`),
+      );
+      expect(fach?.id).toBeTruthy();
+      await admin.client`delete from subject where id = ${fach!.id}`;
+    });
+
+    // --- ADR 0009 D2: welche Fächer in einem Schuljahr laufen ---
+
+    test("Kind ordnet ein Fach dem eigenen Schuljahr zu, Elternteil sieht die Zuordnung", async () => {
+      await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`
+          insert into school_year_subject (student_id, school_year_id, subject_id)
+          values (${A.studentId}, ${A.schuljahr}, ${A.franzoesisch})`),
+      );
+      const gesehen = await runWithActor(app.db, parent(A.studentId), (tx) =>
+        tx.execute<{ n: string }>(sql`
+          select count(*)::text as n from school_year_subject
+          where school_year_id = ${A.schuljahr} and subject_id = ${A.franzoesisch}`),
+      );
+      expect(gesehen[0]?.n).toBe("1");
+    });
+
+    test("Ein Fach lässt sich nicht dem Schuljahr eines fremden Kindes zuordnen", async () => {
+      const error = await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`
+          insert into school_year_subject (student_id, school_year_id, subject_id)
+          values (${A.studentId}, ${B.schuljahr}, ${A.franzoesisch})`),
+      ).catch((err: unknown) => err);
+      expect(error).toBeDefined();
+    });
+
+    test("Ein fremdes Kind sieht die Zuordnung des anderen nicht", async () => {
+      const rows = await runWithActor(app.db, student(B.studentId), (tx) =>
+        tx.execute(sql`select 1 from school_year_subject`),
+      );
+      expect(rows).toHaveLength(0);
+    });
   },
 );

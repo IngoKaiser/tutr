@@ -7,6 +7,7 @@ import {
   deleteChild,
   deleteMyAccount,
   deleteMyParentAccount,
+  loadActiveSchoolYearLabel,
   loadDevices,
   loadOwnFirstName,
 } from "./actions";
@@ -40,7 +41,10 @@ export default async function SettingsPage() {
 
   if (!login) redirect("/heute");
 
-  const devices = await loadDevices();
+  const [devices, schoolYearLabel] = await Promise.all([
+    loadDevices(),
+    loadActiveSchoolYearLabel(),
+  ]);
   const currentStudent = login.students.find((s) => s.id === actor.studentId);
 
   return (
@@ -55,6 +59,15 @@ export default async function SettingsPage() {
               : `Verknüpft: ${login.students.map((s) => s.firstName).join(", ")}. Wechseln Sie oben im Kopfbereich.`}
           </Notice>
         </Block>
+
+        {schoolYearLabel ? (
+          <Block title="Schuljahr" trailing={schoolYearLabel}>
+            <Notice>
+              {currentStudent?.firstName ?? "Ihr Kind"} legt Fächer selbst unter „Fächer&quot; an.
+              Umschalten auf ein anderes Schuljahr kommt, sobald eins ansteht.
+            </Notice>
+          </Block>
+        ) : null}
 
         <Block
           title="Passkeys"
@@ -135,13 +148,21 @@ export default async function SettingsPage() {
   );
 }
 
-/** Die einzige Aktion, die ein Kind hier braucht (F-06e). */
+/** Nur-Lese-Zeile plus die einzige Aktion, die ein Kind hier sonst braucht (F-06e, F-16a). */
 async function StudentSettings() {
-  const firstName = await loadOwnFirstName();
+  const [firstName, schoolYearLabel] = await Promise.all([
+    loadOwnFirstName(),
+    loadActiveSchoolYearLabel(),
+  ]);
 
   return (
     <>
       <PageHeader title="Einstellungen" trailing={firstName ?? undefined} />
+      {schoolYearLabel ? (
+        <Block title="Schuljahr" trailing={schoolYearLabel}>
+          <Notice>Deine Fächer legst du unter „Fächer&quot; an.</Notice>
+        </Block>
+      ) : null}
       <Block title="Konto löschen">
         <DeleteChild
           firstName={firstName ?? ""}

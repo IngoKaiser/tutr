@@ -28,14 +28,22 @@ security`.
    Mandant sieht nichts, und die Schreibrechte stimmen.
 5. **Zeile in der RLS-Matrix** in ADR 0004 D4.
 
-## Die drei Muster
+## Die vier Muster
 
-**Eigene Daten, Eltern schreiben** (`school_year`, `subject`,
-`school_year_textbook`): Eltern `for all`, Kind `for select` – beide über
-dieselbe Bedingung, unterschieden nur durch `app.actor_role()`.
+**Eigene Daten, beide schreiben** (`school_year`, `subject`,
+`school_year_subject`, ADR 0009 D1): beide Rollen `for all`, unterschieden
+nur durch `app.actor_role()`. Ein Kind ohne Elternkonto (ADR 0006 D1: „funktioniert
+ohne") muss ein Fach und ein Schuljahr selbst anlegen können – bei
+`for select` fürs Kind käme es dazu nie. Ursprünglich „Eltern schreiben,
+Kind liest" (siehe ADR 0004 D4); `school_year_textbook` blieb bei diesem
+älteren Muster.
 
-**Eigene Daten, Kind schreibt** (`topic`, `learning_objective`): umgekehrt –
-Kind `for all`, Eltern `for select`.
+**Eigene Daten, Eltern schreiben** (`school_year_textbook`): Eltern
+`for all`, Kind `for select` – beide über dieselbe Bedingung, unterschieden
+nur durch `app.actor_role()`.
+
+**Eigene Daten, Kind schreibt** (`topic`, `learning_objective`, `vocab_*`):
+umgekehrt – Kind `for all`, Eltern `for select`.
 
 **Kuratiert oder eigen** (`textbook`, `chapter`, `school_profile`): braucht
 **zwei** Policies, keine einzige.

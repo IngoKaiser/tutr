@@ -77,6 +77,27 @@ export async function loadOwnFirstName(): Promise<string | null> {
   return rows[0]?.first_name ?? null;
 }
 
+/**
+ * Das Label des aktiven Schuljahres, nur zum Anzeigen (F-16a, ADR 0009).
+ *
+ * Für beide Rollen: Ein Elternteil soll ohne Umweg sehen, in welchem
+ * Schuljahr das gewählte Kind gerade steht. Kein Formular dazu – das
+ * Umschalten/Anlegen weiterer Jahre kommt erst mit F-16b, solange es genau
+ * eins gibt, hätte ein Umschalter nichts zu tun.
+ */
+export async function loadActiveSchoolYearLabel(): Promise<string | null> {
+  if (!databaseConfigured()) return null;
+  const { actor } = await loginStatus();
+  if (!actor) return null;
+
+  const rows = await withActor(actor, (tx) =>
+    tx.execute<{ label: string }>(
+      sql`select label from school_year where student_id = ${actor.studentId} and status = 'aktiv'`,
+    ),
+  );
+  return rows[0]?.label ?? null;
+}
+
 export async function loadDevices(): Promise<DeviceList | null> {
   const actor = await requireParentActor();
   if (!actor) return null;
