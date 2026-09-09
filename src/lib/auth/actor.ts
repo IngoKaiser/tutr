@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import type { Actor } from "@/db/actor";
 import { actorFromSession, SESSION_COOKIE } from "@/lib/auth/student-session";
@@ -55,7 +56,18 @@ const EMPTY: LoginStatus = {
   login: null,
 };
 
-export async function loginStatus(): Promise<LoginStatus> {
+/**
+ * **Einmal je Anfrage**, nicht einmal je Aufrufer (F-16a-Nachtrag, Ladezeiten).
+ *
+ * Ohne `cache()` lief das hier auf `/faecher/vokabeln` viermal: Layout, Seite
+ * und zwei Loader, die je `requireActor()` aufrufen. Für ein angemeldetes Kind
+ * ist jeder Aufruf eine eigene Transaktion mit Session-Nachschlag – zusammen
+ * mit den eigentlichen Abfragen kam eine Seite so auf über dreißig Runden zur
+ * Datenbank. `cache()` von React dedupliziert innerhalb *einer* Anfrage;
+ * zwischen Anfragen wird nichts geteilt, ein Rollen- oder Kindwechsel wirkt
+ * also sofort.
+ */
+export const loginStatus = cache(async function loginStatus(): Promise<LoginStatus> {
   const testActor = e2eActor();
   if (testActor) {
     const testLogin = e2eLogin();
@@ -147,4 +159,4 @@ export async function loginStatus(): Promise<LoginStatus> {
     view: "parent",
     login,
   };
-}
+});
