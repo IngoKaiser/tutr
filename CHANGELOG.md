@@ -6,6 +6,20 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **F-16a: Fächerverwaltung.** Der Blocker aus `docs/roadmap.md` Stufe 0 ist behoben – ein Kind
+  legt Fach und Schuljahr jetzt selbst an, ohne Elternteil ([ADR 0009](docs/adr/0009-schuljahr-als-sichtfenster.md)).
+  Vorher stand `insert into subject` nur im Seed-Skript, und selbst mit Formular hätte nur ein
+  Elternteil schreiben dürfen – ein Kind ohne Elternkonto (ADR 0006 D1) kam dadurch nie zu einem
+  Fach. Neue Seite unter „Fächer": anlegen (Name + optionale Sprache), umbenennen, löschen (mit
+  Riegel – ein Fach mit Themen oder Vokabelsets lässt sich nicht löschen). Das Schuljahr entsteht
+  mit der Registrierung, in derselben Transaktion wie das Profil
+- **Schuljahr als Sichtfenster, Fach als Lernraum** (ADR 0009 D2–D4): Fächer bleiben über Jahre
+  dieselbe Zeile (Französisch bleibt Französisch), welche Fächer _dieses Jahr_ laufen, sagt die
+  neue Zuordnungstabelle `school_year_subject`. Sets, Themen und Arbeiten sind jahresgebunden
+  (`vocab_set.school_year_id`, neu) – der Lernstand (`vocab_item`, `card`, `review`) bleibt
+  ausdrücklich zeitlos, das schärft ADR 0004 D6, statt sie zu brechen
+- `subject.language` (nullable, ISO-639-1): steuert erst ab V-06a die Richtungswahl beim Üben,
+  kommt aber schon mit F-16a, weil das Anlege-Formular hier entsteht
 - **V-03c: Foto-Import als Minigalerie.** Mehrere fotografierte Seiten stehen jetzt als Kacheln
   nebeneinander, jede mit eigenem Zustand (wartet · wird verkleinert · wird gelesen · fertig ·
   nicht geklappt) statt eines gemeinsamen Fortschrittstexts für alle Bilder. Scheitert eins,

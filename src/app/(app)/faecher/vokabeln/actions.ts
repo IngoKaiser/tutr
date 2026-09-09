@@ -6,13 +6,19 @@ import { revalidatePath } from "next/cache";
 import { withActor, type Actor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { databaseConfigured } from "@/lib/env";
+import { activeSchoolYearId } from "@/lib/school-year/active";
 
 /**
- * Sets und Fächer für die Vokabelverwaltung (V-03a, ADR 0007).
+ * Sets und Fächer für die Vokabelverwaltung (V-03a, ADR 0007; jahresgebunden
+ * seit F-16a, ADR 0009 D2–D4).
  *
  * Der Actor kommt ausschließlich aus `loginStatus()` – wie überall sonst.
  * Vokabel-Policies (ADR 0004 D4): Kind schreibt, Eltern lesen. `loadSets()`
  * funktioniert deshalb für beide Rollen, Schreiben nur fürs Kind.
+ *
+ * Sets und die Fächer, aus denen man wählen kann, zeigen nur das **aktive**
+ * Schuljahr – kein expliziter `student_id`-Filter dafür nötig, RLS auf
+ * `school_year`/`subject` sorgt dafür ohnehin schon.
  */
 
 async function requireActor(): Promise<Actor | null> {
@@ -53,6 +59,7 @@ export async function loadSets(): Promise<VocabSetSummary[] | null> {
             count(vsi.id)::text as item_count
           from vocab_set vs
           join subject s on s.id = vs.subject_id
+          join school_year sy on sy.id = vs.school_year_id and sy.status = 'aktiv'
           left join vocab_set_item vsi on vsi.vocab_set_id = vs.id
           group by vs.id, vs.title, vs.subject_id, s.name
           order by s.name, vs.title`,
@@ -69,13 +76,17 @@ export async function loadSets(): Promise<VocabSetSummary[] | null> {
 
 export type SubjectOption = { id: string; name: string };
 
-/** Fächer für den Set-Anlegen-Dialog. */
+/** Fächer des aktiven Schuljahres, für den Set-Anlegen-Dialog (ADR 0009 D3). */
 export async function loadSubjects(): Promise<SubjectOption[] | null> {
   const actor = await requireActor();
   if (!actor) return null;
 
   return withActor(actor, (tx) =>
-    tx.execute<SubjectOption>(sql`select id, name from subject order by name`),
+    tx.execute<SubjectOption>(sql`
+      select s.id, s.name from subject s
+      join school_year_subject sys on sys.subject_id = s.id
+      join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
+      order by s.name`),
   );
 }
 
@@ -86,12 +97,18 @@ export async function createSet(input: { subjectId: string; title: string }): Pr
   const title = input.title.trim();
   if (!title) return;
 
-  await withActor(actor, (tx) =>
-    tx.execute(
-      sql`insert into vocab_set (student_id, subject_id, title)
-          values (${actor.studentId}, ${input.subjectId}, ${title})`,
-    ),
-  );
+  await withActor(actor, async (tx) => {
+    const schoolYearId = await activeSchoolYearId(tx, actor.studentId);
+    // Sollte nach F-16a nicht vorkommen (jede Registrierung legt ein Jahr
+    // an) – bricht hier still ab statt mit einem Fehler ohne Ansprache; die
+    // Fach-Auswahl im Formular käme ohnehin schon leer von `loadSubjects()`.
+    if (!schoolYearId) return;
+
+    await tx.execute(
+      sql`insert into vocab_set (student_id, subject_id, school_year_id, title)
+          values (${actor.studentId}, ${input.subjectId}, ${schoolYearId}, ${title})`,
+    );
+  });
   revalidatePath("/faecher/vokabeln");
 }
 

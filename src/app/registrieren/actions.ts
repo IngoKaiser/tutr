@@ -4,12 +4,13 @@ import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 import { cookies, headers } from "next/headers";
 
 import { withActor, type Actor } from "@/db/actor";
-import { student, studentCredential } from "@/db/schema";
+import { schoolYear, student, studentCredential } from "@/db/schema";
 import { challengeCookieName, challengeMaxAge, verifyChallenge } from "@/lib/auth/challenge";
 import { registrationOptions, verifyRegistration } from "@/lib/auth/passkey";
 import { createSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth/student-session";
 import { consentEmail } from "@/lib/mail/consent";
 import { sendMail } from "@/lib/mail/resend";
+import { currentSchoolYear } from "@/lib/school-year/current";
 
 /**
  * Selbstanlage des Kind-Profils (F-06, ADR 0005).
@@ -147,6 +148,21 @@ export async function completeRegistration(
       publicKey: passkey.publicKey,
       counter: passkey.counter,
       transports: passkey.transports,
+    });
+    // Das aktive Schuljahr entsteht mit dem Profil (F-16a, ADR 0009): Ohne
+    // Schuljahr kann später kein Fach zugeordnet werden
+    // (`school_year_subject`), und `topic.school_year_id` ist `not null`.
+    // Jahrgang und Klasse kommen aus dem Profil – die Klasse bleibt hier
+    // `null`, weil sie beim Anlegen nicht gefragt wird (siehe oben); wer sie
+    // braucht, trägt sie am Schuljahr selbst nach.
+    const { label, startDate, endDate } = currentSchoolYear(new Date());
+    await tx.insert(schoolYear).values({
+      studentId: remembered.studentId,
+      label,
+      gradeLevel: remembered.gradeLevel,
+      startDate,
+      endDate,
+      status: "aktiv",
     });
   });
 

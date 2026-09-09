@@ -41,18 +41,23 @@ darf er nicht live gehen:
 
 ---
 
-## Stufe 0 · Der Blocker
+## Stufe 0 · Der Blocker — behoben (F-16a, 9.9.2026)
 
-**Es gibt keinen Weg, ein Fach anzulegen.** `insert into subject` steht
-ausschließlich im Seed-Skript. Nach der Registrierung ist die Fachauswahl leer –
-kein Set, keine Vokabeln, kein Üben, kein Termin, kein Thema. Alles Weitere
-hängt daran.
+**Es gab keinen Weg, ein Fach anzulegen.** `insert into subject` stand
+ausschließlich im Seed-Skript, und selbst mit Formular hätte nur ein
+Elternteil schreiben dürfen (ADR 0004 D4) – ein Kind ohne Elternkonto
+(ADR 0006 D1) kam dadurch nie zu einem Fach.
 
-Dasselbe gilt für `school_year`: `topic.school_year_id` ist `not null`, ohne
-Schuljahr also kein Thema – und ohne Thema kein Tutor-Kontext und keine
-Prüfungsvorbereitung.
+F-16a schließt das: Das Kind legt Fach und Schuljahr selbst an
+([ADR 0009](adr/0009-schuljahr-als-sichtfenster.md)), das Schuljahr entsteht
+mit der Registrierung. Zugleich die Leitplanke gegen Sammelwut aus §9:
+**Das Schuljahr bestimmt, was sichtbar ist, das Fach, was geübt wird** – Sets,
+Themen und Arbeiten sind jahresgebunden, der Lernstand (Vokabeln, Karten,
+Reviews) bleibt es ausdrücklich nicht.
 
-→ **F-16** (siehe `docs/PLAN.md`). Muss vor allem anderen kommen.
+Zurückgestellt als **F-16b**: Jahr umschalten, Historie ansehen, Sommer-
+Rollover. Es gibt genau ein Schuljahr; ein Umschalter hätte bis August 2027
+nichts zu tun.
 
 ---
 
@@ -112,7 +117,7 @@ Jeder Bereich in drei Stufen: **schmal aber echt** → **nützlich** → **reif*
 
 ## Vorgeschlagene Reihenfolge der nächsten Tickets
 
-1. **F-16 · Fächer und Schuljahr anlegen** — der Blocker. Ohne ihn geht nichts
+1. ~~**F-16a · Fächer und Schuljahr anlegen** — der Blocker.~~ Erledigt (9.9.2026)
 2. **K-01 · Kalender, Termine von Hand** — klein, unabhängig, sofort nützlich (vier Arbeiten stehen an)
 3. **T-01/T-02 schmal + T-02a + S-03 · Tutor-Chat** — der größte Brocken der Stufe 1. Rate Limit und Sprachwächter gehören dazu, nicht danach
 4. **T-03 schmal · Hausaufgabe mit Hinweisleiter** — baut auf dem Vision-Weg aus V-03b auf

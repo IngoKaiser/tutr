@@ -75,13 +75,30 @@ export async function seed(sql: postgres.Sql): Promise<void> {
       (${SEED_IDS.schoolYearTwo}, ${SEED_IDS.studentTwo}, '2026/27', 8, '8b', '2026-08-01', '2027-07-31', 'aktiv')`;
 
   // --- Fächer: hängen am Schüler, nicht am Schuljahr (ADR 0004 D6) ---
+  // `language` (ISO-639-1) nur bei den beiden Sprachfächern – steuert erst
+  // ab V-06a die Richtungswahl, aber realistische Seed-Daten schaden nicht.
   await sql`
-    insert into subject (id, student_id, name) values
-      (${SEED_IDS.subjectFrench}, ${SEED_IDS.studentOne}, 'Französisch'),
-      (${SEED_IDS.subjectMaths}, ${SEED_IDS.studentOne}, 'Mathematik')`;
+    insert into subject (id, student_id, name, language) values
+      (${SEED_IDS.subjectFrench}, ${SEED_IDS.studentOne}, 'Französisch', 'fr'),
+      (${SEED_IDS.subjectMaths}, ${SEED_IDS.studentOne}, 'Mathematik', null)`;
+  const weitereFaecher = (await sql`
+    insert into subject (student_id, name, language)
+    select ${SEED_IDS.studentOne}::uuid, name, language
+    from (values ('Deutsch', null), ('Englisch', 'en'), ('Biologie', null), ('PGW', null))
+      as f(name, language)
+    returning id`) as { id: string }[];
+
+  // --- Zuordnung: welche Fächer im aktuellen Schuljahr laufen (ADR 0009
+  //     D2). Alle sechs Fächer Mias sind dieses Jahr aktiv; Bens und Leas
+  //     Schuljahre bleiben ohne Fach – sie sind für andere Fälle da (F-06b:
+  //     Geschwister, ADR 0005: Kind ohne Elternkonto), nicht für diesen.
   await sql`
-    insert into subject (student_id, name)
-    select ${SEED_IDS.studentOne}, unnest(ARRAY['Deutsch', 'Englisch', 'Biologie', 'PGW'])`;
+    insert into school_year_subject (student_id, school_year_id, subject_id)
+    select ${SEED_IDS.studentOne}::uuid, ${SEED_IDS.schoolYearOne}::uuid, id
+    from unnest(array[${SEED_IDS.subjectFrench}, ${SEED_IDS.subjectMaths}]::uuid[]) as id
+    union all
+    select ${SEED_IDS.studentOne}::uuid, ${SEED_IDS.schoolYearOne}::uuid, id
+    from unnest(${weitereFaecher.map((f) => f.id)}::uuid[]) as id`;
 
   // Lehrwerk für Französisch in diesem Schuljahr (§8 lehrwerke{fach→id})
   await sql`
@@ -137,8 +154,8 @@ export async function seed(sql: postgres.Sql): Promise<void> {
   //     `createEmptyCard()` für eine frische Karte liefert – gegen die
   //     echte Bibliothek geprüft, nicht auswendig hingeschrieben.
   await sql`
-    insert into vocab_set (id, student_id, subject_id, chapter_id, unit, title)
-    values (${SEED_IDS.vocabSetUnite3}, ${SEED_IDS.studentOne}, ${SEED_IDS.subjectFrench}, ${SEED_IDS.chapterUnite3}, '3.1', 'Unité 3 · Le quotidien')`;
+    insert into vocab_set (id, student_id, subject_id, school_year_id, chapter_id, unit, title)
+    values (${SEED_IDS.vocabSetUnite3}, ${SEED_IDS.studentOne}, ${SEED_IDS.subjectFrench}, ${SEED_IDS.schoolYearOne}, ${SEED_IDS.chapterUnite3}, '3.1', 'Unité 3 · Le quotidien')`;
 
   // Jeder Wert als gebundener Parameter, keine SQL-Text-Literale –
   // "s'habiller" und "d'abord" tragen ein Apostroph. `sql(rows, [...])` –

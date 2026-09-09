@@ -1,16 +1,24 @@
--- school_year, subject, topic, learning_objective, objective_prerequisite.
+-- school_year, subject, school_year_subject, topic, learning_objective,
+-- objective_prerequisite.
 --
--- Richtungen unverändert aus ADR 0004 D4, nur auf `student_id` umgestellt
--- (ADR 0006 D2):
---   school_year, subject:   Eltern lesen + schreiben, Kind liest.
+-- Richtungen (ADR 0004 D4, auf `student_id` umgestellt in ADR 0006 D2, für
+-- school_year/subject/school_year_subject geändert in ADR 0009 D1):
+--   school_year, subject, school_year_subject:
+--                           Kind liest + schreibt, Eltern lesen + schreiben.
 --   topic, learning_objective, objective_prerequisite:
 --                           Kind liest + schreibt, Eltern lesen.
+--
+-- **Nachtrag ADR 0009 D1:** Vorher durfte nur ein Elternteil ein Fach oder
+-- Schuljahr anlegen (`for select` fürs Kind) – ein Kind ohne Elternkonto
+-- (ADR 0006 D1: „funktioniert ohne") kam dadurch nie zu einem Fach. Das
+-- Kind bekommt jetzt dasselbe Schreibrecht dazu, den Eltern nimmt es nichts.
 --
 -- Der Zusatzfilter auf `student_id`, den die Kind-Policies früher brauchten,
 -- ist entfallen – er *ist* jetzt die Bedingung. Idempotent.
 
 grant select, insert, update, delete
-  on school_year, subject, topic, learning_objective, objective_prerequisite
+  on school_year, subject, school_year_subject, topic, learning_objective,
+     objective_prerequisite
   to tutr_app;
 
 -- --- school_year ----------------------------------------------------------
@@ -24,8 +32,9 @@ create policy school_year_parent on school_year
 
 drop policy if exists school_year_student on school_year;
 create policy school_year_student on school_year
-  for select to tutr_app
-  using (student_id = app.student_id() and app.actor_role() = 'student');
+  for all to tutr_app
+  using (student_id = app.student_id() and app.actor_role() = 'student')
+  with check (student_id = app.student_id() and app.actor_role() = 'student');
 
 -- --- subject --------------------------------------------------------------
 alter table subject enable row level security;
@@ -38,8 +47,26 @@ create policy subject_parent on subject
 
 drop policy if exists subject_student on subject;
 create policy subject_student on subject
-  for select to tutr_app
-  using (student_id = app.student_id() and app.actor_role() = 'student');
+  for all to tutr_app
+  using (student_id = app.student_id() and app.actor_role() = 'student')
+  with check (student_id = app.student_id() and app.actor_role() = 'student');
+
+-- --- school_year_subject ---------------------------------------------------
+-- Neu mit F-16a (ADR 0009 D2): welche Fächer in einem Schuljahr laufen.
+-- Dieselbe Richtung wie school_year/subject, aus demselben Grund.
+alter table school_year_subject enable row level security;
+
+drop policy if exists school_year_subject_parent on school_year_subject;
+create policy school_year_subject_parent on school_year_subject
+  for all to tutr_app
+  using (student_id = app.student_id() and app.actor_role() = 'parent')
+  with check (student_id = app.student_id() and app.actor_role() = 'parent');
+
+drop policy if exists school_year_subject_student on school_year_subject;
+create policy school_year_subject_student on school_year_subject
+  for all to tutr_app
+  using (student_id = app.student_id() and app.actor_role() = 'student')
+  with check (student_id = app.student_id() and app.actor_role() = 'student');
 
 -- --- topic ----------------------------------------------------------------
 alter table topic enable row level security;
