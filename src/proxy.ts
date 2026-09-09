@@ -83,7 +83,12 @@ export const config = {
   // `konto-geloescht` (F-06e) aus demselben Grund, nur umgekehrt: `logout()`
   // ist schon gelaufen, bevor der Redirect hierher zeigt – ohne die Ausnahme
   // würde diese Seite den Redirect auf `/anmelden` nie überleben.
+  // `robots.txt` gehört mit in die Ausnahmen (D-01): Ohne sie leitet der
+  // Proxy auch sie auf /anmelden um, und ein Crawler bekommt eine
+  // Weiterleitung statt der Datei – die Anweisung, ihn auszusperren, käme
+  // nie an. Beim Entwickeln unsichtbar, weil der Dev-Actor-Bypass oben den
+  // Proxy überspringt; erst der echte Deploy hat es gezeigt.
   matcher: [
-    "/((?!anmelden|registrieren|wiederherstellen|konto-geloescht|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest).*)",
+    "/((?!anmelden|registrieren|wiederherstellen|konto-geloescht|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest|robots.txt).*)",
   ],
 };

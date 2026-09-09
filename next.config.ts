@@ -6,6 +6,11 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  // Kein Suchindex (D-01). `robots.txt` ist die Bitte, dieser Header die
+  // Durchsetzung – er gilt auch für Antworten, die kein HTML sind, und für
+  // Crawler, die die robots.txt gar nicht erst lesen. Die App ist das
+  // Lernkonto eines Kindes, keine Website.
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
   // Content-Security-Policy folgt in Ticket S-03, sobald Supabase- und Anthropic-Origins feststehen.
 ];
 

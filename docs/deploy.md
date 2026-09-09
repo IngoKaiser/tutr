@@ -1,0 +1,154 @@
+# Deploy nach mytutr.de (D-01)
+
+Reihenfolge zählt: Schritt 3 (Domain) muss **vor** der ersten Passkey-Anmeldung
+stehen, sonst muss das Kind sie später wiederholen. Warum, steht in Schritt 3.
+
+---
+
+## 1 · Vercel-Projekt anlegen
+
+Repository `IngoKaiser/tutr` importieren. Framework wird als Next.js erkannt,
+Build-Kommando und Ausgabeverzeichnis bleiben auf den Vorgaben.
+
+Node-Version: **22** — steht in `.nvmrc` und als `engines` in `package.json`,
+Vercel liest das von selbst.
+
+## 2 · Umgebungsvariablen setzen
+
+Alle für **Production**, **Preview** und **Development** setzen, sonst
+scheitern Vorschau-Deployments an der Zod-Prüfung in `src/lib/env.ts`.
+
+| Variable                               | Quelle                                            |
+| -------------------------------------- | ------------------------------------------------- |
+| `DATABASE_URL`                         | wie in `.env.local` – Rolle `tutr_app`, Port 6543 |
+| `SUPABASE_SECRET_KEY`                  | wie in `.env.local`                               |
+| `NEXT_PUBLIC_SUPABASE_URL`             | wie in `.env.local`                               |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | wie in `.env.local`                               |
+| `ANTHROPIC_API_KEY`                    | wie in `.env.local`                               |
+| `AUTH_COOKIE_SECRET`                   | wie in `.env.local`                               |
+| `RESEND_API_KEY`, `RESEND_FROM`        | optional, siehe Schritt 6                         |
+
+**Zwei Werte gehören ausdrücklich NICHT nach Vercel:**
+`MIGRATION_DATABASE_URL` und `TUTR_APP_DB_PASSWORD`. Das sind die
+Zugangsdaten der Rolle `postgres`, die RLS umgeht. Migrationen laufen von
+deinem Rechner (`npm run db:migrate`), nie aus der Anwendung heraus – so
+liegt der mächtigste Schlüssel nicht auf der Hosting-Plattform.
+
+`DATABASE_URL` muss auf **Port 6543** (Transaction Pooler) und die Rolle
+`tutr_app` zeigen. Mit `postgres` statt `tutr_app` griffe RLS nicht, und ein
+vergessener `withActor()`-Aufruf sähe alle Mandanten (ADR 0004 D1).
+
+## 3 · Domain — und warum die Reihenfolge zählt
+
+`mytutr.de` als Domain hinzufügen. **`mytutr.de` (ohne `www`) als primäre
+Domain setzen, `www.mytutr.de` darauf weiterleiten.**
+
+Das ist keine Geschmacksfrage. `src/lib/auth/passkey.ts` leitet die
+WebAuthn-`rpID` aus dem Host-Header ab (bewusst, damit Vorschau-Deployments
+funktionieren). Ein Passkey gilt nur für genau die Domain, auf der er angelegt
+wurde:
+
+- angelegt auf `www.mytutr.de` → funktioniert **nicht** auf `mytutr.de`
+- angelegt auf `tutr-xyz.vercel.app` → funktioniert **nicht** auf `mytutr.de`
+
+Deshalb: erst die Domain steht, dann registriert sich das Kind. Andernfalls
+Passkey löschen und neu anlegen — machbar, aber unnötig.
+
+DNS beim Domain-Anbieter nach Vercels Anweisung setzen (A-Record auf die
+Vercel-IP oder ALIAS/ANAME auf `cname.vercel-dns.com`), dann warten, bis
+Vercel „Valid Configuration" zeigt und das Zertifikat ausgestellt ist.
+
+## 4 · Supabase auf die echte Domain umstellen
+
+Dashboard → Authentication → URL Configuration:
+
+- **Site URL**: `https://mytutr.de`
+- **Redirect URLs**: `https://mytutr.de/**` ergänzen
+
+Ohne das zeigen die Anmeldelinks in den Mails weiter auf `localhost:3000` —
+die Vorlagen benutzen `{{ .SiteURL }}`. Der Rückweg der App
+(`/auth/callback`) wird über `emailRedirectTo` gesetzt und muss in der
+Allowlist stehen, sonst weist Supabase ihn ab.
+
+## 5 · Seed-Daten aus der Produktivdatenbank entfernen
+
+Die Datenbank enthält aus der Entwicklung drei erfundene Kinder (Mia, Ben,
+Lea) samt Vokabelset. Sie stören nicht — niemand kann sich mit ihnen anmelden,
+und sie hängen an `eltern@example.org`, nicht an einer echten Adresse. Aber sie
+sind Attrappen in einer echten Datenbank, und wenn das Kind zufällig einen
+dieser Vornamen trägt, wird es verwirrend.
+
+Vor der ersten echten Anmeldung entfernen (als Migrationsrolle, lokal):
+
+```sql
+-- Mia, Ben, Lea (SEED_IDS.studentOne/siblingOne/studentTwo)
+delete from student where id in (
+  '00000000-0000-4000-8000-00000000d003',
+  '00000000-0000-4000-8000-00000000d004',
+  '00000000-0000-4000-8000-00000000e003'
+);
+-- Die beiden Attrappen-Elternkonten
+delete from parent_account where id in (
+  '00000000-0000-4000-8000-00000000d002',
+  '00000000-0000-4000-8000-00000000e002'
+);
+-- Das kuratierte Lehrwerk „Découvertes 4" (hängt an keinem Kind)
+delete from textbook where id = '00000000-0000-4000-8000-00000000c001';
+```
+
+Die IDs stammen aus `src/db/seed-ids.ts` — Vokabeln, Karten, Schuljahre und
+Themen hängen per Kaskade an `student` und gehen mit.
+
+**Danach `npm run db:seed` nie wieder gegen die Produktivdatenbank ausführen.**
+Es legt die Attrappen erneut an. Für die Test-Datenbank bleibt es richtig.
+
+## 6 · E-Mail (kann warten)
+
+Zwei verschiedene Wege, nicht verwechseln:
+
+| Mail                     | Verschickt von | Zustand                                                            |
+| ------------------------ | -------------- | ------------------------------------------------------------------ |
+| Eltern-Anmeldelink       | Supabase Auth  | funktioniert sofort, aber knappe Rate-Limits (ein paar pro Stunde) |
+| Einwilligungsmail (F-06) | Resend         | ohne verifizierte Domain nur an die Adresse deines Resend-Kontos   |
+
+Für den ersten Test reicht beides. Eine verifizierte Resend-Domain brauchst
+du erst, wenn die Einwilligungsmail an eine andere Adresse gehen soll — und
+für F-06f (Wiederherstellung vom Anmeldebildschirm).
+
+Wenn Supabase' Rate-Limit stört: eigenen SMTP-Anbieter unter
+Authentication → Emails hinterlegen.
+
+## 7 · Nach dem Deploy prüfen
+
+```bash
+curl -sI https://mytutr.de | grep -i "x-robots-tag\|strict-transport"
+curl -s  https://mytutr.de/robots.txt
+```
+
+Erwartet: `noindex, nofollow`, HSTS gesetzt, `Disallow: /`.
+
+Dann von Hand:
+
+1. `https://mytutr.de` → leitet auf `/heute`, von dort auf `/anmelden`
+   (der Dev-Actor ist in Produktion hart aus)
+2. Eltern-Anmeldung mit deiner Adresse → Mail kommt an, Link führt zurück
+3. Angemeldet, aber ohne Kind → leerer Zustand, keine Fehlermeldung
+4. Auf dem Handy: `/registrieren`, Kind anlegen, **Passkey mit Face ID/Fingerabdruck**
+   — das ist der Schritt, der über LAN nicht ging
+5. Einwilligungsmail prüfen, bestätigen → Elternkonto sieht das Kind
+6. Vokabelset anlegen, **Foto aus dem Vokabelheft** — der bisher ungetestete Fall
+7. Üben starten
+
+## Was bewusst offen bleibt
+
+- **S-03** (Content-Security-Policy, Rate Limits auf den KI-Endpunkten). Kein
+  Hindernis für einen privaten Familienzugang, aber offen — und mit einem
+  KI-Endpunkt hinter der Anmeldung der nächste Sicherheitsschritt.
+- **F-09** (Offline über Service Worker). Ohne ihn braucht Üben eine Verbindung.
+- **F-10** (echte Anmeldung in Playwright). Bis dahin läuft E2E gegen `next dev`.
+
+## Ab jetzt gilt
+
+**Migrationen werden nie mehr gelöscht** (CLAUDE.md). Bis hierher war ein
+Reset der Historie zulässig und ist zweimal passiert (ADR 0006 D9). Ab dem
+ersten Deploy ist jede Schemaänderung ein Schritt nach vorn.
