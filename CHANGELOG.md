@@ -6,6 +6,9 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- `docs/roadmap.md`: Arbeitsreihenfolge in die Breite statt in die Tiefe – von jedem Bereich (Tutor, Hausaufgabe, Kalender, Material, Prüfen, Heute) erst eine schmale, aber echte Fassung, dann Runde für Runde vertiefen. Ordnet Konzept §12 neu, ohne der Spezifikation zu widersprechen. Trägt jetzt, weil der prüfungskritische Weg (Vokabeln) fertig ist. Enthält je Bereich eine Reifeleiter in drei Stufen und benennt ausdrücklich, **was sich nicht reduzieren lässt** – Hinweisleiter vor jeder Lösung, Sprachwächter, RLS auf `tutor_sessions`, Kontext-Chip, Quellenangabe, Rate Limits: Regeln, die zur ersten Fassung eines Bereichs gehören, nicht zu einer Härtungsrunde danach
+- **F-16** als Blocker aufgenommen: `insert into subject` steht heute nur im Seed-Skript, `school_year` ebenso. Nach der Registrierung ist die Fachauswahl deshalb leer – kein Set, keine Vokabeln, kein Üben, kein Termin, kein Thema. Muss vor allem Weiteren kommen
+
 - `docs/deploy.md`: Beim Prüfen des Mailwegs nie `@example.com` verwenden, sondern `delivered@resend.dev`. Resend weist `example.com` ausdrücklich ab – aber erst beim Senden der Nachricht, nicht schon bei der Empfängerprüfung, sodass ein Test dagegen wie ein kaputtes SMTP-Setup aussieht. Beim ersten Deploy hat genau das über eine Stunde Fehlersuche gekostet: Port, Passwort und Verschlüsselung wurden nacheinander verdächtigt, während nur die Testadresse falsch war
 
 ### Added
