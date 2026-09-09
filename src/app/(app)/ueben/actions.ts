@@ -233,6 +233,26 @@ export async function submitAnswer(input: {
     return { outcome };
   });
 
-  revalidatePath("/ueben");
   return result;
+}
+
+/**
+ * Die Fällig-Zahlen der Übersicht auffrischen (V-02-Nachtrag). Läuft
+ * **einmal beim Verlassen der Session**, nicht nach jeder Antwort.
+ *
+ * Vorher stand `revalidatePath("/ueben")` am Ende von `submitAnswer()` –
+ * bei jeder einzelnen Antwort. `loadDueBySubject()` ist aber eine
+ * Aggregation über alle Karten, und Next rendert die Seite dafür komplett
+ * neu. Der „Weiter"-Knopf blieb so lange deaktiviert, bis das durch war:
+ * spürbare Verzögerung zwischen Antwort und Rückmeldung, obwohl
+ * `submitAnswer()` selbst nur eine Zeile schreibt. Gefunden beim Testen.
+ *
+ * Während der Session selbst braucht es das nicht – der Fortschritt in der
+ * Kopfzeile kommt aus dem clientseitigen `SessionState`, nicht aus dieser
+ * Zahl (siehe Kommentar in `practice-session.tsx`). Erst die Übersicht, zu
+ * der man nach „Geschafft" oder einem Ausstieg zurückkehrt, muss wieder
+ * stimmen.
+ */
+export async function refreshDueOverview(): Promise<void> {
+  revalidatePath("/ueben");
 }
