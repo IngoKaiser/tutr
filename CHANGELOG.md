@@ -22,6 +22,17 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
   im Nachhinein nicht mehr rekonstruieren. Jetzt geht die Ursache ins Serverlog, eine passende
   deutsche Meldung auf den Bildschirm
 
+### Fixed
+
+- **Übungssession: spürbare Verzögerung nach jeder Antwort.** `submitAnswer()` rief
+  `revalidatePath("/ueben")` bei jeder einzelnen Antwort auf – `loadDueBySubject()` ist aber eine
+  Aggregation über alle Karten, und Next rendert die Übersicht dafür komplett neu. Der
+  „Weiter"-Knopf blieb so lange deaktiviert, bis das durch war: rund drei Sekunden zwischen
+  Antwort und Rückmeldung, obwohl `submitAnswer()` selbst nur eine Zeile schreibt. Gefunden beim
+  eigenen Testen des Nutzers. Die Zahlen der Übersicht frischen jetzt einmal auf, wenn die Session
+  verlassen wird (`refreshDueOverview()`), nicht mehr nach jeder Karte – der Fortschritt in der
+  Kopfzeile kam ohnehin schon aus dem clientseitigen Sitzungszustand, nicht aus dieser Abfrage
+
 - `docs/roadmap.md`: Arbeitsreihenfolge in die Breite statt in die Tiefe – von jedem Bereich (Tutor, Hausaufgabe, Kalender, Material, Prüfen, Heute) erst eine schmale, aber echte Fassung, dann Runde für Runde vertiefen. Ordnet Konzept §12 neu, ohne der Spezifikation zu widersprechen. Trägt jetzt, weil der prüfungskritische Weg (Vokabeln) fertig ist. Enthält je Bereich eine Reifeleiter in drei Stufen und benennt ausdrücklich, **was sich nicht reduzieren lässt** – Hinweisleiter vor jeder Lösung, Sprachwächter, RLS auf `tutor_sessions`, Kontext-Chip, Quellenangabe, Rate Limits: Regeln, die zur ersten Fassung eines Bereichs gehören, nicht zu einer Härtungsrunde danach
 - **F-16** als Blocker aufgenommen: `insert into subject` steht heute nur im Seed-Skript, `school_year` ebenso. Nach der Registrierung ist die Fachauswahl deshalb leer – kein Set, keine Vokabeln, kein Üben, kein Termin, kein Thema. Muss vor allem Weiteren kommen
 

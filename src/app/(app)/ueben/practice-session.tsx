@@ -15,6 +15,7 @@ import {
 
 import {
   loadSessionCards,
+  refreshDueOverview,
   submitAnswer,
   type DueBySubject,
   type SessionCardContent,
@@ -80,6 +81,10 @@ export function PracticeSession({
     setSession(null);
     setCards([]);
     setPhase("wahl");
+    // Erst jetzt auffrischen, nicht nach jeder Antwort (V-02-Nachtrag) –
+    // die Übersicht ist ohnehin schon frisch angefordert, sobald sie wieder
+    // sichtbar wird; die Zahlen müssen nur bis dahin stimmen.
+    void refreshDueOverview();
   }
 
   if (phase === "fertig") {
