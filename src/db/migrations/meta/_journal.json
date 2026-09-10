@@ -50,6 +50,13 @@
       "when": 1789017648005,
       "tag": "0006_sweet_the_captain",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789022058142,
+      "tag": "0007_third_doctor_strange",
+      "breakpoints": true
     }
   ]
 }

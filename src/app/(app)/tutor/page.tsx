@@ -1,45 +1,65 @@
-import { Block, Notice, ContextChip, ReadingText, PageHeader } from "@/components/shell/primitives";
+import { redirect } from "next/navigation";
+
+import { Block, Notice, PageHeader } from "@/components/shell/primitives";
+import { loginStatus } from "@/lib/auth/actor";
+import { anthropicConfigured } from "@/lib/env";
+
+import { loadSession, loadTutorOverview } from "./actions";
+import { TutorChat } from "./chat";
 
 export const metadata = { title: "Tutor · tutr" };
 
 /**
- * Konzept §5 und §15: Der Kontext-Chip steht immer über der Eingabe, damit
- * jederzeit sichtbar ist, worüber geredet wird. Einstiegs-Chips als Abkürzung,
- * „Hausaufgabe" am prominentesten.
+ * Der Tutor-Chat (T-02, Konzept §4/§15, ADR 0010).
+ *
+ * Stufe 1: ein Chatfenster, Kontext-Chip mit Fach, zwei Einstiege (freie
+ * Frage und „Verstehen"), Antworten aus Allgemeinwissen – ausdrücklich als
+ * solche gekennzeichnet. Kontextpaket, Schichten und „Erklär es anders"
+ * sind Stufe 2 (T-01/T-02c).
+ *
+ * Für Eltern gibt es hier nichts (ADR 0010 D2): kein Verlauf, keine
+ * Zusammenfassung. Der Zweizeiler für die Elternsicht kommt mit T-03.
  */
-const STARTERS = ["Hausaufgabe", "Verstehen", "Vorschau", "Prüfung", "Nachbereitung"] as const;
+export default async function TutorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ s?: string }>;
+}) {
+  const { actor } = await loginStatus();
+  if (!actor) redirect("/anmelden");
 
-export default function TutorPage() {
-  return (
-    <div className="flex flex-col gap-3">
-      <PageHeader title="Tutor" />
-
-      <Block>
-        <ReadingText>
-          Reflexive Verben beschreiben eine Handlung, die auf die handelnde Person zurückwirkt. Im
-          Deutschen steht dafür „sich“ — im Französischen ändert sich das Pronomen mit der Person.
-        </ReadingText>
-      </Block>
-
-      <div className="flex flex-wrap gap-1.5">
-        {STARTERS.map((e, i) => (
-          <span
-            key={e}
-            className={`rounded-md border px-2.5 py-1.5 text-xs font-medium ${
-              i === 0
-                ? "border-koenigsblau bg-koenigsblau-hell text-koenigsblau"
-                : "border-linie-stark bg-flaeche text-tinte-weich"
-            }`}
-          >
-            {e}
-          </span>
-        ))}
+  if (actor.role !== "student") {
+    return (
+      <div className="flex flex-col gap-3">
+        <PageHeader title="Tutor" />
+        <Block>
+          <Notice>
+            Der Tutor ist die Lernseite deines Kindes. Gespräche mit dem Tutor bleiben zwischen Kind
+            und Tutor – du siehst später Termine, Fortschritt und Zusammenfassungen, nicht den Chat.
+          </Notice>
+        </Block>
       </div>
+    );
+  }
 
-      <Block>
-        <ContextChip subject="Französisch" topic="Les verbes pronominaux" />
-        <Notice>Frag etwas, sprich oder fotografiere die Aufgabe.</Notice>
-      </Block>
-    </div>
+  const { s } = await searchParams;
+  const [overview, active] = await Promise.all([
+    loadTutorOverview(),
+    s ? loadSession(s) : Promise.resolve(null),
+  ]);
+
+  // `key` bindet den Client-Zustand an das gewählte Gespräch: Ein Klick auf
+  // ein anderes Gespräch (echte Navigation) baut die Komponente frisch aus
+  // den neuen Props auf. Ein **neu** begonnenes Gespräch navigiert dagegen
+  // nicht, sondern schreibt nur die URL um – so bricht der laufende Stream
+  // nicht ab.
+  return (
+    <TutorChat
+      key={s ?? "neu"}
+      overview={overview}
+      active={active}
+      activeId={s ?? null}
+      available={anthropicConfigured()}
+    />
   );
 }

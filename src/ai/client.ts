@@ -32,6 +32,9 @@ import { vocabExtractionSchema, type VocabExtraction } from "./schemas/vocab-ext
 
 const VISION_MODEL = "claude-sonnet-5";
 
+/** CLAUDE.md: „Sonnet für Tutor". Eine Konstante, damit ein Wechsel eine Zeile ist. */
+const TUTOR_MODEL = "claude-sonnet-5";
+
 /** Ein Bild, wie es aus dem Browser kommt – Base64 ohne `data:`-Präfix. */
 export type InlineImage = {
   base64: string;
@@ -87,4 +90,29 @@ export async function extractVocabularyFromImage(
     throw new Error("Die Bilderkennung hat keine verwertbare Antwort geliefert.");
   }
   return message.parsed_output;
+}
+
+/** Ein Gesprächsbeitrag, wie ihn das Modell erwartet. */
+export type TutorTurn = { role: "user" | "assistant"; content: string };
+
+/**
+ * Startet die Tutor-Antwort als Stream (T-02, ADR 0010 D1).
+ *
+ * Gibt den rohen `MessageStream` des SDK zurück – der Route Handler hängt
+ * sich mit `.on("text", …)` an die Wortdeltas und liest nach `.finalMessage()`
+ * die verbrauchten Token. **Kein** Structured Output: Streaming und ein
+ * Zod-Schema schließen sich aus (ADR 0010 D1). Die Kennzeichnung
+ * „Allgemeinwissen" setzt deshalb der Server, nicht das Modell (D5).
+ *
+ * `max_tokens` großzügig, aber nicht üppig: Eine Erklärung für Jahrgang 8
+ * liegt bei 300–600 Tokens; 1200 lässt Luft, ohne zu einem Vortrag
+ * einzuladen.
+ */
+export function streamTutorReply(system: string, verlauf: TutorTurn[]) {
+  return anthropic().messages.stream({
+    model: TUTOR_MODEL,
+    max_tokens: 1200,
+    system,
+    messages: verlauf.map((turn) => ({ role: turn.role, content: turn.content })),
+  });
 }

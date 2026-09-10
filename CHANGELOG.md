@@ -18,6 +18,30 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **T-02: der Tutor-Chat, schmale Fassung.** Die Seite „Tutor" ist echt (statt der Attrappe aus
+  F-07): ein Chatfenster mit Kontext-Chip (Fach), zwei Einstiegen – **freie Frage** und
+  **„Verstehen"** – und einer **streamenden** Antwort, Wort für Wort statt Spinner. Der Verlauf
+  liegt in `tutor_session`/`tutor_message` mit RLS **von Anfang an** und **nur fürs Kind**: Für
+  Eltern gibt es keine Policy, also keinen Zugriff – strukturell, nicht nur in der Oberfläche
+  ([ADR 0004](docs/adr/0004-datenmodell-rls.md) D3, [ADR 0010](docs/adr/0010-tutor-architektur.md)
+  D2). Die Zusammenfassung für Eltern (`tutor_session_summary`) kommt erst mit T-03, wo sie etwas
+  zu tragen hat. Jede Antwort trägt einen festen Hinweis „Allgemeinwissen — noch ohne dein
+  Material und dein Lehrwerk" – den setzt der Server, nicht das Modell (ADR 0010 D5). Frühere
+  Gespräche bleiben über eine Liste erreichbar. Der eine streamende Endpunkt
+  (`POST /api/tutor`) ist die einzige dokumentierte Ausnahme von der Server-Action-Regel
+  (ADR 0010 D1).
+- **T-02a: Sprachwächter.** Der Systemprompt fixiert Deutsch; in Fremdsprachenfächern sind
+  Zielsprache in Beispielen und Vokabeln erlaubt, die Erklärung drumherum bleibt deutsch
+  (`subject.language` entscheidet, nicht der Fachname). Nach dem Streamen prüft ein reiner,
+  API-freier Detektor (`istDeutsch()`, Funktionswort-Heuristik) die Antwort und schreibt das
+  Ergebnis an `tutor_message.language_ok` – **gemessen, nicht blockiert** (Streaming und
+  Vorabprüfung schließen sich aus, ADR 0010 D3). Der Astra-Fehler („Hey! Cool that you're
+  here…" in einer deutschen Lektion) ist damit per Test ausgeschlossen.
+- **S-03b: Kostendeckel für KI-Endpunkte.** Ab dem ersten Tutor-Klick kostet jede Frage Geld
+  (~1,1 ct). `ai_usage` zählt die Aufrufe je Kind über ein gleitendes Fenster – **20 pro
+  Stunde, 60 pro Tag** –, geprüft **vor** dem Modellaufruf. Beim Überschreiten eine 429 mit
+  einem deutschen Satz, der sagt, _wann es weitergeht_, nicht „Rate limit exceeded". Zähler in
+  Postgres, kein Redis; aufgeräumt wird beim Schreiben (ADR 0010 D4).
 - **K-01: Prüfungskalender, Termine von Hand.** Neue Seite „Prüfungen" (statt der Attrappe aus
   F-07): Termin anlegen (Fach, Art, Titel, Datum), Liste in drei Fenstern – **kommend** (nächste
   vier Wochen), **später im Schuljahr**, **vergangen & abgesagt** (Historie). Bearbeiten an Ort
