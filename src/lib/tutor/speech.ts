@@ -83,29 +83,67 @@ export function diktatAnhaengen(bisher: string, neu: string): string {
   return /\s$/.test(bisher) ? bisher + rechts : `${bisher} ${rechts}`;
 }
 
+/** Alle Stimmen einer Sprachfamilie (`de` deckt `de-DE`, `de-AT`, `de-CH`). */
+export function stimmenFuerSprache(
+  stimmen: readonly SpeechSynthesisVoice[],
+  sprache = "de-DE",
+): SpeechSynthesisVoice[] {
+  const familie = sprache.split("-")[0]!.toLowerCase();
+  return stimmen.filter((v) => v.lang.toLowerCase().startsWith(familie));
+}
+
 /**
- * Wählt die beste Stimme für eine Sprache (Standard Deutsch, ADR 0011 D2).
+ * Güte einer Systemstimme, höher ist besser (T-07b).
  *
- * Vorrang für **lokale** Stimmen (`localService`): Manche Systemstimmen sind
- * netzgebunden, und der Sinn dieses Wegs ist ja, dass nichts nach außen
- * geht. Reihenfolge: exakte Sprache + lokal → exakte Sprache → Sprachfamilie
- * (`de` deckt `de-DE`, `de-AT`) + lokal → Sprachfamilie → nichts (dann nimmt
- * der Browser seine Vorgabe).
+ * `speechSynthesis` liefert auf einem Gerät oft mehrere deutsche Stimmen:
+ * die alte, kompakte „Anna" (roboterhaft) neben neueren neuronalen Stimmen
+ * („… (Premium)", „… (Enhanced)", Siri). Die alte Auswahl bevorzugte
+ * `localService` – und traf damit auf iOS genau die kompakte. Jetzt zählt
+ * zuerst die **Qualität**, `localService` nur noch als Gleichstand-Brecher
+ * (der Weg soll das Gerät möglichst nicht verlassen, ADR 0011 D2).
+ *
+ * Die Erkennung läuft über den **Namen**, weil die Web Speech API kein
+ * Qualitätsfeld hat. Das ist eine Heuristik, kein Vertrag – deshalb steht
+ * die manuelle Auswahl (`use-speech.ts`) daneben.
+ */
+export function stimmGuete(stimme: SpeechSynthesisVoice): number {
+  const name = stimme.name.toLowerCase();
+  let punkte = 0;
+  if (/premium|enhanced|neural|natural/.test(name)) punkte += 4;
+  if (/siri/.test(name)) punkte += 3;
+  // „compact" / „eloquence" sind die alten, schlechten – aktiv abwerten.
+  if (/compact|eloquence/.test(name)) punkte -= 3;
+  if (stimme.localService) punkte += 1;
+  if (stimme.default) punkte += 0.5;
+  return punkte;
+}
+
+/**
+ * Die deutschen Stimmen, beste zuerst. Für die Auswahlliste im Composer.
+ *
+ * Sortiert zuerst nach Güte (`stimmGuete`), bei Gleichstand kommt die
+ * exakt passende Region zuerst (`de-DE` vor `de-AT` für `sprache = "de-DE"`),
+ * danach der Name für ein stabiles Ergebnis.
+ */
+export function deutscheStimmenSortiert(
+  stimmen: readonly SpeechSynthesisVoice[],
+  sprache = "de-DE",
+): SpeechSynthesisVoice[] {
+  const ziel = sprache.toLowerCase();
+  const rang = (v: SpeechSynthesisVoice) =>
+    stimmGuete(v) + (v.lang.toLowerCase() === ziel ? 0.25 : 0);
+  return [...stimmenFuerSprache(stimmen, sprache)].sort(
+    (a, b) => rang(b) - rang(a) || a.name.localeCompare(b.name, "de"),
+  );
+}
+
+/**
+ * Die beste verfügbare Stimme für eine Sprache (Standard Deutsch, ADR 0011
+ * D2). `null`, wenn keine passt – dann nimmt der Browser seine Vorgabe.
  */
 export function waehleDeutscheStimme(
   stimmen: readonly SpeechSynthesisVoice[],
   sprache = "de-DE",
 ): SpeechSynthesisVoice | null {
-  if (stimmen.length === 0) return null;
-  const familie = sprache.split("-")[0]!.toLowerCase();
-  const passtGenau = (v: SpeechSynthesisVoice) => v.lang.toLowerCase() === sprache.toLowerCase();
-  const passtFamilie = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().startsWith(familie);
-
-  return (
-    stimmen.find((v) => passtGenau(v) && v.localService) ??
-    stimmen.find(passtGenau) ??
-    stimmen.find((v) => passtFamilie(v) && v.localService) ??
-    stimmen.find(passtFamilie) ??
-    null
-  );
+  return deutscheStimmenSortiert(stimmen, sprache)[0] ?? null;
 }
