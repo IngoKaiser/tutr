@@ -84,6 +84,17 @@ test.describe("Tutor-Chat als Kind", () => {
     // Der feste Herkunfts-Hinweis unter der Tutor-Antwort (ADR 0010 D5).
     await expect(page.getByText(/Allgemeinwissen — noch ohne dein Material/).first()).toBeVisible();
 
+    // --- Vorlesen (T-02d): Knopf da, Schalter merkt sich den Zustand ----
+    await expect(page.getByRole("button", { name: "Vorlesen" }).first()).toBeVisible();
+    const schalter = page.getByRole("button", { name: /Vorlesen: (an|aus)/ });
+    await expect(schalter).toHaveText("Vorlesen: aus");
+    await schalter.click();
+    await expect(schalter).toHaveText("Vorlesen: an");
+    await page.reload();
+    await expect(page.getByRole("button", { name: /Vorlesen: (an|aus)/ })).toHaveText(
+      "Vorlesen: an",
+    );
+
     // --- Über „Frühere Gespräche" wieder hinfinden ---------------------
     // Titel mit dem Worker-eigenen Präfix suchen: Bei parallelen Projekten
     // legt jeder Worker eine eigene „Reflexive Verben"-Session an, und RLS
@@ -110,5 +121,60 @@ test.describe("Tutor-Chat als Kind", () => {
     await expect(page.getByLabel("Fach")).toContainText("Französisch");
     await expect(page.getByText("Freie Frage")).toBeVisible();
     await expect(page.getByText("Verstehen")).toBeVisible();
+  });
+
+  test("Diktat füllt das Feld und stoppt von selbst (T-02b)", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+
+    // Die Web Speech API gibt es im Test-Browser nicht – ein minimaler Stub
+    // an ihrer Stelle. Er liefert nach dem Start ein Ergebnis und beendet
+    // sich dann selbst, wie es die echte API bei `continuous = false` tut.
+    // Bewusst ohne Klassensyntax mit privaten Feldern: Playwright transpiliert
+    // das Init-Skript, und die Babel-Helfer dafür gibt es im Seitenkontext
+    // nicht („_classPrivateMethodInitSpec is not defined").
+    await page.addInitScript(() => {
+      type Rueckruf = { onresult: ((e: unknown) => void) | null; onend: (() => void) | null };
+      function FakeRecognition(this: Rueckruf) {
+        this.onresult = null;
+        this.onend = null;
+      }
+      FakeRecognition.prototype.start = function (this: Rueckruf) {
+        const alt = { transcript: "wie kürzt man Brüche" };
+        const eintrag = { isFinal: true, length: 1, item: () => alt, 0: alt };
+        const results = { length: 1, item: () => eintrag, 0: eintrag };
+        setTimeout(() => {
+          if (this.onresult) this.onresult({ resultIndex: 0, results });
+          if (this.onend) this.onend();
+        }, 30);
+      };
+      FakeRecognition.prototype.stop = function (this: Rueckruf) {
+        if (this.onend) this.onend();
+      };
+      FakeRecognition.prototype.abort = function () {};
+      (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = FakeRecognition;
+    });
+
+    await page.goto("/heute");
+    await page.getByLabel("Kind").selectOption({ label: "Mia" });
+    const kind = page.getByRole("button", { name: "Kind" });
+    await kind.click();
+    await expect(kind).toHaveAttribute("aria-pressed", "true");
+
+    await page.goto("/tutor");
+    const mikro = page.getByRole("button", { name: "Diktieren" });
+    await expect(mikro).toBeVisible();
+    await mikro.click();
+
+    // Erste Nutzung: der Hinweis auf den Datenweg (ADR 0011 D1).
+    await expect(
+      page.getByText(/schickt dein Browser die Aufnahme an seinen Hersteller/),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Verstanden, los" }).click();
+
+    // Der erkannte Text landet im Feld – und bleibt dort editierbar.
+    const feld = page.getByRole("textbox");
+    await expect(feld).toHaveValue(/wie kürzt man Brüche/);
+    // Der Stub beendet sich selbst → „hört zu" ist wieder weg.
+    await expect(page.getByText(/tutr hört zu/)).toHaveCount(0);
   });
 });
