@@ -6,6 +6,22 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **T-08 / T-09: der Tutor liest sich besser und trifft den Jahrgang.** Zwei Punkte aus der
+  Rückmeldung am Live-Chat.
+  **Markdown** — die Antwort kommt strukturiert (`**fett**`, Listen, Absätze), stand aber
+  wörtlich im Chat. Jetzt gerendert über `react-markdown` + `remark-gfm`, jedes Element an die
+  Designtokens gebunden. **Kein rohes HTML**: die Bibliothek interpretiert HTML im Text
+  standardmäßig nicht, damit ist der Weg XSS-frei ohne Sanitizer. Gerendert wird erst, wenn die
+  Antwort steht — während des Streamens bleibt es Klartext, sonst würde halbfertiges `**` bei
+  jedem Wort umspringen. Der Systemprompt hat dazu einen FORMAT-Block bekommen: kurze Absätze,
+  Fettung sparsam, keine Überschriften bei kurzen Antworten.
+  **Jahrgang** — der Prompt sagte bisher fest „einer Schülerin in Jahrgang 8". Das war für
+  jedes andere Kind falsch und hat nebenbei gegendert (Kind-Profile sind pseudonym, es gibt
+  kein Geschlecht). Jetzt staffelt `tonNachJahrgang()` die Tonlage nach `student.grade_level` in
+  drei Stufen — Unterstufe: kurze Sätze, Alltagsbild vor dem Fachbegriff; Mittelstufe:
+  Fachsprache mit Einführung; Oberstufe: herleiten statt vereinfachen. Die Ansprache ist
+  durchgängig „du", ohne Rollen- oder Geschlechtsbezeichnung.
+
 - **Ladezeiten der angemeldeten Seiten.** Ein Aufbau von `/faecher/vokabeln` kostete über
   **dreißig Netzwerkrunden** zur Datenbank. Zwei Ursachen, beide behoben:
   `loginStatus()` lief viermal je Seite (Layout, Seite und zwei Loader mit je

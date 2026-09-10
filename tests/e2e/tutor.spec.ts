@@ -59,8 +59,11 @@ test.describe("Tutor als Kind", () => {
     sessionId = row!.id;
     // Die Tutor-Antwort ist absichtlich lang: Nur mit überlaufendem Inhalt
     // lässt sich prüfen, dass der Composer klebt und der ↓-Knopf erscheint.
+    // Und sie trägt Markdown (**fett**, Liste), damit der T-08-Renderer im
+    // E2E einen echten Fall bekommt.
     const langeAntwort =
-      `${PREFIX} Ein reflexives Verb wirkt auf die handelnde Person zurueck.\n\n` +
+      `${PREFIX} Ein **reflexives Verb** wirkt auf die handelnde Person zurueck.\n\n` +
+      "Merke dir:\n\n- Das Pronomen passt zur Person\n- Es steht vor dem Verb\n\n" +
       "Beispielzeile fuer genug Hoehe im Gespraech.\n".repeat(40);
     await admin`
       insert into tutor_message (student_id, session_id, role, content) values
@@ -106,6 +109,13 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByText(/Ich verstehe die reflexiven Verben nicht/)).toBeVisible();
     await expect(page.getByText(/wirkt auf die handelnde Person zurueck/)).toBeVisible();
     await expect(page.getByText(/Allgemeinwissen — noch ohne dein Material/).first()).toBeVisible();
+
+    // Markdown wird gerendert, nicht wörtlich angezeigt (T-08).
+    await expect(page.getByText("reflexives Verb")).toHaveJSProperty("tagName", "STRONG");
+    await expect(page.getByText(/\*\*reflexives Verb\*\*/)).toHaveCount(0);
+    const punkt = page.getByText("Das Pronomen passt zur Person", { exact: true });
+    await expect(punkt).toBeVisible();
+    await expect(punkt).toHaveJSProperty("tagName", "LI");
 
     // Vorlesen (T-02d): Knopf an der Antwort, Schalter merkt sich den Zustand.
     await expect(page.getByRole("button", { name: "Vorlesen" }).first()).toBeVisible();
