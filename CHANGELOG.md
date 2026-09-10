@@ -6,6 +6,15 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **V-11: Vokabeln per Wischen löschen, mit Rückgängig statt Rückfrage.** Der Knopf hieß
+  „Das ist keine Vokabel – löschen“ und steckte im Bearbeiten-Zustand – jetzt lässt sich
+  jede Zeile nach links wegwischen (auf dem Handy der schnelle Weg), was einen roten
+  „Löschen“-Knopf freilegt; für Tastatur und Maus bleibt derselbe Knopf im aufgeklappten
+  Zustand. Statt eines Bestätigungsdialogs verschwindet die Zeile sofort und eine
+  „Rückgängig“-Leiste steht 5 Sekunden – erst danach löscht der Server wirklich. Wer die
+  Seite vorher verlässt, dessen Löschung wird ausgeführt, nicht verworfen. Gilt für die
+  Vokabelliste eines Sets und die Liste der Vokabeln ohne Set.
+
 - **V-10: Foto-Import sammelt erst, liest dann ein.** Die Kamera startete die Verarbeitung
   bislang sofort bei der Auswahl – ein Bild, dann warten. Jetzt wie beim Laden aus der
   Mediathek: so viele Bilder aufnehmen oder laden wie nötig, jedes einzeln noch drehen (↻,

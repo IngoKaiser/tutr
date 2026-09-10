@@ -156,12 +156,17 @@ test.describe("Vokabelverwaltung", () => {
 
     await expect(page.getByText("2 Zeilen solltest du prüfen.")).toBeVisible({ timeout: 10_000 });
 
-    // --- Löschen: eine Zeile, die gar keine Vokabel ist --------------------
+    // --- Löschen mit Rückgängig-Fenster (V-11) ---------------------------
+    // Der „Löschen"-Knopf im Bearbeiten-Zustand ist jetzt der Tastatur-/
+    // Rechnerweg; auf dem Handy geht es per Wischen. Die Zeile verschwindet
+    // sofort, die eigentliche Löschung läuft nach 5 s (oder beim Verlassen
+    // der Seite, siehe die Navigation gleich darunter).
     await page.getByRole("button", { name: new RegExp(GAMMA) }).click();
-    await page.getByRole("button", { name: "Das ist keine Vokabel – löschen" }).click();
+    await page.getByRole("button", { name: "Löschen" }).click();
     await expect(page.getByRole("button", { name: new RegExp(GAMMA) })).toHaveCount(0, {
       timeout: 10_000,
     });
+    await expect(page.getByRole("button", { name: "Rückgängig" })).toBeVisible();
 
     // --- Eine Ebene höher, ohne Umweg über die Fußleiste -------------------
     // Die Fußleiste kennt nur die fünf Bereiche; ohne diesen Link käme man aus
@@ -204,13 +209,21 @@ test.describe("Vokabelverwaltung", () => {
     const inhaltOhneSet = page.getByRole("main");
     await expect(inhaltOhneSet.locator("ul > li")).toHaveCount(3);
 
-    // Eine Waise vollständig löschen (kaskadiert auf Karten, Reviews).
+    // Eine Waise vollständig löschen (kaskadiert auf Karten, Reviews). Seit
+    // V-11 mit Rückgängig-Fenster: Die Zeile geht sofort, die DB-Löschung
+    // erst, wenn das Fenster zu ist – hier warten wir, bis die Rückgängig-
+    // Leiste wieder verschwindet, bevor wir den Kaskaden-Effekt prüfen.
     await page.getByRole("button", { name: new RegExp(ALPHA) }).click();
-    const loeschen = page.getByRole("button", { name: "Vokabel löschen" });
+    const loeschen = page.getByRole("button", { name: "Löschen" });
     await expect(loeschen).toBeVisible();
     await loeschen.click();
 
     await expect(inhaltOhneSet.locator("ul > li")).toHaveCount(2, { timeout: 10_000 });
+    // Warten, bis das Rückgängig-Fenster zu ist – erst dann läuft die
+    // eigentliche (kaskadierende) Löschung.
+    await expect(page.getByRole("button", { name: "Rückgängig" })).toHaveCount(0, {
+      timeout: 10_000,
+    });
     const db = admin;
     await expect
       .poll(
