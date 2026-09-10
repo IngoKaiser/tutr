@@ -82,6 +82,9 @@ type FotoEintrag = {
   status: FotoStatus;
   fehler: string | null;
   ergebnis: AddSummary | null;
+  /** Handdrehung in Grad (0/90/180/270), aus dem ↻-Knopf – für Seiten, deren
+   *  EXIF-Orientierung fehlt oder falsch ist (V-10). */
+  rotation: number;
 };
 
 /** Exportiert nur für den Komponententest der Foto-Galerie (V-03c). */
@@ -148,33 +151,40 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
    * Direkt aufrufbar für „Nochmal" – dieselbe Funktion, kein eigener
    * Retry-Pfad, weil ein wiederholter Versuch fachlich derselbe Vorgang ist.
    */
-  async function verarbeiteFoto(id: string, file: File) {
-    aktualisiereFoto(id, { status: "verkleinert", fehler: null, ergebnis: null });
+  async function verarbeiteFoto(eintrag: FotoEintrag) {
+    aktualisiereFoto(eintrag.id, { status: "verkleinert", fehler: null, ergebnis: null });
     try {
-      const image = await prepareImageForUpload(file);
-      aktualisiereFoto(id, { status: "liest" });
+      const image = await prepareImageForUpload(eintrag.file, eintrag.rotation);
+      aktualisiereFoto(eintrag.id, { status: "liest" });
       const result = await addFromPhoto(setId, image);
 
       if (!result) {
-        aktualisiereFoto(id, { status: "fehler", fehler: "Dafür fehlt die Berechtigung." });
+        aktualisiereFoto(eintrag.id, { status: "fehler", fehler: "Dafür fehlt die Berechtigung." });
         return;
       }
       if (!result.ok) {
-        aktualisiereFoto(id, { status: "fehler", fehler: result.fehler });
+        aktualisiereFoto(eintrag.id, { status: "fehler", fehler: result.fehler });
         return;
       }
-      aktualisiereFoto(id, { status: "fertig", ergebnis: result.summary });
+      aktualisiereFoto(eintrag.id, { status: "fertig", ergebnis: result.summary });
     } catch {
-      aktualisiereFoto(id, {
+      aktualisiereFoto(eintrag.id, {
         status: "fehler",
         fehler: "Das Bild ließ sich nicht lesen. Versuch es noch einmal.",
       });
     }
   }
 
-  /** Neu ausgewählte Bilder nacheinander verarbeiten – ein Server-Aufruf je Bild (V-03b). */
-  async function verarbeiteNeueFotos(eintraege: FotoEintrag[]) {
-    for (const eintrag of eintraege) await verarbeiteFoto(eintrag.id, eintrag.file);
+  /**
+   * Erst sammeln, dann einlesen (V-10). Wie beim Laden aus der Mediathek:
+   * mehrere Bilder aufnehmen, einzeln wieder wegnehmen oder drehen, und den
+   * Server-Lauf selbst starten – nicht bei jeder Auswahl sofort. Verarbeitet
+   * werden nur die noch wartenden; ein Server-Aufruf je Bild (V-03b).
+   */
+  async function fotosEinlesen() {
+    for (const eintrag of fotos) {
+      if (eintrag.status === "wartet") await verarbeiteFoto(eintrag);
+    }
   }
 
   function fotosAusgewaehlt(files: File[]) {
@@ -186,9 +196,23 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
       status: "wartet",
       fehler: null,
       ergebnis: null,
+      rotation: 0,
     }));
     setFotos((prev) => [...prev, ...neu]);
-    void verarbeiteNeueFotos(neu);
+  }
+
+  /** Ein wartendes oder gescheitertes Bild wieder wegnehmen, bevor eingelesen wird. */
+  function fotoEntfernen(id: string) {
+    setFotos((prev) => {
+      const raus = prev.find((f) => f.id === id);
+      if (raus) URL.revokeObjectURL(raus.vorschauUrl);
+      return prev.filter((f) => f.id !== id);
+    });
+  }
+
+  /** Ein Bild um 90° weiterdrehen – für Seiten, deren Ausrichtung nicht stimmt. */
+  function fotoDrehen(id: string) {
+    setFotos((prev) => prev.map((f) => (f.id === id ? { ...f, rotation: f.rotation + 90 } : f)));
   }
 
   /**
@@ -215,6 +239,7 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
   }
 
   const verarbeitungLaeuft = fotos.some((f) => f.status === "verkleinert" || f.status === "liest");
+  const wartende = fotos.filter((f) => f.status === "wartet").length;
 
   if (mode === "geschlossen") {
     return (
@@ -237,9 +262,10 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
         {photoAvailable ? (
           <>
             <Notice>
-              Buchseite, Arbeitsblatt oder Vokabelheft. Mehrere Bilder auf einmal gehen – eine
-              Vokabelliste läuft oft über eine Doppelseite. Jedes Bild zählt für sich: Scheitert
-              eins, bleiben die anderen und lassen sich einzeln wiederholen. Die Fotos werden nicht
+              Buchseite, Arbeitsblatt oder Vokabelheft. Erst so viele Bilder aufnehmen oder laden,
+              wie du brauchst – eine Vokabelliste läuft oft über eine Doppelseite –, dann
+              „Einlesen“. Vorher lässt sich jedes Bild noch drehen oder wieder wegnehmen. Jedes Bild
+              zählt für sich: Scheitert eins, bleiben die anderen. Die Fotos werden nicht
               gespeichert.
             </Notice>
 
@@ -274,7 +300,11 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
             />
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => kameraRef.current?.click()} disabled={verarbeitungLaeuft}>
+              <Button
+                quiet
+                onClick={() => kameraRef.current?.click()}
+                disabled={verarbeitungLaeuft}
+              >
                 Kamera
               </Button>
               <Button
@@ -284,8 +314,17 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
               >
                 Bild auswählen
               </Button>
+              {wartende > 0 ? (
+                <Button onClick={() => void fotosEinlesen()} disabled={verarbeitungLaeuft}>
+                  {verarbeitungLaeuft
+                    ? "Wird eingelesen …"
+                    : wartende === 1
+                      ? "Einlesen"
+                      : `Einlesen (${wartende})`}
+                </Button>
+              ) : null}
               <Button quiet onClick={fotosSchliessen} disabled={verarbeitungLaeuft}>
-                {fotos.length > 0 ? "Fertig" : "Abbrechen"}
+                {fotos.some((f) => f.ergebnis !== null) ? "Fertig" : "Abbrechen"}
               </Button>
             </div>
 
@@ -296,7 +335,9 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
                     key={foto.id}
                     nummer={index + 1}
                     foto={foto}
-                    onNochmal={() => void verarbeiteFoto(foto.id, foto.file)}
+                    onNochmal={() => void verarbeiteFoto(foto)}
+                    onDrehen={() => fotoDrehen(foto.id)}
+                    onEntfernen={() => fotoEntfernen(foto.id)}
                   />
                 ))}
               </ul>
@@ -418,13 +459,20 @@ function FotoZeile({
   nummer,
   foto,
   onNochmal,
+  onDrehen,
+  onEntfernen,
 }: {
   nummer: number;
   foto: FotoEintrag;
   onNochmal: () => void;
+  onDrehen: () => void;
+  onEntfernen: () => void;
 }) {
   const istFehler = foto.status === "fehler";
   const istFertig = foto.status === "fertig";
+  // Vor dem Einlesen (oder nach einem Fehler) lässt sich das Bild noch
+  // drehen und wegnehmen – währenddessen und danach nicht mehr.
+  const bearbeitbar = foto.status === "wartet" || istFehler;
   return (
     <li
       className={`flex items-center gap-3 rounded-[9px] border px-3 py-2.5 ${
@@ -434,12 +482,15 @@ function FotoZeile({
       {/* Objekt-URL im Speicher des Tabs – dasselbe Bild, das an die
           Bilderkennung ging, nie das Original in voller Größe (`image.ts`
           verkleinert vor dem Hochladen, hier zeigt die Vorschau die
-          Originaldatei, weil das für eine Miniatur ohnehin reicht). */}
+          Originaldatei, weil das für eine Miniatur ohnehin reicht). Die
+          Drehung ist hier nur Vorschau; die echte Drehung passiert in
+          `prepareImageForUpload()`. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- Objekt-URL aus lokaler Datei, kein Next-Bildoptimierer nötig */}
       <img
         src={foto.vorschauUrl}
         alt=""
-        className="border-linie h-12 w-12 shrink-0 rounded-md border object-cover"
+        style={{ transform: `rotate(${foto.rotation}deg)` }}
+        className="border-linie h-12 w-12 shrink-0 rounded-md border object-cover transition-transform"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-tinte-leise text-[0.6875rem] font-semibold tracking-wide uppercase">
@@ -465,6 +516,26 @@ function FotoZeile({
         >
           Nochmal
         </button>
+      ) : null}
+      {bearbeitbar ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onDrehen}
+            aria-label={`Bild ${nummer} drehen`}
+            className="text-tinte-leise hover:text-koenigsblau rounded p-1 text-base leading-none"
+          >
+            <span aria-hidden="true">↻</span>
+          </button>
+          <button
+            type="button"
+            onClick={onEntfernen}
+            aria-label={`Bild ${nummer} entfernen`}
+            className="text-tinte-leise hover:text-offen rounded p-1 text-base leading-none"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
       ) : null}
     </li>
   );
