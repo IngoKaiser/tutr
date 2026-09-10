@@ -45,8 +45,38 @@ test.describe("Übungssession", () => {
     // Ein Block je Fach (V-06, ADR 0008 D3), nicht eine Zahl über alles –
     // die Seed-Daten haben fällige Vokabeln nur in Französisch.
     await expect(page.getByRole("heading", { name: "Französisch" })).toBeVisible();
-    await expect(page.getByText(/\d+ fällig/)).toBeVisible();
+    // V-06a: gezählt wird die Vokabel, nicht die Karte. Der Seed hat zwölf
+    // Vokabeln mit je zwei Karten – die Kachel zeigt 12, nicht 24.
+    await expect(page.getByText("12 fällig")).toBeVisible();
     await expect(page.getByText("Kommt mit V-04.")).toHaveCount(2);
+  });
+
+  test("Richtungsumschalter beschriftet sich aus der Fachsprache (V-06a)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
+    );
+    await page.goto("/heute");
+    const kindButton = page.getByRole("button", { name: "Kind" });
+    await kindButton.click();
+    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
+
+    await page.goto("/ueben");
+    const nichtsFaellig = await page
+      .getByText("Nichts fällig. Schau später wieder vorbei.")
+      .count();
+    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
+
+    // Französisch (`language: 'fr'` im Seed) → „FR → DE" / „DE → FR",
+    // nicht mehr fest getippt. Ein Frage-Antwort-Fach ohne Sprache hätte
+    // hier gar keinen Umschalter.
+    const richtung = page.getByRole("radiogroup", { name: "Richtung" });
+    await expect(richtung.getByRole("radio", { name: "Gemischt" })).toBeVisible();
+    await expect(richtung.getByRole("radio", { name: "FR → DE" })).toBeVisible();
+    await expect(richtung.getByRole("radio", { name: "DE → FR" })).toBeVisible();
   });
 
   test("eine Karte beantworten zeigt eine Rückmeldung, 'Weiter' bringt sichtbar weiter", async ({
@@ -57,7 +87,7 @@ test.describe("Übungssession", () => {
     // kleiner Viewport) bricht der Next-Dev-Server die Verbindung direkt
     // nach dem Rollenwechsel ab ("ECONNRESET") – von Hand nachgestellt
     // (Chromium, mobiler Viewport, identischer Ablauf) läuft derselbe Weg
-    // sofort korrekt und zeigt die echten 24 fälligen Karten. Kein Fund an
+    // sofort korrekt und zeigt die echten 12 fälligen Vokabeln (V-06a: je Vokabel eine Karte). Kein Fund an
     // der Anwendung, sondern dieselbe Art Engine-Lücke wie die fehlenden
     // virtuellen Authenticators in `passkey.spec.ts`.
     test.skip(

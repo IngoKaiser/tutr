@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 
 import { Block, Button, Notice, PageHeader, Stack } from "@/components/shell/primitives";
+import { directionLabels } from "@/lib/subjects/languages";
 import { buildMultipleChoiceOptions } from "@/lib/vocab/distractors";
 import {
   advance,
@@ -182,12 +183,18 @@ function SubjectBlock({
   const [pending, startTransition] = useTransition();
   const [loadError, setLoadError] = useState(false);
 
+  // Ohne Zielsprache am Fach gibt es keine Rückrichtung (V-06a) – dann kein
+  // Umschalter, und `direction` bleibt auf „gemischt" (die Abfrage liefert
+  // dann je Vokabel eine Karte).
+  const labels = directionLabels(subject.language);
+  const effektiveRichtung: DirectionChoice = labels ? direction : "gemischt";
+
   function start() {
     setLoadError(false);
     startTransition(async () => {
       const loaded = await loadSessionCards(
         subject.subjectId,
-        direction === "gemischt" ? null : direction,
+        effektiveRichtung === "gemischt" ? null : effektiveRichtung,
       );
       if (!loaded || loaded.length === 0) {
         setLoadError(true);
@@ -206,7 +213,9 @@ function SubjectBlock({
       />
       {canStart ? (
         <>
-          <DirectionPicker value={direction} onChange={setDirection} />
+          {labels ? (
+            <DirectionPicker value={direction} onChange={setDirection} labels={labels} />
+          ) : null}
           <Button onClick={start} disabled={pending}>
             {pending ? "Einen Moment …" : "Loslegen"}
           </Button>
@@ -224,14 +233,16 @@ function SubjectBlock({
 function DirectionPicker({
   value,
   onChange,
+  labels,
 }: {
   value: DirectionChoice;
   onChange: (value: DirectionChoice) => void;
+  labels: { vorwaerts: string; rueckwaerts: string };
 }) {
   const OPTIONS: { value: DirectionChoice; label: string }[] = [
     { value: "gemischt", label: "Gemischt" },
-    { value: "vorwaerts", label: "FR → DE" },
-    { value: "rueckwaerts", label: "DE → FR" },
+    { value: "vorwaerts", label: labels.vorwaerts },
+    { value: "rueckwaerts", label: labels.rueckwaerts },
   ];
   return (
     <div
