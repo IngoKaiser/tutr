@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Block, Button, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
 
 import type { SessionView, TutorOverview } from "./actions";
+import { useDiktat, useVorlesen } from "./use-speech";
 
 const FIELD =
   "border-linie-stark bg-flaeche text-tinte placeholder:text-tinte-leise focus-visible:outline-koenigsblau rounded-[9px] border px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1";
@@ -16,8 +17,17 @@ const HERKUNFT = "Allgemeinwissen — noch ohne dein Material und dein Lehrwerk.
 const NICHT_EINGERICHTET =
   "Der Tutor ist gerade nicht eingerichtet. Deine Vokabeln, Karten und der Prüfungskalender funktionieren weiter.";
 
+/** Einmaliger Hinweis vor der ersten Diktat-Nutzung (ADR 0011 D1, §. 2). */
+const DIKTAT_HINWEIS_KEY = "tutr:diktat-hinweis";
+const DIKTAT_HINWEIS =
+  "Zum Diktieren schickt dein Browser die Aufnahme an seinen Hersteller (bei Chrome an Google, bei Safari an Apple) und gibt den Text zurück. Nichts davon läuft über tutr, und die Aufnahme wird nirgends gespeichert.";
+
 type ChatMessage = { id: string; role: "nutzer" | "tutor"; content: string };
 type Draft = { subjectId: string; entryPoint: "freie_frage" | "verstehen" };
+type VorlesenSteuerung = ReturnType<typeof useVorlesen>;
+
+const MINI_BUTTON =
+  "border-linie-stark bg-flaeche text-tinte-weich hover:bg-papier-tief rounded-md border px-2 py-1 text-[0.6875rem] font-medium disabled:opacity-50";
 
 export function TutorChat({
   overview,
@@ -54,7 +64,15 @@ export function TutorChat({
 
 // --- gemeinsame Bausteine ---------------------------------------------
 
-function MessageList({ messages, streamText }: { messages: ChatMessage[]; streamText: string }) {
+function MessageList({
+  messages,
+  streamText,
+  vorlesen,
+}: {
+  messages: ChatMessage[];
+  streamText: string;
+  vorlesen: VorlesenSteuerung;
+}) {
   const endeRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endeRef.current?.scrollIntoView({ block: "end" });
@@ -64,9 +82,15 @@ function MessageList({ messages, streamText }: { messages: ChatMessage[]; stream
     <>
       <ol className="flex flex-col gap-2.5">
         {messages.map((m) => (
-          <MessageBubble key={m.id} role={m.role} content={m.content} />
+          <MessageBubble key={m.id} message={m} vorlesen={vorlesen} />
         ))}
-        {streamText ? <MessageBubble role="tutor" content={streamText} live /> : null}
+        {streamText ? (
+          <MessageBubble
+            message={{ id: "live", role: "tutor", content: streamText }}
+            vorlesen={vorlesen}
+            live
+          />
+        ) : null}
       </ol>
       <div ref={endeRef} />
     </>
@@ -74,15 +98,16 @@ function MessageList({ messages, streamText }: { messages: ChatMessage[]; stream
 }
 
 function MessageBubble({
-  role,
-  content,
+  message,
+  vorlesen,
   live = false,
 }: {
-  role: "nutzer" | "tutor";
-  content: string;
+  message: ChatMessage;
+  vorlesen: VorlesenSteuerung;
   live?: boolean;
 }) {
-  const istTutor = role === "tutor";
+  const istTutor = message.role === "tutor";
+  const spricht = vorlesen.sprichtId === message.id;
   return (
     <li className={`flex flex-col gap-1 ${istTutor ? "items-start" : "items-end"}`}>
       <div
@@ -92,11 +117,24 @@ function MessageBubble({
             : "border-koenigsblau bg-koenigsblau-hell text-tinte"
         }`}
       >
-        {content}
+        {message.content}
         {live ? <span className="text-tinte-leise"> ▍</span> : null}
       </div>
       {istTutor && !live ? (
-        <span className="text-tinte-leise text-[0.6875rem]">{HERKUNFT}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-tinte-leise text-[0.6875rem]">{HERKUNFT}</span>
+          {vorlesen.verfuegbar ? (
+            <button
+              type="button"
+              onClick={() =>
+                spricht ? vorlesen.stop() : vorlesen.liesVor(message.id, message.content)
+              }
+              className="text-koenigsblau text-[0.6875rem] font-medium"
+            >
+              {spricht ? "Stopp" : "Vorlesen"}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </li>
   );
@@ -109,8 +147,11 @@ function Composer({
   placeholder,
   label,
   value,
+  sprache,
   onChange,
   onSend,
+  onTippen,
+  vorlesen,
 }: {
   available: boolean;
   pending: boolean;
@@ -118,9 +159,46 @@ function Composer({
   placeholder: string;
   label: string;
   value: string;
+  sprache: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  onTippen: () => void;
+  vorlesen: VorlesenSteuerung;
 }) {
+  const [hinweisOffen, setHinweisOffen] = useState(false);
+  const diktat = useDiktat({ sprache, onText: onChange });
+
+  function mikrofon() {
+    if (diktat.hoert) {
+      diktat.umschalten(value);
+      return;
+    }
+    let bestaetigt = true;
+    try {
+      bestaetigt = window.localStorage.getItem(DIKTAT_HINWEIS_KEY) === "1";
+    } catch {
+      // localStorage nicht verfügbar – dann den Hinweis lieber jedes Mal zeigen.
+      bestaetigt = false;
+    }
+    if (!bestaetigt) {
+      setHinweisOffen(true);
+      return;
+    }
+    vorlesen.stop();
+    diktat.umschalten(value);
+  }
+
+  function hinweisWeg() {
+    try {
+      window.localStorage.setItem(DIKTAT_HINWEIS_KEY, "1");
+    } catch {
+      // egal
+    }
+    setHinweisOffen(false);
+    vorlesen.stop();
+    diktat.umschalten(value);
+  }
+
   if (!available) {
     return (
       <Block>
@@ -128,6 +206,7 @@ function Composer({
       </Block>
     );
   }
+
   return (
     <form
       onSubmit={(e) => {
@@ -136,24 +215,90 @@ function Composer({
       }}
       className="flex flex-col gap-2"
     >
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onSend();
-          }
-        }}
-        rows={2}
-        placeholder={placeholder}
-        className={`${FIELD} resize-none`}
-      />
-      <Button type="submit" disabled={disabled}>
-        {pending ? "Der Tutor schreibt …" : label}
-      </Button>
+      {hinweisOffen ? (
+        <Block>
+          <Notice>{DIKTAT_HINWEIS}</Notice>
+          <div className="flex gap-2">
+            <Button type="button" onClick={hinweisWeg}>
+              Verstanden, los
+            </Button>
+            <Button type="button" quiet onClick={() => setHinweisOffen(false)}>
+              Doch tippen
+            </Button>
+          </div>
+        </Block>
+      ) : null}
+
+      <div className="relative">
+        <textarea
+          value={value}
+          onChange={(e) => {
+            vorlesen.stop();
+            onTippen();
+            onChange(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          rows={2}
+          placeholder={placeholder}
+          className={`${FIELD} w-full resize-none ${diktat.verfuegbar ? "pr-11" : ""}`}
+        />
+        {diktat.verfuegbar ? (
+          <button
+            type="button"
+            onClick={mikrofon}
+            aria-pressed={diktat.hoert}
+            aria-label={diktat.hoert ? "Diktat beenden" : "Diktieren"}
+            className={`absolute top-2 right-2 rounded-md border px-2 py-1 text-xs font-medium ${
+              diktat.hoert
+                ? "border-koenigsblau bg-koenigsblau text-auf-koenigsblau"
+                : "border-linie-stark bg-flaeche text-tinte-weich hover:bg-papier-tief"
+            }`}
+          >
+            {diktat.hoert ? "● Stopp" : "🎤"}
+          </button>
+        ) : null}
+      </div>
+
+      {diktat.hoert ? (
+        <span className="text-koenigsblau text-[0.6875rem] font-medium">tutr hört zu …</span>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-3">
+        <Button type="submit" disabled={disabled}>
+          {pending ? "Der Tutor schreibt …" : label}
+        </Button>
+        {vorlesen.verfuegbar ? (
+          <button
+            type="button"
+            onClick={vorlesen.umschaltenImmer}
+            aria-pressed={vorlesen.immerAn}
+            className={`${MINI_BUTTON} shrink-0 ${
+              vorlesen.immerAn ? "border-koenigsblau text-koenigsblau" : ""
+            }`}
+          >
+            {vorlesen.immerAn ? "Vorlesen: an" : "Vorlesen: aus"}
+          </button>
+        ) : null}
+      </div>
     </form>
   );
+}
+
+/** Liest eine neu hinzugekommene Tutor-Antwort vor, wenn „immer vorlesen" an ist (ADR 0011 D2). */
+function useAutoVorlesen(messages: ChatMessage[], vorlesen: VorlesenSteuerung) {
+  const zuletztRef = useRef<string | null>(null);
+  const { immerAn, liesVor } = vorlesen;
+  useEffect(() => {
+    const letzte = messages[messages.length - 1];
+    if (!letzte || letzte.role !== "tutor" || letzte.id === zuletztRef.current) return;
+    zuletztRef.current = letzte.id;
+    if (immerAn) liesVor(letzte.id, letzte.content);
+  }, [messages, immerAn, liesVor]);
 }
 
 // --- laufendes Gespräch --------------------------------------------------
@@ -174,6 +319,8 @@ function Conversation({
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const vorlesen = useVorlesen();
+  useAutoVorlesen(messages, vorlesen);
 
   async function senden() {
     const frage = input.trim();
@@ -203,7 +350,7 @@ function Conversation({
   return (
     <div className="flex flex-col gap-3">
       <ContextChip subject={active.subjectName} topic={active.topicTitle ?? "ohne Thema"} />
-      <MessageList messages={messages} streamText={streamText} />
+      <MessageList messages={messages} streamText={streamText} vorlesen={vorlesen} />
       {fehler ? <Notice>{fehler}</Notice> : null}
       <Composer
         available={available}
@@ -214,8 +361,11 @@ function Conversation({
           fach?.language ? "Frag etwas — auf Deutsch." : "Frag etwas oder sag, wo es hakt."
         }
         value={input}
+        sprache="de-DE"
         onChange={setInput}
         onSend={() => void senden()}
+        onTippen={vorlesen.stop}
+        vorlesen={vorlesen}
       />
     </div>
   );
@@ -234,6 +384,8 @@ function StartForm({ overview, available }: { overview: TutorOverview; available
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+  const vorlesen = useVorlesen();
+  useAutoVorlesen(messages, vorlesen);
 
   if (overview.subjects.length === 0) {
     return (
@@ -334,7 +486,9 @@ function StartForm({ overview, available }: { overview: TutorOverview; available
         </Block>
       )}
 
-      {gestartet ? <MessageList messages={messages} streamText={streamText} /> : null}
+      {gestartet ? (
+        <MessageList messages={messages} streamText={streamText} vorlesen={vorlesen} />
+      ) : null}
       {fehler ? <Notice>{fehler}</Notice> : null}
 
       <Composer
@@ -348,8 +502,11 @@ function StartForm({ overview, available }: { overview: TutorOverview; available
             : "Deine Frage …"
         }
         value={input}
+        sprache="de-DE"
         onChange={setInput}
         onSend={() => void senden()}
+        onTippen={vorlesen.stop}
+        vorlesen={vorlesen}
       />
     </div>
   );

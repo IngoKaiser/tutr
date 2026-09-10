@@ -18,6 +18,22 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **T-02b/T-02d: der Tutor lässt sich besprechen und liest vor.** Ein Mikrofonknopf am
+  Eingabefeld diktiert (Web Speech API): Gesprochenes läuft **live ins Feld**, nicht direkt in
+  den Chat – gelesen, korrigiert, dann abgeschickt. Erkennung im Deutschen ist bei Fachbegriffen
+  und Zahlen mittelmäßig; der Korrekturschritt ist deshalb Absicht, kein Zwischenschritt
+  ([ADR 0011](docs/adr/0011-sprache-im-tutor.md) D1). Solange das Mikrofon offen ist, steht
+  „tutr hört zu …" da – kein stilles Mithören. Und **vor der ersten Nutzung** ein klarer Satz
+  darüber, dass die Aufnahme zur Erkennung an den Browser-Hersteller geht (Chrome → Google,
+  Safari → Apple) und nirgends gespeichert wird; Konzept §11 nennt die API „kostenlos" und
+  übergeht diesen Datenweg.
+  Jede Tutor-Antwort bekommt einen **„Vorlesen"**-Knopf, dazu einen Schalter
+  „Vorlesen: an/aus" (Standard aus, gemerkt) – dann werden neue Antworten von selbst
+  vorgelesen. Tippen oder Diktieren stoppt das Laufende. Es sprechen die **Systemstimmen** über
+  `speechSynthesis`, lokale bevorzugt: kein Dienst, kein Schlüssel, keine Kosten, nichts
+  verlässt das Gerät. Damit steht die gesprochene Schleife – reden, lesen, vorgelesen bekommen.
+  Ein Echtzeit-Sprachdialog bleibt bewusst vertagt (ADR 0011 D3). Unterstützt der Browser eine
+  der beiden APIs nicht, erscheint der jeweilige Knopf gar nicht erst.
 - **T-02: der Tutor-Chat, schmale Fassung.** Die Seite „Tutor" ist echt (statt der Attrappe aus
   F-07): ein Chatfenster mit Kontext-Chip (Fach), zwei Einstiegen – **freie Frage** und
   **„Verstehen"** – und einer **streamenden** Antwort, Wort für Wort statt Spinner. Der Verlauf

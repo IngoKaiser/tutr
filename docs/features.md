@@ -82,10 +82,10 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | „Erklär es anders", Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter                                  | 🌑    | T-03    |
 |                          | Einstieg Vorschau (Selbsteinschätzung → Hook)                                      | 🌑    | T-04    |
-| **Sprache im Tutor**     |                                                                                    | 🌒    |         |
+| **Sprache im Tutor**     |                                                                                    | 🌓    |         |
 |                          | Weg entschieden (ADR 0011: Diktat + Vorlesen, Echtzeit vertagt)                    | ✅    | T-01b   |
-|                          | Diktat (Web Speech API), Text vor dem Senden korrigierbar                          | 🌑    | T-02b   |
-|                          | Antwort vorlesen (`speechSynthesis`), abschaltbar                                  | 🌑    | T-02d   |
+|                          | Diktat (Web Speech API), Text vor dem Senden korrigierbar                          | ✅    | T-02b   |
+|                          | Antwort vorlesen (`speechSynthesis`), abschaltbar                                  | ✅    | T-02d   |
 |                          | Echtzeit-Sprachdialog (zweiter Anbieter, an Bedingungen geknüpft)                  | 🌑    | T-06    |
 | **Material & Karten**    |                                                                                    | 🌑    |         |
 |                          | Material-Upload zu Thema (Foto/PDF/Link/Notiz)                                     | 🌑    | M-01    |
@@ -113,7 +113,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 2. ~~**K-01**~~ — erledigt (Prüfungskalender, Termine von Hand: anlegen, bearbeiten, absagen, Historie)
 3. ~~**T-01a + T-01b**~~ — erledigt (ADR 0010 Tutor-Architektur, ADR 0011 Sprachweg; beide akzeptiert)
 4. ~~**T-02 + T-02a + S-03b**~~ — erledigt (Tutor-Chat schmal, streamend, mit Sprachwächter und Rate Limit von Anfang an)
-5. **T-02b + T-02d** — Diktat und Vorlesen; die gesprochene Schleife, ohne neuen Dienst
+5. ~~**T-02b + T-02d**~~ — erledigt (Diktat und Vorlesen; die gesprochene Schleife, ohne neuen Dienst)
 6. **T-03 schmal** — Hausaufgabe mit Hinweisleiter
 7. **H-01 schmal** — Heute mit echten Daten
 8. **V-04** — Set-Modus
