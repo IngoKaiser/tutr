@@ -1,6 +1,6 @@
 # ADR 0010: Der Tutor streamt über einen Route Handler, Stufe 1 ohne Kontextpaket
 
-Status: **vorgeschlagen** · Datum: 2026-09-10 · Bezug: docs/konzept.md §4, §10, §11, §15
+Status: **akzeptiert** · Datum: 2026-09-10 · Bezug: docs/konzept.md §4, §10, §11, §15
 Weicht bewusst von der Stack-Regel „Route Handler nur für Uploads, Webhooks, Cron"
 (CLAUDE.md) ab und begründet das in D1.
 Setzt [ADR 0004](0004-datenmodell-rls.md) D3/D4 um, verschiebt aber eine der dort

@@ -74,7 +74,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Klausurplan per Foto einlesen                                                      | 🌑    | K-03    |
 |                          | Datei-Import CSV/XLSX (SchulDock) + ICS                                            | 🌑    | K-04    |
 | **Tutor & Hausaufgaben** |                                                                                    | 🌒    |         |
-|                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                      | 🌔    | T-01a   |
+|                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                      | ✅    | T-01a   |
 |                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen"                        | 🌑    | T-02    |
 |                          | Sprachwächter (Tutor antwortet auf Deutsch)                                        | 🌑    | T-02a   |
 |                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | 🌑    | S-03b   |
@@ -83,7 +83,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter                                  | 🌑    | T-03    |
 |                          | Einstieg Vorschau (Selbsteinschätzung → Hook)                                      | 🌑    | T-04    |
 | **Sprache im Tutor**     |                                                                                    | 🌒    |         |
-|                          | Weg entschieden (ADR 0011: Diktat + Vorlesen, Echtzeit vertagt)                    | 🌔    | T-01b   |
+|                          | Weg entschieden (ADR 0011: Diktat + Vorlesen, Echtzeit vertagt)                    | ✅    | T-01b   |
 |                          | Diktat (Web Speech API), Text vor dem Senden korrigierbar                          | 🌑    | T-02b   |
 |                          | Antwort vorlesen (`speechSynthesis`), abschaltbar                                  | 🌑    | T-02d   |
 |                          | Echtzeit-Sprachdialog (zweiter Anbieter, an Bedingungen geknüpft)                  | 🌑    | T-06    |
@@ -111,7 +111,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 
 1. ~~**V-03d + V-06a**~~ — erledigt (Vokabeln ohne Set aufräumbar; Übungszahl + Richtung stimmen)
 2. ~~**K-01**~~ — erledigt (Prüfungskalender, Termine von Hand: anlegen, bearbeiten, absagen, Historie)
-3. **T-01a + T-01b** — die zwei Architekturentscheidungen für den Tutor als ADR 0010 und ADR 0011 (_geschrieben, warten auf Freigabe_)
+3. ~~**T-01a + T-01b**~~ — erledigt (ADR 0010 Tutor-Architektur, ADR 0011 Sprachweg; beide akzeptiert)
 4. **T-02 + T-02a + S-03b** — Tutor-Chat schmal, mit Sprachwächter und Rate Limit von Anfang an
 5. **T-02b + T-02d** — Diktat und Vorlesen; die gesprochene Schleife, ohne neuen Dienst
 6. **T-03 schmal** — Hausaufgabe mit Hinweisleiter

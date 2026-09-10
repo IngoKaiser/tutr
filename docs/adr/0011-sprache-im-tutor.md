@@ -1,6 +1,6 @@
 # ADR 0011: Sprache ist ein Eingabeweg, kein zweites Gehirn
 
-Status: **vorgeschlagen** · Datum: 2026-09-10 · Bezug: docs/konzept.md §4, §4a, §11, §15
+Status: **akzeptiert** · Datum: 2026-09-10 · Bezug: docs/konzept.md §4, §4a, §11, §15
 Baut auf [ADR 0010](0010-tutor-architektur.md) auf und lässt dessen D1 unberührt: Der
 Textweg bleibt der Hauptweg. Ein Echtzeit-Sprachmodell wäre ein **zweiter** Transport,
 kein Ersatz — was das für D1 hieße, steht in D3.
