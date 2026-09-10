@@ -4,10 +4,16 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { aiEnv } from "@/lib/env";
 
 import {
+  homeworkExtractionSystemPrompt,
+  homeworkExtractionUserPrompt,
+  type HomeworkExtractionContext,
+} from "./prompts/homework-extraction";
+import {
   vocabExtractionSystemPrompt,
   vocabExtractionUserPrompt,
   type VocabExtractionContext,
 } from "./prompts/vocab-extraction";
+import { homeworkExtractionSchema, type HomeworkExtraction } from "./schemas/homework-extraction";
 import { vocabExtractionSchema, type VocabExtraction } from "./schemas/vocab-extraction";
 
 /**
@@ -81,6 +87,44 @@ export async function extractVocabularyFromImage(
             source: { type: "base64", media_type: image.mediaType, data: image.base64 },
           },
           { type: "text", text: vocabExtractionUserPrompt() },
+        ],
+      },
+    ],
+  });
+
+  if (!message.parsed_output) {
+    throw new Error("Die Bilderkennung hat keine verwertbare Antwort geliefert.");
+  }
+  return message.parsed_output;
+}
+
+/**
+ * Ein Foto einer Hausaufgabe → Aufgabenliste (T-03, §4a Schritt 1).
+ *
+ * Derselbe Weg wie `extractVocabularyFromImage()`: Structured Output über
+ * `zodOutputFormat()`, Bild nur im Nutzerteil, Bild wird **nicht**
+ * gespeichert. Der Systemprompt verbietet ausdrücklich, die Aufgaben zu
+ * lösen – sonst stünde die Lösung schon in der Liste, bevor §4a überhaupt
+ * greift.
+ */
+export async function extractHomeworkFromImage(
+  image: InlineImage,
+  context: HomeworkExtractionContext,
+): Promise<HomeworkExtraction> {
+  const message = await anthropic().messages.parse({
+    model: VISION_MODEL,
+    max_tokens: 4000,
+    system: homeworkExtractionSystemPrompt(context),
+    output_config: { format: zodOutputFormat(homeworkExtractionSchema) },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: image.mediaType, data: image.base64 },
+          },
+          { type: "text", text: homeworkExtractionUserPrompt() },
         ],
       },
     ],
