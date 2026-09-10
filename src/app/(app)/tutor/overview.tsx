@@ -106,8 +106,12 @@ function NeuesGespraech({ subjects }: { subjects: TutorOverview["subjects"] }) {
         </span>
       </fieldset>
 
+      {/* `URLSearchParams` statt Zusammenkleben: kodiert die Werte, egal was
+          im Feld steht. CodeQL hatte die Interpolation zu Recht als
+          „DOM text reinterpreted as HTML" markiert – und ein Fach-Name mit
+          `&` hätte die URL ohnehin zerlegt. */}
       <Link
-        href={`/tutor/neu?fach=${subjectId}&einstieg=${entryPoint}`}
+        href={`/tutor/neu?${new URLSearchParams({ fach: subjectId, einstieg: entryPoint }).toString()}`}
         className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau w-full rounded-[9px] border border-transparent px-4 py-2.5 text-center text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
       >
         Gespräch beginnen
