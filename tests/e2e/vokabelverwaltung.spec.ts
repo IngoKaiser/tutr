@@ -164,11 +164,14 @@ test.describe("Vokabelverwaltung", () => {
       timeout: 10_000,
     });
 
-    // --- Set löschen: die Vokabeln bleiben --------------------------------
+    // --- Set löschen, „Nur das Set": die Vokabeln bleiben (V-03a) --------
+    // Seit V-03d fragt das Löschen, weil alle drei Vokabeln in keinem
+    // anderen Set stecken. „Nur das Set" lässt sie stehen.
     await page.goto("/faecher/vokabeln");
     const row = page.getByRole("listitem").filter({ hasText: SET_TITLE });
     await row.getByRole("button", { name: "Löschen" }).click();
-    await row.getByRole("button", { name: "Ja, löschen" }).click();
+    await expect(row.getByText(/Vokabeln stecken in keinem anderen Set/)).toBeVisible();
+    await row.getByRole("button", { name: "Nur das Set" }).click();
     await expect(page.getByRole("link", { name: new RegExp(SET_TITLE) })).toHaveCount(0, {
       timeout: 10_000,
     });
@@ -176,5 +179,36 @@ test.describe("Vokabelverwaltung", () => {
     const [{ count: rest }] = await admin<{ count: string }[]>`
       select count(*)::text as count from vocab_item where term like ${PREFIX + "%"}`;
     expect(Number(rest)).toBe(3);
+
+    // --- „Ohne Set": die drei Waisen sind erreichbar (V-03d) ------------
+    const ohneSet = page.getByRole("link", { name: /Ohne Set/ }).first();
+    await expect(ohneSet).toBeVisible({ timeout: 10_000 });
+    await expect(ohneSet).toContainText("3 Vokabeln");
+    await ohneSet.click();
+
+    await expect(page.getByRole("heading", { name: "Ohne Set", level: 1 })).toBeVisible();
+    const inhaltOhneSet = page.getByRole("main");
+    await expect(inhaltOhneSet.locator("ul > li")).toHaveCount(3);
+
+    // Eine Waise vollständig löschen (kaskadiert auf Karten, Reviews).
+    await page.getByRole("button", { name: new RegExp(ALPHA) }).click();
+    const loeschen = page.getByRole("button", { name: "Vokabel löschen" });
+    await expect(loeschen).toBeVisible();
+    await loeschen.click();
+
+    await expect(inhaltOhneSet.locator("ul > li")).toHaveCount(2, { timeout: 10_000 });
+    const db = admin;
+    await expect
+      .poll(
+        async () =>
+          Number(
+            (
+              await db<{ count: string }[]>`
+                select count(*)::text as count from vocab_item where term like ${PREFIX + "%"}`
+            )[0]!.count,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(2);
   });
 });

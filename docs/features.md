@@ -55,7 +55,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Foto & Kamera → Vision → dieselbe Liste                             | ✅    | V-03b     |
 |                          | Foto-Import als Minigalerie, echte Fehlerursachen                   | ✅    | V-03c     |
 |                          | Fachbindung im Modell (ADR 0008)                                    | ✅    | V-05      |
-|                          | Vokabeln ohne Set sichtbar/löschbar machen                          | 🌑    | V-03d     |
+|                          | Vokabeln ohne Set sichtbar/löschbar machen                          | ✅    | V-03d     |
 |                          | Set-Modus: ein Set gezielt vor der Arbeit üben                      | 🌑    | V-04      |
 |                          | Offline-Sessions (Service Worker)                                   | 🌑    | F-09      |
 | **Üben**                 |                                                                     | 🌓    |           |
@@ -101,7 +101,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 
 ## Nächste Reihenfolge (aus `docs/roadmap.md`)
 
-1. **V-03d** — Vokabeln ohne Set aufräumbar machen (V-06a erledigt: Übungszahl + Richtung stimmen)
+1. ~~**V-03d + V-06a**~~ — erledigt (Vokabeln ohne Set aufräumbar; Übungszahl + Richtung stimmen)
 2. **K-01** — Prüfungskalender, Termine von Hand
 3. **T-01/T-02 schmal + T-02a + S-03** — Tutor-Chat, mit Sprachwächter und Rate Limit von Anfang an
 4. **T-03 schmal** — Hausaufgabe mit Hinweisleiter

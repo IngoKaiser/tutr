@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { loginStatus } from "@/lib/auth/actor";
 
-import { loadSets, loadSubjects } from "./actions";
+import { loadOrphanGroups, loadSets, loadSubjects } from "./actions";
 import { SetList } from "./set-list";
 
 export const metadata = { title: "Vokabeln · tutr" };
@@ -18,7 +18,18 @@ export default async function VocabSetsPage() {
   const { actor } = await loginStatus();
   if (!actor) redirect("/anmelden");
 
-  const [sets, subjects] = await Promise.all([loadSets(), loadSubjects()]);
+  const [sets, subjects, orphanGroups] = await Promise.all([
+    loadSets(),
+    loadSubjects(),
+    loadOrphanGroups(),
+  ]);
 
-  return <SetList sets={sets} subjects={subjects} canManage={actor.role === "student"} />;
+  return (
+    <SetList
+      sets={sets}
+      subjects={subjects}
+      orphanGroups={orphanGroups}
+      canManage={actor.role === "student"}
+    />
+  );
 }

@@ -18,6 +18,14 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **V-03d: Vokabeln ohne Set sind erreichbar.** `deleteSet()` bewahrt seit V-03a die Vokabeln –
+  aber es gab keinen Zustand „Vokabel ohne Set" in der Oberfläche: ein Weg hinein, keiner hinaus.
+  Produktiv aufgefallen: 60 von 83 Vokabeln hingen im Nichts, ihre Karten kamen trotzdem täglich
+  im Üben. Jetzt: je Fach ein „Ohne Set · N Vokabeln"-Eintrag auf der Vokabelseite, dahinter eine
+  Liste zum Bearbeiten, **einem Set zuordnen** oder ganz **löschen** (samt Lernstand). Und
+  Set-Löschen fragt, wenn Vokabeln dadurch in keinem Set mehr stecken würden: „Nur das Set" oder
+  „Set und N Vokabeln". Die Sortier- und „prüfen"-Logik der Liste ist nach `lib/vocab/review-list.ts`
+  gezogen und wird jetzt von beiden Ansichten geteilt.
 - **V-06a: die Übungszahl stimmt, die Richtung heißt richtig.** `/ueben` zählt jetzt **Vokabeln
   statt Karten** – Ingos „Englisch" zeigt 83 fällig, nicht mehr 166 (das war 83 × 2 Richtungen).
   „Gemischt" fragt jede fällige Vokabel je Runde genau einmal (die früher fällige Karte, bei
