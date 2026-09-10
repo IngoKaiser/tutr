@@ -141,25 +141,30 @@ export type DeleteSubjectResult = { ok: true } | { ok: false; fehler: string };
 /**
  * Löscht ein Fach nur, wenn nichts daran hängt (§15, dieselbe Linie wie das
  * Set-Löschen in V-03a). `topic.subject_id` kaskadiert, `vocab_set.subject_id`
- * steht auf `restrict` – ohne diesen Riegel bräche eins von beiden mit einer
- * harten Datenbankmeldung ab, das andere nähme Themen stillschweigend mit.
+ * und `calendar_event.subject_id` stehen auf `restrict` – ohne diesen Riegel
+ * bräche eins davon mit einer harten Datenbankmeldung ab, `topic` nähme
+ * Themen stillschweigend mit.
  */
 export async function deleteSubject(subjectId: string): Promise<DeleteSubjectResult | null> {
   const actor = await requireStudentActor();
   if (!actor) return null;
 
   const result = await withActor(actor, async (tx) => {
-    const [counts] = await tx.execute<{ themen: string; sets: string }>(sql`
+    const [counts] = await tx.execute<{ themen: string; sets: string; termine: string }>(sql`
       select
         (select count(*) from topic where subject_id = ${subjectId})::text as themen,
-        (select count(*) from vocab_set where subject_id = ${subjectId})::text as sets`);
+        (select count(*) from vocab_set where subject_id = ${subjectId})::text as sets,
+        (select count(*) from calendar_event where subject_id = ${subjectId})::text as termine`);
     const themen = Number(counts?.themen ?? 0);
     const sets = Number(counts?.sets ?? 0);
+    const termine = Number(counts?.termine ?? 0);
 
-    if (themen > 0 || sets > 0) {
+    if (themen > 0 || sets > 0 || termine > 0) {
       const teile: string[] = [];
       if (themen > 0) teile.push(themen === 1 ? "1 Thema" : `${themen} Themen`);
       if (sets > 0) teile.push(sets === 1 ? "1 Vokabelset" : `${sets} Vokabelsets`);
+      if (termine > 0)
+        teile.push(termine === 1 ? "1 Prüfungstermin" : `${termine} Prüfungstermine`);
       return {
         ok: false as const,
         fehler: `Erst ${teile.join(" und ")} entfernen, dann lässt sich das Fach löschen.`,
