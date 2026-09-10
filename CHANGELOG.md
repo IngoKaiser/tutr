@@ -4,6 +4,23 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Added
+
+- **V-09: Vokabeln lassen sich als geprüft abhaken – und Ungeprüftes wird nicht abgefragt.**
+  Zwei Dinge, die zusammengehören. Bisher war „prüfen“ teils **abgeleitet**: Dasselbe Wort
+  mit zwei verschiedenen Übersetzungen (`pasar` = verbringen _und_ passieren) galt für
+  immer als unsicher, auch wenn beide Übersetzungen richtig sind – es gab keinen Weg, das
+  zu akzeptieren. Jetzt merkt sich `vocab_item.confirmed_at`, dass jemand hingeschaut hat:
+  Speichern im Bearbeiten-Zustand setzt es, und für den Fall, in dem es **nichts zu
+  korrigieren** gibt, steht daneben ein Knopf „Passt so“. Ein leeres Feld bleibt
+  ausgenommen – das ist eine Lücke, keine Einschätzung, und lässt sich nur füllen.
+  Umgekehrt kommen zu prüfende Vokabeln jetzt **nicht mehr im Üben dran**: Eine Zeile
+  abzufragen, bei der noch offen ist, ob sie stimmt, hieße dem Kind womöglich Falsches als
+  richtig zu bestätigen. Die Fällig-Zahl zählt sie deshalb auch nicht mehr mit – sonst
+  stünde dort eine Zahl, die kein „Loslegen“ je abarbeiten kann. Die Regel steht an zwei
+  Orten (SQL für die Übungsabfragen, TypeScript für die Liste); ein Test hält beide
+  Fassungen an neun Fällen gegen die echte Datenbank gegeneinander.
+
 ### Changed
 
 - **V-11: Vokabeln per Wischen löschen, mit Rückgängig statt Rückfrage.** Der Knopf hieß

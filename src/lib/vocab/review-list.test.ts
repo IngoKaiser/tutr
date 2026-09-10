@@ -40,6 +40,83 @@ describe("withDerivedUnsicher", () => {
   });
 });
 
+describe("withDerivedUnsicher – bestätigte Zeilen (V-09)", () => {
+  it("nimmt „gleiches Wort, andere Übersetzung“ die Markierung, sobald bestätigt", () => {
+    // Der Anlass: `pasar` = verbringen / passieren. Beide Zeilen sind
+    // richtig, ohne `confirmed_at` blieben sie für immer „prüfen“.
+    const rows = withDerivedUnsicher([
+      {
+        id: "1",
+        term: "pasar",
+        translation: "verbringen",
+        recognition_uncertain: false,
+        confirmed_at: new Date("2026-09-11T00:00:00Z"),
+      },
+      {
+        id: "2",
+        term: "pasar",
+        translation: "passieren; geschehen",
+        recognition_uncertain: false,
+        confirmed_at: new Date("2026-09-11T00:00:00Z"),
+      },
+    ]);
+    expect(rows.map((r) => r.unsicher)).toEqual([false, false]);
+  });
+
+  it("bestätigt nur, was bestätigt wurde – die andere Zeile bleibt markiert", () => {
+    const rows = withDerivedUnsicher([
+      {
+        id: "1",
+        term: "pasar",
+        translation: "verbringen",
+        recognition_uncertain: false,
+        confirmed_at: new Date("2026-09-11T00:00:00Z"),
+      },
+      { id: "2", term: "pasar", translation: "passieren", recognition_uncertain: false },
+    ]);
+    expect(rows.map((r) => r.unsicher)).toEqual([false, true]);
+  });
+
+  it("nimmt auch der gespeicherten Konfidenz-Markierung ihre Wirkung", () => {
+    const [row] = withDerivedUnsicher([
+      {
+        id: "1",
+        term: "venir",
+        translation: "kommen",
+        recognition_uncertain: true,
+        confirmed_at: new Date("2026-09-11T00:00:00Z"),
+      },
+    ]);
+    expect(row!.unsicher).toBe(false);
+  });
+
+  it("ein leeres Feld bleibt markiert, auch bestätigt – das ist eine Lücke, keine Einschätzung", () => {
+    const [row] = withDerivedUnsicher([
+      {
+        id: "1",
+        term: "aller",
+        translation: "   ",
+        recognition_uncertain: false,
+        confirmed_at: new Date("2026-09-11T00:00:00Z"),
+      },
+    ]);
+    expect(row!.unsicher).toBe(true);
+  });
+
+  it("`confirmed_at: null` verhält sich wie „nie bestätigt“", () => {
+    const [row] = withDerivedUnsicher([
+      {
+        id: "1",
+        term: "venir",
+        translation: "kommen",
+        recognition_uncertain: true,
+        confirmed_at: null,
+      },
+    ]);
+    expect(row!.unsicher).toBe(true);
+  });
+});
+
 describe("sortForReview", () => {
   it("zieht unsichere Zeilen nach oben, der Rest bleibt alphabetisch", () => {
     const items: VocabRow[] = [

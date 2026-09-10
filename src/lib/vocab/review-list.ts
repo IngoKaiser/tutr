@@ -31,9 +31,26 @@ export function sortForReview(items: VocabRow[]): VocabRow[] {
  * Er ist eine Tatsache aus dem Moment des Imports, die sich später aus der
  * Zeile nicht mehr ablesen lässt („la trousse / das Fed" sieht vollständig
  * aus). Gefunden beim Testen von V-03b gegen die echte Bilderkennung.
+ *
+ * **`confirmed_at` sticht zwei der drei Gründe** (V-09): Wer die Zeile
+ * angesehen und für richtig befunden hat, hat damit die Frage beantwortet,
+ * die „prüfen" gestellt hat. Nötig wurde das durch `pasar` (= verbringen /
+ * passieren): Zwei richtige Übersetzungen desselben Worts lösen „uneinig"
+ * aus und blieben sonst für immer markiert – und seit V-09 auch für immer
+ * vom Üben ausgeschlossen.
+ *
+ * **Ein leeres Feld bleibt markiert**, auch bestätigt: Das ist keine
+ * Einschätzung, sondern eine Lücke. Die kann man nicht akzeptieren, nur
+ * füllen. Das hält die Regel deckungsgleich mit `practiceReadySql`.
  */
 export function withDerivedUnsicher(
-  rows: { id: string; term: string; translation: string; recognition_uncertain: boolean }[],
+  rows: {
+    id: string;
+    term: string;
+    translation: string;
+    recognition_uncertain: boolean;
+    confirmed_at?: Date | string | null;
+  }[],
 ): VocabRow[] {
   const termCounts = new Map<string, Set<string>>();
   for (const row of rows) {
@@ -42,10 +59,14 @@ export function withDerivedUnsicher(
     translations.add(row.translation.trim().toLowerCase());
     termCounts.set(key, translations);
   }
-  return rows.map(({ recognition_uncertain, ...row }) => {
+  return rows.map(({ recognition_uncertain, confirmed_at, ...row }) => {
     const key = row.term.trim().toLowerCase();
     const leer = row.term.trim() === "" || row.translation.trim() === "";
     const uneinig = (termCounts.get(key)?.size ?? 0) > 1;
-    return { ...row, unsicher: leer || uneinig || recognition_uncertain };
+    const bestaetigt = confirmed_at != null;
+    return {
+      ...row,
+      unsicher: leer || (!bestaetigt && (uneinig || recognition_uncertain)),
+    };
   });
 }

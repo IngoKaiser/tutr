@@ -9,6 +9,7 @@ import { fsrsCardStateSchema } from "@/db/types/fsrs";
 import { loginStatus } from "@/lib/auth/actor";
 import { databaseConfigured } from "@/lib/env";
 import { applyReview } from "@/lib/vocab/fsrs";
+import { practiceReadySql } from "@/lib/vocab/practice-filter";
 import {
   classifyMultipleChoice,
   classifyTyped,
@@ -92,6 +93,10 @@ export type DueBySubject = {
  * `card` (ADR 0008 D1). `card_exactly_one_source` garantiert, dass nie beide
  * Joins gleichzeitig treffen.
  *
+ * **Zu prüfende Vokabeln zählen nicht mit** (V-09, `practiceReadySql`):
+ * Was hier nicht abgefragt wird, darf auch nicht als fällig erscheinen –
+ * sonst stünde eine Zahl da, die kein „Loslegen" je abarbeiten kann.
+ *
  * `null`, wenn nicht angemeldet oder ohne DB (CI-E2E). Ein leeres Array
  * heißt: nichts fällig, kein Fach zeigt einen Block.
  */
@@ -122,6 +127,7 @@ export async function loadDueBySubject(): Promise<DueBySubject[] | null> {
             left join vocab_item vi on vi.id = c.vocab_item_id
             left join learning_objective lo on lo.id = c.objective_id
             left join topic t on t.id = lo.topic_id
+            where ${practiceReadySql}
             group by 1, 2
           )
           select
@@ -183,6 +189,11 @@ export type SessionCardContent = {
  * (`["vorwaerts", "rueckwaerts"]`), nicht alphabetisch. `random()` als
  * einziger Sortierschlüssel nach der `distinct on`-Spalte mischt die
  * Richtungen jetzt wirklich; über eine Reihe hinweg kommt jede etwa gleich oft.
+ *
+ * **Zu prüfende Vokabeln bleiben draußen** (V-09, `practiceReadySql`): Eine
+ * Zeile, bei der noch offen ist, ob sie stimmt, abzufragen hieße, dem Kind
+ * womöglich Falsches als richtig zu bestätigen. Erst akzeptieren,
+ * korrigieren oder wegwerfen – dann üben.
  */
 export async function loadSessionCards(
   subjectId: string,
@@ -206,6 +217,7 @@ export async function loadSessionCards(
         ? sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
               from card c join vocab_item vi on vi.id = c.vocab_item_id
               where c.due_at <= now() and c.direction = ${direction} and vi.subject_id = ${subjectId}
+                and ${practiceReadySql}
               order by c.due_at`
         : sql`select card_id, vocab_item_id, direction, state, term, translation from (
                 select distinct on (c.vocab_item_id)
@@ -213,6 +225,7 @@ export async function loadSessionCards(
                   vi.term, vi.translation, c.due_at
                 from card c join vocab_item vi on vi.id = c.vocab_item_id
                 where c.due_at <= now() and vi.subject_id = ${subjectId}
+                  and ${practiceReadySql}
                 order by c.vocab_item_id, random()
               ) gewaehlt
               order by due_at`,

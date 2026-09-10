@@ -50,6 +50,7 @@ export async function loadOrphans(subjectId: string): Promise<OrphanView | null>
     term: string;
     translation: string;
     recognition_uncertain: boolean;
+    confirmed_at: string | null;
   };
   type SetRow = { id: string; title: string };
 
@@ -60,7 +61,7 @@ export async function loadOrphans(subjectId: string): Promise<OrphanView | null>
     if (!subject) return null;
 
     const items = await tx.execute<ItemRow>(
-      sql`select vi.id, vi.term, vi.translation, vi.recognition_uncertain
+      sql`select vi.id, vi.term, vi.translation, vi.recognition_uncertain, vi.confirmed_at
           from vocab_item vi
           where vi.subject_id = ${subjectId}
             and not exists (
@@ -124,9 +125,11 @@ export async function updateOrphan(
 
   await withActor(actor, (tx) =>
     tx.execute(
+      // Wie in `[setId]/actions.ts`: Speichern heißt „ich hab draufgeschaut"
+      // und setzt deshalb auch `confirmed_at` (V-09).
       sql`update vocab_item
           set term = ${term.trim()}, translation = ${translation.trim()},
-              recognition_uncertain = false
+              recognition_uncertain = false, confirmed_at = now()
           where id = ${itemId}`,
     ),
   );
@@ -139,6 +142,22 @@ export async function deleteOrphan(subjectId: string, itemId: string): Promise<v
   if (!actor) return;
 
   await withActor(actor, (tx) => tx.execute(sql`delete from vocab_item where id = ${itemId}`));
+  revalidatePath(`/faecher/vokabeln/ohne-set/${subjectId}`);
+  revalidatePath("/faecher/vokabeln");
+}
+
+/** „Passt so" für eine Waise – siehe `confirmItem()` in `[setId]/actions.ts` (V-09). */
+export async function confirmOrphan(subjectId: string, itemId: string): Promise<void> {
+  const actor = await requireStudentActor();
+  if (!actor) return;
+
+  await withActor(actor, (tx) =>
+    tx.execute(
+      sql`update vocab_item
+          set confirmed_at = now(), recognition_uncertain = false
+          where id = ${itemId}`,
+    ),
+  );
   revalidatePath(`/faecher/vokabeln/ohne-set/${subjectId}`);
   revalidatePath("/faecher/vokabeln");
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "vocab_item" ADD COLUMN "confirmed_at" timestamp with time zone;
