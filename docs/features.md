@@ -83,6 +83,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Altersgerechte Ansprache nach Jahrgang                                             | ✅    | T-09    |
 |                          | Kontextpaket, Schichten mit Quellenangabe, Prompt Caching                          | 🌑    | T-01    |
 |                          | „Erklär es anders", Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
+|                          | Elternsicht entschieden (ADR 0012: was, nicht wie gut)                             | ✅    | T-01c   |
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter                                  | 🌑    | T-03    |
 |                          | Einstieg Vorschau (Selbsteinschätzung → Hook)                                      | 🌑    | T-04    |
 | **Sprache im Tutor**     |                                                                                    | 🌓    |         |
@@ -119,9 +120,10 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 5. ~~**T-02b + T-02d**~~ — erledigt (Diktat und Vorlesen; die gesprochene Schleife, ohne neuen Dienst)
 6. ~~**T-07**~~ — erledigt (Chat-Shell: Übersicht + Gespräch, klebendes Eingabefeld, ↓-Knopf)
 7. ~~**T-08 + T-09**~~ — erledigt (Markdown-Rendering; Ansprache nach `student.grade_level`)
-8. **T-03 schmal** — Hausaufgabe mit Hinweisleiter
-9. **H-01 schmal** — Heute mit echten Daten
-10. **V-04** — Set-Modus
+8. ~~**T-01c**~~ — erledigt (ADR 0012 Elternsicht, akzeptiert); **F-17** räumt die Alt-Policies auf
+9. **T-03 schmal** — Hausaufgabe mit Hinweisleiter, in zwei PRs
+10. **H-01 schmal** — Heute mit echten Daten
+11. **V-04** — Set-Modus
 
 `S-03a` (CSP) hängt an nichts und kann jederzeit dazwischen.
 
