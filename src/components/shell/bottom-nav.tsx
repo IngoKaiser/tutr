@@ -21,7 +21,10 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Bereiche"
-      className="border-linie bg-flaeche sticky bottom-0 z-10 border-t pb-[env(safe-area-inset-bottom)]"
+      // Kein `sticky` mehr nötig: Seit T-07 ist die Hülle ein fester Rahmen
+      // (`h-dvh`), gescrollt wird nur `main`. Die Leiste steht damit ohnehin
+      // immer unten.
+      className="border-linie bg-flaeche shrink-0 border-t pb-[env(safe-area-inset-bottom)]"
     >
       <ul className="mx-auto flex max-w-2xl">
         {SECTIONS.map((s) => {

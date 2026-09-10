@@ -16,6 +16,26 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
   Abfragefolge einer Seite 493 ms → 202 ms. `set_config('role', …)` ist gleichbedeutend
   mit `set local role`; dass RLS unverändert greift, belegen die 96 Policy-Tests
 
+### Changed
+
+- **T-07: der Tutor ist jetzt bedienbar.** Aus der Rückmeldung am Live-Chat — das
+  Eingabefeld wanderte beim Lesen einer langen Antwort aus dem Bild, es gab keinen Weg zurück,
+  und die Gesprächsliste stand ausgerechnet unter dem laufenden Gespräch. Behoben, und zwar an
+  der Wurzel: Die App-Hülle ist jetzt ein **fester Rahmen** (`h-dvh`), gescrollt wird nur der
+  Inhaltsbereich. Damit klebt das Eingabefeld per `sticky` pixelgenau über der Fußleiste, ohne
+  deren Höhe zu kennen — und das gilt für jede Seite, nicht nur den Tutor.
+  Der Tutor ist zweistufig geworden: **`/tutor`** ist die Übersicht (neues Gespräch mit Fach und
+  Einstieg, Historie nach Fach gruppiert), **`/tutor/[id]`** das Gespräch mit einem echten
+  „‹ Gespräche"-Weg zurück. Das schließt nebenbei einen Regelverstoß: `/tutor?s=…` war eine
+  Unterseite ohne Zurück-Link, was `primitives.tsx` ausdrücklich verbietet.
+  Statt eines breiten „Fragen"-Knopfes sitzen **🔈 Vorlesen, 🎤 Diktieren und ↑ Senden als Icons
+  im Textfeld**. Die Antwort **scrollt mit**, solange der Blick unten klebt — wer hochscrollt,
+  wird nicht zurückgerissen und bekommt einen **↓-Knopf**, der in einem Klick ans Ende springt.
+  Und der Textfluss ist **geglättet statt gebremst**: Die Schübe des Modells werden gleichmäßig
+  freigegeben, immer schneller als der Nachschub — es liest sich ruhig, ohne dass die Antwort
+  später fertig ist. Der Platzhalter „ohne Thema" ist weg; das Thema kommt laut §4a daher, dass
+  man aus einer Themenseite in den Tutor geht, und bis es die gibt, zeigt der Chip nur das Fach.
+
 ### Added
 
 - **T-02b/T-02d: der Tutor lässt sich besprechen und liest vor.** Ein Mikrofonknopf am

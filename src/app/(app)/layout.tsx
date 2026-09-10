@@ -42,8 +42,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!actor) redirect("/anmelden");
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="border-linie bg-flaeche border-b">
+    // **Fester Rahmen statt scrollendem Dokument** (T-07): Die Höhe ist der
+    // Bildschirm, gescrollt wird nur `main`. Das ist der Unterschied zwischen
+    // einer Website und einer App – und die Voraussetzung dafür, dass der
+    // Tutor-Composer per `sticky bottom-0` genau über der Fußleiste klebt,
+    // ohne deren Höhe kennen zu müssen. Vorher wanderte er beim Lesen einer
+    // langen Antwort aus dem Bild.
+    <div className="flex h-dvh flex-col">
+      <header className="border-linie bg-flaeche shrink-0 border-b">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-3">
           <span className="text-koenigsblau text-lg font-bold tracking-tight">tutr</span>
 
@@ -95,7 +101,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-5">{children}</main>
+      {/* `min-h-0` ist hier nicht kosmetisch: Ohne das weigert sich ein
+          Flex-Kind zu schrumpfen, `overflow-y-auto` liefe ins Leere und die
+          Seite scrollte wieder als Ganzes. */}
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-2xl px-4 py-5">{children}</div>
+      </main>
 
       <BottomNav />
     </div>
