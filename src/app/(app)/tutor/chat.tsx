@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  LautsprecherAusIcon,
+  LautsprecherIcon,
+  MikrofonIcon,
+  PfeilRunterIcon,
+  SendenIcon,
+  StoppIcon,
+} from "@/components/shell/icons";
 import { Block, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
 import { istEingeholt, naechsteLaenge } from "@/lib/tutor/stream-text";
 
@@ -24,8 +32,9 @@ const DIKTAT_HINWEIS =
 export type ChatMessage = { id: string; role: "nutzer" | "tutor"; content: string };
 type VorlesenSteuerung = ReturnType<typeof useVorlesen>;
 
+/** Runder 36er-Knopf für die Icons im Eingabefeld. Das Icon erbt die Farbe (`currentColor`). */
 const ICON_BUTTON =
-  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base transition-colors disabled:opacity-40";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40";
 
 /**
  * Ein Tutor-Gespräch (T-02, umgebaut in T-07).
@@ -275,9 +284,9 @@ function Composer({
           type="button"
           onClick={nachUnten}
           aria-label="Zum Ende springen"
-          className="border-linie-stark bg-flaeche text-tinte-weich hover:bg-papier-tief absolute -top-11 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border shadow-sm"
+          className="border-linie-stark bg-flaeche text-tinte-weich hover:bg-papier-tief hover:text-tinte absolute -top-11 left-1/2 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border shadow-sm transition-colors"
         >
-          <span aria-hidden="true">↓</span>
+          <PfeilRunterIcon size={17} />
         </button>
       ) : null}
 
@@ -345,7 +354,7 @@ function Composer({
                 : "text-tinte-leise hover:bg-papier-tief"
             }`}
           >
-            <span aria-hidden="true">{vorlesen.immerAn ? "🔊" : "🔈"}</span>
+            {vorlesen.immerAn ? <LautsprecherIcon /> : <LautsprecherAusIcon />}
           </button>
         ) : null}
 
@@ -361,7 +370,7 @@ function Composer({
                 : "text-tinte-leise hover:bg-papier-tief"
             }`}
           >
-            <span aria-hidden="true">{diktat.hoert ? "■" : "🎤"}</span>
+            {diktat.hoert ? <StoppIcon size={16} /> : <MikrofonIcon />}
           </button>
         ) : null}
 
@@ -375,7 +384,7 @@ function Composer({
               : "bg-papier-tief text-tinte-leise cursor-default"
           }`}
         >
-          <span aria-hidden="true">{pending ? "…" : "↑"}</span>
+          <SendenIcon className={pending ? "animate-pulse" : undefined} />
         </button>
       </form>
     </div>
