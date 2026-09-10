@@ -43,6 +43,13 @@
       "when": 1788983220308,
       "tag": "0005_lame_typhoid_mary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789017648005,
+      "tag": "0006_sweet_the_captain",
+      "breakpoints": true
     }
   ]
 }

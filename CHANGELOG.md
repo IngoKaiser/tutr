@@ -18,6 +18,18 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **K-01: Prüfungskalender, Termine von Hand.** Neue Seite „Prüfungen" (statt der Attrappe aus
+  F-07): Termin anlegen (Fach, Art, Titel, Datum), Liste in drei Fenstern – **kommend** (nächste
+  vier Wochen), **später im Schuljahr**, **vergangen & abgesagt** (Historie). Bearbeiten an Ort
+  und Stelle; **Absagen** ist ein Statuswechsel, kein Löschen – der Termin rutscht in die
+  Historie und lässt sich wieder planen; **Löschen** entfernt ihn endgültig, mit Rückfrage.
+  Termine hängen am aktiven Schuljahr; **beide Rollen** dürfen eintragen und ändern (ADR 0004 D4),
+  anders als bei Themen und Vokabeln. Fachbindung über einen zusammengesetzten Fremdschlüssel
+  (§15 Fehler 2) – ein Termin mit dem Fach eines fremden Kindes scheitert an der Datenbank; der
+  Fach-Fremdschlüssel steht auf `restrict`, also zählt „Fach löschen" jetzt auch offene Termine
+  in seinen Riegel. Die Zeitfenster-Logik (`splitByHorizon`, „heute" in UTC) liegt rein und
+  unit-getestet in `lib/calendar/upcoming.ts`. Import per Foto/Datei (K-02–K-04) und die
+  Themen-Verknüpfung mit Countdown-Seite (P-01) kommen später.
 - **V-03d: Vokabeln ohne Set sind erreichbar.** `deleteSet()` bewahrt seit V-03a die Vokabeln –
   aber es gab keinen Zustand „Vokabel ohne Set" in der Oberfläche: ein Weg hinein, keiner hinaus.
   Produktiv aufgefallen: 60 von 83 Vokabeln hingen im Nichts, ihre Karten kamen trotzdem täglich

@@ -1,30 +1,36 @@
-import { Block, Notice, Button, Mastery, PageHeader } from "@/components/shell/primitives";
+import { redirect } from "next/navigation";
+
+import { loginStatus } from "@/lib/auth/actor";
+
+import { loadCalendar } from "./actions";
+import { CalendarList } from "./calendar-list";
 
 export const metadata = { title: "Prüfungen · tutr" };
 
-/** Konzept §5 und §6 M7: Kalender, Lernplan, Probeprüfungen, Noten. */
-export default function ExamsPage() {
+/**
+ * Prüfungskalender (K-01, Konzept §5/§6 M7).
+ *
+ * Die schmale Fassung: Termine von Hand. Lernplan, Probeprüfungen und Noten
+ * (§6 M7 Rest) kommen später. Die Zeitfenster-Logik steckt in
+ * `@/lib/calendar/upcoming` und ist dort unit-getestet; hier wird nur der
+ * „heute"-Stichtag gesetzt (UTC, wie `daysUntil`) und weitergereicht.
+ */
+export default async function ExamsPage() {
+  const { actor } = await loginStatus();
+  if (!actor) redirect("/anmelden");
+
+  const data = await loadCalendar();
+  const todayISO = new Date().toISOString().slice(0, 10);
+
+  // `canManage` ist hier immer wahr: beide Rollen dürfen Termine anlegen und
+  // ändern (ADR 0004 D4, Zeile `calendar_event`) – anders als bei Themen und
+  // Vokabeln. Der Schalter bleibt trotzdem, für eine spätere Nur-Lesen-Sicht.
   return (
-    <div className="flex flex-col gap-3">
-      <PageHeader title="Prüfungen" trailing="nächste 4 Wochen" />
-
-      <Block title="Französisch · Klassenarbeit" trailing="25.09." emphasized>
-        <Notice>2 von 3 Themen vorbereitet · Zielnote 2</Notice>
-        <Mastery coverage={72} confidence={58} />
-        <Button>Vorbereitung öffnen</Button>
-      </Block>
-
-      <Block title="Mathematik · Klassenarbeit" trailing="09.10.">
-        <Notice>Themen noch nicht verknüpft.</Notice>
-        <Button quiet>Themen zuordnen</Button>
-      </Block>
-
-      <Block title="Termin eintragen">
-        <Notice>
-          Klausurplan fotografieren, Datei importieren oder von Hand eintragen — alles landet vorher
-          im Review.
-        </Notice>
-      </Block>
-    </div>
+    <CalendarList
+      events={data?.events ?? null}
+      subjects={data?.subjects ?? null}
+      todayISO={todayISO}
+      canManage
+    />
   );
 }
