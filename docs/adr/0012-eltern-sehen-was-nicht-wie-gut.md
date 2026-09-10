@@ -1,6 +1,6 @@
 # ADR 0012: Eltern sehen, **was** gelernt wird – nicht, **wie gut** es läuft
 
-Status: **vorgeschlagen** · Datum: 2026-09-10 · Bezug: docs/konzept.md §11, §12, §15
+Status: **akzeptiert** · Datum: 2026-09-10 · Bezug: docs/konzept.md §11, §12, §15
 Schneidet die RLS-Matrix aus [ADR 0004](0004-datenmodell-rls.md) D4 neu und setzt
 [ADR 0006](0006-student-als-mandant.md) D2 fort („Das Kind ist der Mandant").
 Tickets: T-03 (braucht die Entscheidung für `homework_task`), F-17 (Aufräumen der
