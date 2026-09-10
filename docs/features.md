@@ -63,6 +63,8 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Rückmeldung richtig/fast/falsch, Ausstiegsknopf                                    | ✅    | V-02    |
 |                          | Fachgebundenes Üben, fällige Karten je Fach                                        | ✅    | V-06    |
 |                          | Zahl zeigt Vokabeln statt Karten; Richtung aus `subject.language`                  | ✅    | V-06a   |
+|                          | „Gemischt“ mischt die Richtungen wirklich; EXIF-Drehung beim Foto                  | ✅    | V-07    |
+|                          | Lernstand über den ganzen Wortschatz; Antwortart wählbar (Auswahl/Tippen)          | ✅    | V-08    |
 |                          | Prüfungsmodus, Schwachstellen, Mix                                                 | 🌑    | V-04    |
 | **Heute**                |                                                                                    | 🌒    |         |
 |                          | Attrappe mit Platzhalter-Zahlen (F-07)                                             | 🌒    | F-07    |

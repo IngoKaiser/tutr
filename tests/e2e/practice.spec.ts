@@ -49,6 +49,46 @@ test.describe("Übungssession", () => {
     // Vokabeln mit je zwei Karten – die Kachel zeigt 12, nicht 24.
     await expect(page.getByText("12 fällig")).toBeVisible();
     await expect(page.getByText("Kommt mit V-04.")).toHaveCount(2);
+
+    // V-08: Lernstand über den ganzen Wortschatz, nicht nur die Fälligen –
+    // die drei Kacheln heißen jetzt „Neu / Am Üben / Sitzt". Exakte Zahlen
+    // wandern, sobald ein anderer Test eine Karte beantwortet hat; hier zählt
+    // nur, dass der Fortschritt überhaupt sichtbar ist.
+    for (const label of ["Neu", "Am Üben", "Sitzt"]) {
+      await expect(page.getByText(label, { exact: true })).toBeVisible();
+    }
+  });
+
+  test("die Antwortart lässt sich auf Tippen zwingen, auch wenn die Karte neu ist (V-08)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
+    );
+
+    await page.goto("/heute");
+    const kindButton = page.getByRole("button", { name: "Kind" });
+    await kindButton.click();
+    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
+
+    await page.goto("/ueben");
+    const nichtsFaellig = await page
+      .getByText("Nichts fällig. Schau später wieder vorbei.")
+      .count();
+    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
+
+    // Alle Seed-Karten sind 'neu' → ohne Umschalter käme Multiple Choice
+    // (modeForCardState()). „Tippen" erzwingt das Eingabefeld trotzdem.
+    await page
+      .getByRole("radiogroup", { name: "Antwortart" })
+      .getByRole("radio", { name: "Tippen" })
+      .click();
+    await page.getByRole("button", { name: "Loslegen" }).click();
+
+    await expect(page.locator("input[autocomplete='off']")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("button.text-left")).toHaveCount(0);
   });
 
   test("Richtungsumschalter beschriftet sich aus der Fachsprache (V-06a)", async ({

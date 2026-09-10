@@ -15,6 +15,14 @@
  *    EXIF-Daten nicht mit – Aufnahmeort und Gerät bleiben auf dem Telefon.
  *    Zu ADR 0007 D6 („das Foto wird nicht gespeichert") passt, das GPS
  *    dann auch gar nicht erst zu verschicken.
+ *
+ * Der Haken an Punkt 3: Die EXIF-Orientierung fällt mit weg. Ein Handy legt
+ * ein quergehaltenes Foto oft aufrecht im Speicher ab und notiert „drehen"
+ * nur im Tag – ohne den landet die Buchseite um 90° gekippt auf dem Canvas
+ * und genau so bei der Bilderkennung, die gedrehte Zeilen schlecht liest.
+ * `createImageBitmap(file, { imageOrientation: "from-image" })` backt die
+ * Drehung vor dem Zeichnen in die Pixel; erst danach wirft das Canvas den
+ * Rest der Metadaten weg.
  */
 
 /** Lange Kante nach dem Verkleinern. Darüber bringt es der Erkennung nichts. */
@@ -35,7 +43,7 @@ export type PreparedImage = {
  * codiert – sonst blieben die EXIF-Daten erhalten (Grund 3 oben).
  */
 export async function prepareImageForUpload(file: File): Promise<PreparedImage> {
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));

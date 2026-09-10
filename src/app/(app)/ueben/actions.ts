@@ -44,12 +44,16 @@ async function requireStudentActor(): Promise<Actor | null> {
   return actor?.role === "student" ? actor : null;
 }
 
-export type DueOverview = {
-  /** Grober Ausblick aus dem FSRS-Zustand, nicht die Session selbst –
-   *  die Stapel entstehen erst beim Üben (siehe `session.ts`). */
-  wiederholen: number;
+export type MasteryOverview = {
+  /** Vokabeln des Fachs, bei denen **keine** Richtung je eine Antwort gesehen
+   *  hat (jede Karte noch im Zustand `neu`). */
   neu: number;
-  erneutLernen: number;
+  /** Vokabeln, an denen gearbeitet wird: mindestens eine Richtung angefangen,
+   *  aber noch nicht **jede** Richtung gefestigt. Hier zählt jeder Anfang –
+   *  sonst bewegte sich die Zahl praktisch nie (V-08). */
+  amUeben: number;
+  /** Vokabeln, bei denen **jede** Richtung im FSRS-Zustand `wiederholen` ist. */
+  sitzt: number;
 };
 
 export type DueBySubject = {
@@ -57,21 +61,30 @@ export type DueBySubject = {
   subjectName: string;
   /** ISO-639-1 der Zielsprache, `null` bei einem Frage-Antwort-Fach (V-06a). */
   language: string | null;
+  /** Fällige Vokabeln **heute** – die Handlungszahl. Treibt „X fällig" und ob
+   *  der Block überhaupt erscheint. */
   total: number;
-} & DueOverview;
+} & MasteryOverview;
 
 /**
- * Fällige Vokabeln je Fach (V-06, ADR 0008 D3; gezählt seit V-06a) – **nie**
- * eine Zahl über alles. Niemand übt Französisch- und Spanischvokabeln in
- * derselben Runde; eine Übungssession läuft immer in genau einem Fach.
+ * Fällige Vokabeln je Fach plus Lernstand über den ganzen Wortschatz (V-06,
+ * ADR 0008 D3; Lernstand seit V-08) – **nie** eine Zahl über alle Fächer.
+ * Niemand übt Französisch- und Spanischvokabeln in derselben Runde; eine
+ * Übungssession läuft immer in genau einem Fach.
  *
  * **Gezählt wird die Vokabel, nicht die Karte** (V-06a). Eine Vokabel hat
- * zwei Karten (vorwärts/rückwärts), aber „Gemischt" fragt sie je Runde nur
- * einmal – die frühere Zählung über `card` zeigte deshalb das Doppelte
- * („166 fällig" statt 83). `distinct on` wählt je Vokabel die früher fällige
- * Karte; deren Zustand steht dann für die Vokabel im Stapel. `coalesce(…,
- * c.id)` hält Lernziel-Karten (M-03, `vocab_item_id` null) auseinander,
- * statt sie alle zu einer Zeile zu verschmelzen.
+ * zwei Karten (vorwärts/rückwärts). Der CTE fasst sie über zwei Booleans
+ * zusammen: `ganz_neu` (jede Karte noch `neu`) und `ganz_fest` (jede Karte
+ * `wiederholen`). „Neu" und „Sitzt" verlangen also **alle** Richtungen,
+ * „Am Üben" ist alles dazwischen – schon eine angefangene Richtung reicht.
+ * `coalesce(…, c.id)` hält Lernziel-Karten (M-03, `vocab_item_id` null)
+ * auseinander, statt sie alle zu einer Zeile zu verschmelzen.
+ *
+ * `total` zählt weiter nur, was **heute fällig** ist (`bool_or(due_at <=
+ * now())`) – der Lernstand dagegen über den gesamten Wortschatz, sonst
+ * stünde in „Sitzt" fast immer 0: Eine gefestigte Karte ist per Definition
+ * erst in Tagen wieder fällig und fiele aus einer nur-fällig-Zählung heraus.
+ * Genau das war der Fund aus der Praxis (V-08): sichtbarer Fortschritt fehlte.
  *
  * Das Fach kommt für beide Kartenquellen aus derselben Herkunft: Bei
  * Vokabelkarten über `vocab_item.subject_id` (n:1, V-05), bei Lernziel-Karten
@@ -90,51 +103,50 @@ export async function loadDueBySubject(): Promise<DueBySubject[] | null> {
     subject_id: string;
     subject_name: string;
     language: string | null;
-    state: CardStateValue;
-    n: string;
+    total: string;
+    neu: string;
+    am_ueben: string;
+    sitzt: string;
   };
 
   return withActor(actor, async (tx) => {
     const rows = await tx.execute<Row>(
-      sql`select s.id as subject_id, s.name as subject_name, s.language, gewaehlt.state,
-                 count(*)::text as n
-          from (
-            select distinct on (coalesce(vi.subject_id, t.subject_id), coalesce(c.vocab_item_id, c.id))
+      sql`with karte_pro_vokabel as (
+            select
               coalesce(vi.subject_id, t.subject_id) as subj_id,
-              c.state
+              coalesce(c.vocab_item_id, c.id)       as vok_key,
+              bool_and(c.state = 'neu')             as ganz_neu,
+              bool_and(c.state = 'wiederholen')     as ganz_fest,
+              bool_or(c.due_at <= now())            as faellig
             from card c
             left join vocab_item vi on vi.id = c.vocab_item_id
             left join learning_objective lo on lo.id = c.objective_id
             left join topic t on t.id = lo.topic_id
-            where c.due_at <= now()
-            order by coalesce(vi.subject_id, t.subject_id),
-                     coalesce(c.vocab_item_id, c.id),
-                     c.due_at asc,
-                     c.direction asc nulls last
-          ) gewaehlt
-          join subject s on s.id = gewaehlt.subj_id
-          group by s.id, s.name, s.language, gewaehlt.state`,
+            group by 1, 2
+          )
+          select
+            s.id as subject_id, s.name as subject_name, s.language,
+            count(*) filter (where kpv.faellig)::text as total,
+            count(*) filter (where kpv.ganz_neu)::text as neu,
+            count(*) filter (where not kpv.ganz_neu and not kpv.ganz_fest)::text as am_ueben,
+            count(*) filter (where kpv.ganz_fest)::text as sitzt
+          from karte_pro_vokabel kpv
+          join subject s on s.id = kpv.subj_id
+          group by s.id, s.name, s.language
+          having count(*) filter (where kpv.faellig) > 0`,
     );
 
-    const bySubject = new Map<string, DueBySubject>();
-    for (const row of rows) {
-      const entry = bySubject.get(row.subject_id) ?? {
+    return rows
+      .map((row) => ({
         subjectId: row.subject_id,
         subjectName: row.subject_name,
         language: row.language,
-        total: 0,
-        wiederholen: 0,
-        neu: 0,
-        erneutLernen: 0,
-      };
-      const n = Number(row.n);
-      entry.total += n;
-      if (row.state === "wiederholen") entry.wiederholen += n;
-      else if (row.state === "neu" || row.state === "lernen") entry.neu += n;
-      else if (row.state === "erneut_lernen") entry.erneutLernen += n;
-      bySubject.set(row.subject_id, entry);
-    }
-    return [...bySubject.values()].sort((a, b) => a.subjectName.localeCompare(b.subjectName, "de"));
+        total: Number(row.total),
+        neu: Number(row.neu),
+        amUeben: Number(row.am_ueben),
+        sitzt: Number(row.sitzt),
+      }))
+      .sort((a, b) => a.subjectName.localeCompare(b.subjectName, "de"));
   });
 }
 
@@ -158,14 +170,19 @@ export type SessionCardContent = {
  *
  * `direction` filtert zusätzlich nach ADR 0007 D5 – `null` heißt gemischt
  * (die Voreinstellung). **Gemischt liefert je Vokabel genau eine Karte**
- * (V-06a): die früher fällige, bei gleichem `due_at` die vorwärts-Karte.
- * Sonst käme jede Vokabel zweimal in derselben Runde, und die angezeigte
- * Zahl stimmte nicht mehr mit der Zahl der Fragen überein.
+ * (V-06a), und **welche, entscheidet `random()`** (V-07). Beide Karten sind
+ * ohnehin fällig (`due_at <= now()`), die Reihenfolge dazwischen trägt kein
+ * Signal.
  *
- * `c.direction asc` heißt hier **vorwärts zuerst**: `vocab_direction` ist ein
- * `pgEnum`, Postgres sortiert es nach Deklarationsreihenfolge
- * (`["vorwaerts", "rueckwaerts"]`), nicht alphabetisch. Nicht auf `desc`
- * „korrigieren" – das drehte die Vorzugsrichtung um.
+ * Vorher stand hier `order by … c.due_at asc, c.direction asc`. Zwei Gründe,
+ * warum das „Gemischt" faktisch auf Fremdwort → Deutsch festnagelte: Die
+ * beiden Karten einer Vokabel haben in der Praxis **nie** exakt dasselbe
+ * `due_at` (millisekundengenau, gegen die Produktiv-DB geprüft), also
+ * entschied immer schon `due_at` – und wo es doch zum Gleichstand kam, sortiert
+ * Postgres das `pgEnum` `vocab_direction` nach Deklarationsreihenfolge
+ * (`["vorwaerts", "rueckwaerts"]`), nicht alphabetisch. `random()` als
+ * einziger Sortierschlüssel nach der `distinct on`-Spalte mischt die
+ * Richtungen jetzt wirklich; über eine Reihe hinweg kommt jede etwa gleich oft.
  */
 export async function loadSessionCards(
   subjectId: string,
@@ -196,7 +213,7 @@ export async function loadSessionCards(
                   vi.term, vi.translation, c.due_at
                 from card c join vocab_item vi on vi.id = c.vocab_item_id
                 where c.due_at <= now() and vi.subject_id = ${subjectId}
-                order by c.vocab_item_id, c.due_at asc, c.direction asc
+                order by c.vocab_item_id, random()
               ) gewaehlt
               order by due_at`,
     );

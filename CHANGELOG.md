@@ -4,7 +4,31 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Fixed
+
+- **V-07: „Gemischt“ mischt jetzt wirklich, und hochkant fotografierte Seiten werden
+  gelesen.** Zwei Funde aus dem Vokabelüben. „Gemischt“ fragte die ganze Zeit nur
+  Fremdwort → Deutsch ab: Die beiden Karten einer Vokabel haben in der Praxis nie exakt
+  dasselbe `due_at`, also entschied immer der zweite Sortierschlüssel `c.direction` – und
+  weil `vocab_direction` ein `pgEnum` ist, sortiert Postgres den nach
+  Deklarationsreihenfolge (`vorwaerts` zuerst). Jetzt ist `random()` der einzige Schlüssel
+  nach der `distinct on`-Spalte; beide Karten sind ohnehin fällig, die Reihenfolge trägt
+  kein Signal. Gegen die Produktiv-DB über mehrere Läufe geprüft. Dazu: eine quer
+  gehaltene Handy-Aufnahme kam um 90° gekippt bei der Bilderkennung an – jetzt backt
+  `createImageBitmap(file, { imageOrientation: "from-image" })` die EXIF-Drehung vor dem
+  Verkleinern in die Pixel.
+
 ### Changed
+
+- **V-08: Fortschritt beim Üben wird sichtbar, Antwortart ist wählbar.** „Warum sind alle
+  Vokabeln immer in ‚Übe ich‘, ich sehe keinen Fortschritt“ – zu Recht: Die Übersicht
+  zählte nur, was heute fällig ist, und eine gefestigte Karte ist per Definition erst in
+  Tagen wieder fällig. Der Lernstand zählt jetzt über den **ganzen** Wortschatz des Fachs,
+  je Vokabel zusammengefasst: „Neu“ (keine Richtung angefangen), „Sitzt“ (jede Richtung
+  gefestigt), „Am Üben“ dazwischen – schon ein Anfang zählt. Die „X fällig“-Zahl bleibt
+  die Handlungszahl. Dazu ein Umschalter „Antwortart“ (Automatisch / Auswahl / Tippen):
+  „Tippen“ erzwingt die Eingabe auch bei neuen Karten, für „das erste Level sitzt schon“ –
+  der Server bewertet ohnehin selbst, egal welche Frageform.
 
 - **T-07b: Tutor-Chat aufgeräumt, Vorlese-Stimme verbessert.** Aus der Rückmeldung am
   Live-Chat. Die Kopfzeile – Weg zurück zu den Gesprächen und der Fach-Chip – bleibt beim

@@ -185,27 +185,27 @@ export function Button({
   );
 }
 
-/** Drei Stapel der Vokabel-Session (§6 M4). */
-export function Stack({
-  confident,
-  practicing,
-  again,
-}: {
-  confident: number;
-  practicing: number;
-  again: number;
-}) {
-  const items = [
-    { count: confident, name: "Kann ich", colorClass: "bg-sicher-hell text-sicher" },
-    { count: practicing, name: "Übe ich", colorClass: "bg-koenigsblau-hell text-koenigsblau" },
-    { count: again, name: "Nochmal", colorClass: "bg-offen-hell text-offen" },
-  ];
+export type StapelTon = "sicher" | "koenigsblau" | "offen" | "leise";
+
+const STAPEL_TON_KLASSE: Record<StapelTon, string> = {
+  sicher: "bg-sicher-hell text-sicher",
+  koenigsblau: "bg-koenigsblau-hell text-koenigsblau",
+  offen: "bg-offen-hell text-offen",
+  leise: "bg-papier-tief text-tinte-leise",
+};
+
+/**
+ * Eine Reihe gleich breiter Zahlkacheln (§6 M4). Die Beschriftung kommt vom
+ * Aufrufer: das Üben zeigt den Lernstand („Neu / Am Üben / Sitzt", V-08), der
+ * Heute-Screen die Tagesbilanz.
+ */
+export function Stack({ items }: { items: { count: number; name: string; tone: StapelTon }[] }) {
   return (
     <div className="flex gap-1.5">
       {items.map((item) => (
         <div
           key={item.name}
-          className={`flex flex-1 flex-col gap-0.5 rounded-[7px] px-2 py-2.5 ${item.colorClass}`}
+          className={`flex flex-1 flex-col gap-0.5 rounded-[7px] px-2 py-2.5 ${STAPEL_TON_KLASSE[item.tone]}`}
         >
           <span className="text-lg leading-none font-semibold tabular-nums">{item.count}</span>
           <span className="text-[0.625rem] font-semibold">{item.name}</span>
