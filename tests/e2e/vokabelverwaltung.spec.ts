@@ -103,6 +103,20 @@ test.describe("Vokabelverwaltung", () => {
     const dateifelder = page.locator('input[type="file"]');
     await expect(dateifelder).toHaveCount(2);
     await expect(page.locator('input[type="file"][capture]')).toHaveCount(1);
+
+    // V-10: erst sammeln, dann einlesen. Die Auswahl allein startet keinen
+    // Server-Aufruf (der Vision-Weg läuft hier ohnehin nicht) – sie legt eine
+    // Kachel an, die sich noch drehen und wegnehmen lässt.
+    await page.locator('input[type="file"]:not([capture])').setInputFiles({
+      name: "seite.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("nicht-wirklich-ein-jpeg"),
+    });
+    await expect(page.getByRole("button", { name: "Einlesen" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Bild 1 drehen" })).toBeVisible();
+    await page.getByRole("button", { name: "Bild 1 entfernen" }).click();
+    await expect(page.getByRole("button", { name: "Einlesen" })).toHaveCount(0);
+
     await page.getByRole("button", { name: "Abbrechen" }).click();
 
     // --- Einfügen: alle vier Fälle in einem Text --------------------------

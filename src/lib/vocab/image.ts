@@ -23,6 +23,10 @@
  * `createImageBitmap(file, { imageOrientation: "from-image" })` backt die
  * Drehung vor dem Zeichnen in die Pixel; erst danach wirft das Canvas den
  * Rest der Metadaten weg.
+ *
+ * Wo das EXIF-Tag fehlt oder falsch ist, hilft nur eine Hand: `rotationDeg`
+ * (0/90/180/270, aus dem ↻-Knopf der Galerie, V-10) dreht zusätzlich, bevor
+ * verkleinert und codiert wird.
  */
 
 /** Lange Kante nach dem Verkleinern. Darüber bringt es der Erkennung nichts. */
@@ -37,25 +41,41 @@ export type PreparedImage = {
   mediaType: "image/jpeg";
 };
 
+/** `deg` auf einen der vier rechten Winkel bringen (auch bei negativen Werten). */
+export function normalizeRotation(deg: number): 0 | 90 | 180 | 270 {
+  const r = (((Math.round(deg / 90) * 90) % 360) + 360) % 360;
+  return r as 0 | 90 | 180 | 270;
+}
+
 /**
- * Verkleinert das Bild auf `MAX_EDGE` und gibt es als Base64-JPEG zurück.
- * Ein bereits kleineres Bild wird nicht vergrößert, aber trotzdem neu
- * codiert – sonst blieben die EXIF-Daten erhalten (Grund 3 oben).
+ * Verkleinert das Bild auf `MAX_EDGE`, dreht es um `rotationDeg` und gibt es
+ * als Base64-JPEG zurück. Ein bereits kleineres Bild wird nicht vergrößert,
+ * aber trotzdem neu codiert – sonst blieben die EXIF-Daten erhalten (Grund 3
+ * oben).
  */
-export async function prepareImageForUpload(file: File): Promise<PreparedImage> {
+export async function prepareImageForUpload(file: File, rotationDeg = 0): Promise<PreparedImage> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
 
+    const drehung = normalizeRotation(rotationDeg);
+    const quer = drehung === 90 || drehung === 270;
+
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    // Bei einer Vierteldrehung tauschen Breite und Höhe die Rollen.
+    canvas.width = quer ? height : width;
+    canvas.height = quer ? width : height;
 
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Das Bild ließ sich im Browser nicht verkleinern.");
-    context.drawImage(bitmap, 0, 0, width, height);
+    // Ursprung in die Mitte, drehen, dann das Bild um seine halbe Kante
+    // versetzt zeichnen – so bleibt es zentriert, egal um welchen rechten
+    // Winkel gedreht wird.
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate((drehung * Math.PI) / 180);
+    context.drawImage(bitmap, -width / 2, -height / 2, width, height);
 
     const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
     const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
