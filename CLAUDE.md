@@ -9,6 +9,7 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 - `docs/konzept.md` ist die Spezifikation (v2). Nie komplett laden – gezielt nach Abschnitt fragen:
   §3 Lernpfad · §4/§4a Tutor + Hausaufgaben · §6 Module · §8 Datenmodell · §9 Schuljahr · §10 Themen/Schichten · §11 Architektur + Auth
 - `docs/PLAN.md` ist der Backlog. Arbeite immer an genau einem Ticket daraus.
+- `docs/features.md` ist der Blick von oben: welcher Bereich wie weit ist. Bei jedem Feature-PR mitziehen.
 - `docs/adr/` enthält getroffene Entscheidungen. Widersprich ihnen nicht stillschweigend – schlag einen neuen ADR vor.
 
 ## Domänenregeln (nicht verhandelbar)
@@ -45,7 +46,7 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 3. Tests gehören zum Feature: Unit (Vitest) für Logik, Integration für Server Actions, E2E (Playwright) für den Nutzerpfad. Ein Feature ohne Test ist nicht fertig.
 4. Vor jedem Commit: `npm run check` (lint + typecheck + unit tests) muss grün sein. Hooks erzwingen das.
 5. Commits nach Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`), klein und thematisch.
-6. Nach dem Feature: `docs/PLAN.md` (Status, offene Punkte) und `CHANGELOG.md` unter Unreleased aktualisieren. Kein Statusbericht im Chat, wenn er im Plan steht.
+6. Nach dem Feature: `docs/PLAN.md` (Status, offene Punkte), `docs/features.md` (Stand-Spalte) und `CHANGELOG.md` unter Unreleased aktualisieren. Kein Statusbericht im Chat, wenn er im Plan steht.
 
 ## Definition of Done
 
@@ -54,7 +55,7 @@ Next.js 16 (App Router, `src/`), TypeScript strict, Tailwind 4, Supabase (Postgr
 - [ ] RLS für neue/geänderte Tabellen
 - [ ] Keine neuen Lint-Warnungen, keine `any`
 - [ ] Nutzerfreundliche Fehlermeldungen auf Deutsch
-- [ ] `docs/PLAN.md` und `CHANGELOG.md` (Unreleased) aktualisiert; ADR, falls eine Entscheidung gefallen ist
+- [ ] `docs/PLAN.md`, `docs/features.md` und `CHANGELOG.md` (Unreleased) aktualisiert; ADR, falls eine Entscheidung gefallen ist
 
 ## Befehle
 
