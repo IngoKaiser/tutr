@@ -131,15 +131,26 @@ export function LearningPath({ stage }: { stage: number }) {
   );
 }
 
-/** Kontext-Chip „Fach › Thema" (§15). Steht immer über der Tutor-Eingabe. */
-export function ContextChip({ subject, topic }: { subject: string; topic: string }) {
+/**
+ * Kontext-Chip „Fach › Thema" (§15). Steht immer über der Tutor-Eingabe.
+ *
+ * `topic` ist optional: Solange es keine Themen-Oberfläche gibt, kommt das
+ * Thema laut §4a ohnehin daher, dass man aus einer Themenseite in den Tutor
+ * geht – bis dahin zeigt der Chip nur das Fach. Ein Platzhalter wie „ohne
+ * Thema" würde auf eine Lücke zeigen, statt Kontext zu geben.
+ */
+export function ContextChip({ subject, topic }: { subject: string; topic?: string | null }) {
   return (
     <span className="bg-koenigsblau-hell text-koenigsblau inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-[0.8125rem] font-medium">
-      {subject}{" "}
-      <span aria-hidden="true" className="opacity-55">
-        ›
-      </span>{" "}
-      {topic}
+      {subject}
+      {topic ? (
+        <>
+          <span aria-hidden="true" className="opacity-55">
+            ›
+          </span>
+          {topic}
+        </>
+      ) : null}
     </span>
   );
 }
