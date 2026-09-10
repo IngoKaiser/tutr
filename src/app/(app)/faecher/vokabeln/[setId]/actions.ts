@@ -62,6 +62,7 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
     term: string;
     translation: string;
     recognition_uncertain: boolean;
+    confirmed_at: string | null;
   };
 
   return withActor(actor, async (tx) => {
@@ -73,7 +74,7 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
     if (!set) return null;
 
     const items = await tx.execute<ItemRow>(
-      sql`select vi.id, vi.term, vi.translation, vi.recognition_uncertain
+      sql`select vi.id, vi.term, vi.translation, vi.recognition_uncertain, vi.confirmed_at
           from vocab_set_item vsi
           join vocab_item vi on vi.id = vsi.vocab_item_id
           where vsi.vocab_set_id = ${setId}`,
@@ -358,11 +359,15 @@ export async function updateItem(
     tx.execute(
       // `recognition_uncertain` fällt beim Bearbeiten weg: Wer die Zeile
       // aufgeklappt und gespeichert hat, hat daraufgeschaut – und genau das
-      // war der Zweck der Markierung (V-03b, ADR 0007 D2). Der Lernstand
-      // bleibt davon unberührt, `card`/`review` fasst diese Abfrage nicht an.
+      // war der Zweck der Markierung (V-03b, ADR 0007 D2). Seit V-09 setzt
+      // dasselbe Speichern auch `confirmed_at`: Es beantwortet die Frage
+      // „stimmt das?" genauso wie ein ausdrückliches „Passt so", und ohne
+      // das bliebe eine korrigierte Doppel-Zeile (`pasar`) weiter markiert
+      // und vom Üben ausgeschlossen. Der Lernstand bleibt unberührt,
+      // `card`/`review` fasst diese Abfrage nicht an.
       sql`update vocab_item
           set term = ${term.trim()}, translation = ${translation.trim()},
-              recognition_uncertain = false
+              recognition_uncertain = false, confirmed_at = now()
           where id = ${itemId}`,
     ),
   );
@@ -382,6 +387,33 @@ export async function deleteItem(setId: string, itemId: string): Promise<void> {
   if (!actor) return;
 
   await withActor(actor, (tx) => tx.execute(sql`delete from vocab_item where id = ${itemId}`));
+  revalidatePath(`/faecher/vokabeln/${setId}`);
+  revalidatePath("/faecher/vokabeln");
+}
+
+/**
+ * „Passt so" – die Zeile ist geprüft und richtig (V-09).
+ *
+ * Für den Fall, in dem es **nichts zu korrigieren** gibt: `pasar` =
+ * verbringen *und* passieren. Beide Zeilen stimmen, aber „gleiches Wort,
+ * andere Übersetzung" wird abgeleitet und bliebe ohne diesen Weg für immer
+ * ein „prüfen" – und die Vokabel damit für immer vom Üben ausgeschlossen.
+ *
+ * Bewusst getrennt von `updateItem()`, obwohl das dieselbe Spalte setzt:
+ * Akzeptieren ohne Änderung soll nicht erzwingen, dass man Wort und
+ * Übersetzung noch einmal durch die Formularfelder schickt.
+ */
+export async function confirmItem(setId: string, itemId: string): Promise<void> {
+  const actor = await requireStudentActor();
+  if (!actor) return;
+
+  await withActor(actor, (tx) =>
+    tx.execute(
+      sql`update vocab_item
+          set confirmed_at = now(), recognition_uncertain = false
+          where id = ${itemId}`,
+    ),
+  );
   revalidatePath(`/faecher/vokabeln/${setId}`);
   revalidatePath("/faecher/vokabeln");
 }

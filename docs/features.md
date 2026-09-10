@@ -56,6 +56,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Foto-Import als Minigalerie, echte Fehlerursachen                                  | ✅    | V-03c   |
 |                          | Foto-Import: erst sammeln dann „Einlesen“, drehen, einzeln entfernen               | ✅    | V-10    |
 |                          | Wischen zum Löschen mit Rückgängig-Fenster (Liste + Waisen)                        | ✅    | V-11    |
+|                          | „Geprüft“-Zustand: akzeptierte Zeilen normal, Ungeprüftes nicht im Üben            | ✅    | V-09    |
 |                          | Fachbindung im Modell (ADR 0008)                                                   | ✅    | V-05    |
 |                          | Vokabeln ohne Set sichtbar/löschbar machen                                         | ✅    | V-03d   |
 |                          | Set-Modus: ein Set gezielt vor der Arbeit üben                                     | 🌑    | V-04    |
@@ -79,14 +80,14 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Datei-Import CSV/XLSX (SchulDock) + ICS                                            | 🌑    | K-04    |
 | **Tutor & Hausaufgaben** |                                                                                    | 🌓    |         |
 |                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                      | ✅    | T-01a   |
-|                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen", Streaming             | ✅    | T-02    |
+|                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen“, Streaming             | ✅    | T-02    |
 |                          | Sprachwächter (Tutor antwortet auf Deutsch, Fach-Ausnahme)                         | ✅    | T-02a   |
 |                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | ✅    | S-03b   |
 |                          | Chat-Shell: Übersicht + Gespräch, klebendes Eingabefeld, ↓-Knopf                   | ✅    | T-07    |
 |                          | Antworten als Markdown lesbar (Fettung, Listen)                                    | ✅    | T-08    |
 |                          | Altersgerechte Ansprache nach Jahrgang                                             | ✅    | T-09    |
 |                          | Kontextpaket, Schichten mit Quellenangabe, Prompt Caching                          | 🌑    | T-01    |
-|                          | „Erklär es anders", Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
+|                          | „Erklär es anders“, Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
 |                          | Elternsicht entschieden (ADR 0012: was, nicht wie gut)                             | ✅    | T-01c   |
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter                                  | 🌒    | T-03    |
 |                          | Einstieg Vorschau (Selbsteinschätzung → Hook)                                      | 🌑    | T-04    |

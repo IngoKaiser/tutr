@@ -7,7 +7,13 @@ import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
 import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 import type { VocabRow } from "@/lib/vocab/review-list";
 
-import { assignOrphanToSet, deleteOrphan, updateOrphan, type OrphanView } from "./actions";
+import {
+  assignOrphanToSet,
+  confirmOrphan,
+  deleteOrphan,
+  updateOrphan,
+  type OrphanView,
+} from "./actions";
 
 const FIELD =
   "border-linie-stark bg-flaeche text-tinte placeholder:text-tinte-leise focus-visible:outline-koenigsblau rounded-[9px] border px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1";
@@ -119,6 +125,14 @@ function OrphanRow({
     });
   }
 
+  /** „Passt so" – siehe `confirmItem()` in der Set-Liste (V-09). */
+  function confirm() {
+    startTransition(async () => {
+      await confirmOrphan(subjectId, item.id);
+      setOpen(false);
+    });
+  }
+
   function assign() {
     if (!setId) return;
     startTransition(async () => {
@@ -145,6 +159,11 @@ function OrphanRow({
         <Button onClick={save} disabled={pending}>
           {pending ? "…" : "Speichern"}
         </Button>
+        {item.unsicher ? (
+          <Button quiet onClick={confirm} disabled={pending}>
+            {pending ? "…" : "Passt so"}
+          </Button>
+        ) : null}
         <Button quiet onClick={() => setOpen(false)} disabled={pending}>
           Abbrechen
         </Button>

@@ -11,6 +11,7 @@ import {
   addFromPaste,
   addFromPhoto,
   addManualItem,
+  confirmItem,
   deleteItem,
   updateItem,
   type AddSummary,
@@ -54,7 +55,8 @@ export function VocabList({
         <Notice>
           {unsichereAnzahl === 1
             ? "1 Zeile solltest du prüfen."
-            : `${unsichereAnzahl} Zeilen solltest du prüfen.`}
+            : `${unsichereAnzahl} Zeilen solltest du prüfen.`}{" "}
+          Solange kommen sie im Üben nicht dran.
         </Notice>
       ) : null}
 
@@ -611,6 +613,18 @@ function VocabRowItem({
     });
   }
 
+  /**
+   * „Passt so" – akzeptieren, ohne etwas zu ändern (V-09). Steht nur bei
+   * Zeilen, die ein „prüfen" tragen: der Fall `pasar`, wo beide
+   * Übersetzungen richtig sind und es nichts zu korrigieren gibt.
+   */
+  function confirm() {
+    startTransition(async () => {
+      await confirmItem(setId, item.id);
+      setOpen(false);
+    });
+  }
+
   return (
     <li className="border-koenigsblau bg-koenigsblau-hell flex flex-col gap-2 rounded-[9px] border px-3 py-2.5">
       <label className="flex flex-col gap-1">
@@ -629,6 +643,11 @@ function VocabRowItem({
         <Button onClick={save} disabled={pending}>
           {pending ? "…" : "Speichern"}
         </Button>
+        {item.unsicher ? (
+          <Button quiet onClick={confirm} disabled={pending}>
+            {pending ? "…" : "Passt so"}
+          </Button>
+        ) : null}
         <Button quiet onClick={() => setOpen(false)} disabled={pending}>
           Abbrechen
         </Button>

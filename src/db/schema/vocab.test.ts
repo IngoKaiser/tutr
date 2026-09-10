@@ -2,6 +2,8 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
+import { practiceReadySql } from "../../lib/vocab/practice-filter";
+import { withDerivedUnsicher } from "../../lib/vocab/review-list";
 import { runWithActor, type Actor } from "../actor";
 import {
   connectAsAppRole,
@@ -18,8 +20,8 @@ import {
  * RLS-Richtung wie topic/learning_objective (ADR 0004 D4): Kind liest und
  * schreibt, Eltern lesen nur. Der interessante Teil ist nicht die Richtung –
  * die ist Kopie –, sondern die beiden Check-Constraints an `card`, die
- * dessen Generizität erzwingen: „genau eine Quelle" und „Richtung nur bei
- * einer Vokabelkarte".
+ * dessen Generizität erzwingen: „genau eine Quelle“ und „Richtung nur bei
+ * einer Vokabelkarte“.
  *
  * Läuft nur bei `npm run db:test` (RUN_DB_TESTS=1).
  */
@@ -300,6 +302,85 @@ describe.skipIf(!testDbAvailable())(
       expect(sicht.sets).toHaveLength(0);
       expect(sicht.items).toHaveLength(0);
       expect(sicht.cards).toHaveLength(0);
+    });
+
+    /**
+     * V-09: `practiceReadySql` (SQL) und `withDerivedUnsicher()` (TypeScript)
+     * sind zwei Fassungen derselben Regel an zwei Orten. Dieser Test hält
+     * sie an denselben Zeilen gegeneinander – gegen die echte Datenbank,
+     * nicht gegen eine nachgebaute Vorstellung davon.
+     */
+    test("was „prüfen“ trägt, wird nicht abgefragt – SQL und TypeScript sind sich einig", async () => {
+      const bestaetigt = "2026-09-11T00:00:00.000Z";
+      const zeilen = [
+        { term: "sauber", translation: "propre", unsicher: false, confirmed: null },
+        { term: "ohne", translation: "", unsicher: false, confirmed: null },
+        { term: "ohne-ok", translation: "", unsicher: false, confirmed: bestaetigt },
+        { term: "geraten", translation: "deviné", unsicher: true, confirmed: null },
+        { term: "geraten-ok", translation: "deviné", unsicher: true, confirmed: bestaetigt },
+        { term: "pasar", translation: "verbringen", unsicher: false, confirmed: null },
+        { term: "pasar", translation: "passieren", unsicher: false, confirmed: null },
+        { term: "quedar", translation: "bleiben", unsicher: false, confirmed: bestaetigt },
+        { term: "quedar", translation: "verabreden", unsicher: false, confirmed: bestaetigt },
+      ];
+
+      const ids = await runWithActor(app.db, student(A.studentId), async (tx) => {
+        const angelegt: { id: string; term: string; translation: string }[] = [];
+        for (const z of zeilen) {
+          const [row] = await tx.execute<{ id: string }>(
+            sql`insert into vocab_item
+                  (student_id, subject_id, term, translation, recognition_uncertain, confirmed_at)
+                values (${A.studentId}, ${A.subject}, ${z.term}, ${z.translation},
+                        ${z.unsicher}, ${z.confirmed})
+                returning id`,
+          );
+          angelegt.push({ id: row!.id, term: z.term, translation: z.translation });
+        }
+        return angelegt;
+      });
+
+      const abfragbar = await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute<{ id: string }>(
+          sql`select vi.id from vocab_item vi
+              where vi.subject_id = ${A.subject} and ${practiceReadySql}`,
+        ),
+      );
+      const abfragbareIds = new Set(abfragbar.map((r) => r.id));
+
+      // Dieselben Zeilen durch die TypeScript-Fassung.
+      const ausListe = withDerivedUnsicher(
+        zeilen.map((z, i) => ({
+          id: ids[i]!.id,
+          term: z.term,
+          translation: z.translation,
+          recognition_uncertain: z.unsicher,
+          confirmed_at: z.confirmed,
+        })),
+      );
+
+      for (const zeile of ausListe) {
+        expect(
+          abfragbareIds.has(zeile.id),
+          `${zeile.term} / ${zeile.translation}: SQL sagt abfragbar=${abfragbareIds.has(zeile.id)}, Liste sagt prüfen=${zeile.unsicher}`,
+        ).toBe(!zeile.unsicher);
+      }
+
+      // Und die Erwartung ausgeschrieben, damit der Test auch dann etwas
+      // sagt, wenn beide Fassungen gemeinsam falsch abbiegen.
+      const nachTerm = new Map(
+        ausListe.map((z, i) => [zeilen[i]!.term + "|" + zeilen[i]!.translation, z]),
+      );
+      expect(nachTerm.get("sauber|propre")!.unsicher).toBe(false);
+      expect(nachTerm.get("ohne|")!.unsicher).toBe(true);
+      expect(nachTerm.get("ohne-ok|")!.unsicher).toBe(true); // Lücke bleibt Lücke
+      expect(nachTerm.get("geraten|deviné")!.unsicher).toBe(true);
+      expect(nachTerm.get("geraten-ok|deviné")!.unsicher).toBe(false);
+      expect(nachTerm.get("pasar|verbringen")!.unsicher).toBe(true);
+      expect(nachTerm.get("quedar|bleiben")!.unsicher).toBe(false);
+
+      await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`delete from vocab_item where subject_id = ${A.subject}`),
+      );
     });
   },
 );

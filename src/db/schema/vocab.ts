@@ -144,6 +144,24 @@ export const vocabItem = pgTable(
      * Mensch daraufgeschaut, und darum ging es.
      */
     recognitionUncertain: boolean("recognition_uncertain").notNull().default(false),
+    /**
+     * Das Kind hat diese Zeile angesehen und für richtig befunden (V-09).
+     *
+     * Die drei „prüfen"-Gründe aus ADR 0007 D2 sind teils **abgeleitet** –
+     * „gleiches Wort, andere Übersetzung" gilt sonst für immer, auch wenn
+     * beide Übersetzungen stimmen (`pasar` = verbringen / passieren). Ohne
+     * diese Spalte gäbe es keinen Weg, so eine Zeile zu akzeptieren; sie
+     * bliebe dauerhaft markiert und – seit V-09 – dauerhaft vom Üben
+     * ausgeschlossen.
+     *
+     * Nur die **ableitbaren** Gründe und `recognition_uncertain` lassen sich
+     * damit stillstellen. Ein leeres Feld bleibt markiert: Das kann man
+     * nicht akzeptieren, nur füllen.
+     *
+     * Zeitstempel statt Boolean, weil er nichts kostet und beantwortet,
+     * *wann* zuletzt hingeschaut wurde.
+     */
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     partOfSpeech: text("part_of_speech"),
     example: text("example"),
     hint: text("hint"),
