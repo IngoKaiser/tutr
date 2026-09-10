@@ -6,6 +6,16 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **T-07b: Tutor-Chat aufgeräumt, Vorlese-Stimme verbessert.** Aus der Rückmeldung am
+  Live-Chat. Die Kopfzeile – Weg zurück zu den Gesprächen und der Fach-Chip – bleibt beim
+  Scrollen **angeheftet** statt mitzuwandern; die „Tutor“-Überschrift ist weg (der aktive
+  Fußleisten-Reiter sagt das schon, und sie fraß nur Höhe). Und die vorgelesene Stimme wird
+  jetzt nach **Qualität** gewählt, nicht mehr nach „läuft lokal“: neuronale Stimmen
+  („… (Premium)“, „… (Enhanced)“, Siri) kommen zuerst, die alten kompakten werden
+  abgewertet. Dazu ein langsameres Tempo (0,92) für bessere Verständlichkeit und eine
+  Stimmenauswahl, wenn das Gerät mehrere deutsche Stimmen kennt – gemerkt im Browser, nicht
+  auf dem Server. Reicht das nicht, ist eine erzeugte Stimme (Cloud-TTS) die nächste Frage;
+  die kostet dann und braucht ein eigenes ADR.
 - **T-08 / T-09: der Tutor liest sich besser und trifft den Jahrgang.** Zwei Punkte aus der
   Rückmeldung am Live-Chat.
   **Markdown** — die Antwort kommt strukturiert (`**fett**`, Listen, Absätze), stand aber

@@ -1,10 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { diktatAnhaengen, waehleDeutscheStimme } from "./speech";
+import {
+  deutscheStimmenSortiert,
+  diktatAnhaengen,
+  stimmGuete,
+  waehleDeutscheStimme,
+} from "./speech";
 
 /** Minimaler Stimmen-Stub – nur die Felder, die die Auswahl liest. */
-function stimme(lang: string, localService: boolean, name = lang): SpeechSynthesisVoice {
-  return { lang, localService, name, default: false, voiceURI: name } as SpeechSynthesisVoice;
+function stimme(
+  lang: string,
+  opt: { local?: boolean; default?: boolean; name?: string } = {},
+): SpeechSynthesisVoice {
+  const name = opt.name ?? lang;
+  return {
+    lang,
+    localService: opt.local ?? false,
+    default: opt.default ?? false,
+    name,
+    voiceURI: name,
+  } as SpeechSynthesisVoice;
 }
 
 describe("diktatAnhaengen", () => {
@@ -27,30 +42,66 @@ describe("diktatAnhaengen", () => {
   });
 });
 
-describe("waehleDeutscheStimme", () => {
-  it("nimmt die lokale deutsche Stimme vor einer netzgebundenen", () => {
-    const v = waehleDeutscheStimme([
-      stimme("de-DE", false, "Google Deutsch"),
-      stimme("de-DE", true, "Anna"),
+describe("stimmGuete – Qualität schlägt „lokal“ (T-07b)", () => {
+  it("wertet eine Premium-/Enhanced-Stimme deutlich höher", () => {
+    const premium = stimme("de-DE", { name: "Anna (Premium)" });
+    const kompakt = stimme("de-DE", { local: true, name: "Anna" });
+    expect(stimmGuete(premium)).toBeGreaterThan(stimmGuete(kompakt));
+  });
+
+  it("straft „compact“ und „eloquence“ ab", () => {
+    expect(stimmGuete(stimme("de-DE", { name: "Anna Compact", local: true }))).toBeLessThan(0);
+  });
+
+  it("nimmt bei sonst gleichem die lokale Stimme (Datenweg, ADR 0011 D2)", () => {
+    const lokal = stimme("de-DE", { local: true, name: "Reed" });
+    const netz = stimme("de-DE", { local: false, name: "Sandy" });
+    expect(stimmGuete(lokal)).toBeGreaterThan(stimmGuete(netz));
+  });
+});
+
+describe("deutscheStimmenSortiert", () => {
+  it("bringt die neuronale Stimme vor die kompakte", () => {
+    const sortiert = deutscheStimmenSortiert([
+      stimme("de-DE", { local: true, name: "Anna" }),
+      stimme("de-DE", { name: "Grandma (Premium)" }),
+      stimme("de-DE", { name: "Eloquence Deutsch", local: true }),
     ]);
-    expect(v?.name).toBe("Anna");
+    expect(sortiert.map((v) => v.name)).toEqual(["Grandma (Premium)", "Anna", "Eloquence Deutsch"]);
   });
 
-  it("fällt auf die Sprachfamilie zurück (de-AT für de-DE)", () => {
-    const v = waehleDeutscheStimme([stimme("en-US", true), stimme("de-AT", true, "Wien")], "de-DE");
-    expect(v?.name).toBe("Wien");
-  });
-
-  it("bevorzugt exakte Sprache vor der Familie", () => {
-    const v = waehleDeutscheStimme(
-      [stimme("de-AT", true, "Wien"), stimme("de-DE", false, "Berlin")],
+  it("bei gleicher Güte kommt die exakte Region zuerst (de-DE vor de-AT)", () => {
+    const sortiert = deutscheStimmenSortiert(
+      [
+        stimme("de-AT", { local: true, name: "Wien" }),
+        stimme("de-DE", { local: true, name: "Berlin" }),
+      ],
       "de-DE",
     );
-    expect(v?.name).toBe("Berlin");
+    expect(sortiert[0]?.name).toBe("Berlin");
   });
 
-  it("gibt null zurück, wenn keine passende Stimme da ist", () => {
-    expect(waehleDeutscheStimme([stimme("en-US", true), stimme("fr-FR", true)])).toBeNull();
+  it("nimmt nur die Sprachfamilie, keine fremden Sprachen", () => {
+    const sortiert = deutscheStimmenSortiert([
+      stimme("en-US", { local: true }),
+      stimme("de-CH", { local: true, name: "Zürich" }),
+      stimme("fr-FR", { local: true }),
+    ]);
+    expect(sortiert.map((v) => v.name)).toEqual(["Zürich"]);
+  });
+});
+
+describe("waehleDeutscheStimme", () => {
+  it("gibt die beste deutsche Stimme zurück", () => {
+    const v = waehleDeutscheStimme([
+      stimme("de-DE", { local: true, name: "Anna" }),
+      stimme("de-DE", { name: "Markus (Enhanced)" }),
+    ]);
+    expect(v?.name).toBe("Markus (Enhanced)");
+  });
+
+  it("gibt null zurück, wenn keine deutsche Stimme da ist", () => {
+    expect(waehleDeutscheStimme([stimme("en-US"), stimme("fr-FR")])).toBeNull();
     expect(waehleDeutscheStimme([])).toBeNull();
   });
 });

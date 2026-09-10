@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -11,7 +12,7 @@ import {
   StoppIcon,
 } from "@/components/shell/icons";
 import { TutorMarkdown } from "@/components/shell/markdown";
-import { Block, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
+import { Block, ContextChip, Notice } from "@/components/shell/primitives";
 import { istEingeholt, naechsteLaenge } from "@/lib/tutor/stream-text";
 
 import { useDiktat, useVorlesen } from "./use-speech";
@@ -116,8 +117,21 @@ export function Conversation({
 
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader title="Tutor" back={{ href: "/tutor", label: "Gespräche" }} />
-      <ContextChip subject={subjectName} topic={topicTitle} />
+      {/* Angeheftete Kopfzeile (T-07b): Weg zurück und Fach-Kontext bleiben
+          beim Scrollen sichtbar. Keine „Tutor"-Überschrift – der aktive
+          Fußleisten-Reiter sagt das schon, und die h1 fraß nur Höhe.
+          `-mx-4 px-4` + Hintergrund, damit durchgescrollte Bubbles nicht
+          dahinter durchscheinen; `-mt-5` frisst das `py-5` der Hülle. */}
+      <div className="bg-papier border-linie sticky top-0 z-10 -mx-4 -mt-5 flex items-center gap-3 border-b px-4 py-2">
+        <Link
+          href="/tutor"
+          className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
+        >
+          <span aria-hidden="true">‹</span>
+          Gespräche
+        </Link>
+        <ContextChip subject={subjectName} topic={topicTitle} />
+      </div>
 
       {leer ? (
         <Notice>
@@ -328,6 +342,27 @@ function Composer({
 
       {diktat.hoert ? (
         <span className="text-koenigsblau text-[0.6875rem] font-medium">tutr hört zu …</span>
+      ) : null}
+
+      {/* Stimmenauswahl (T-07b): nur wenn Vorlesen an ist und das Gerät
+          mehr als eine deutsche Stimme kennt. Die Auswahl liegt im Browser
+          (localStorage), nicht auf dem Server. */}
+      {vorlesen.verfuegbar && vorlesen.immerAn && vorlesen.stimmen.length > 1 ? (
+        <label className="text-tinte-leise flex items-center gap-1.5 text-[0.6875rem]">
+          Stimme
+          <select
+            value={vorlesen.stimmeUri}
+            onChange={(e) => vorlesen.stimmeWaehlen(e.target.value)}
+            className="border-linie-stark bg-flaeche text-tinte min-w-0 flex-1 rounded-md border px-1.5 py-1 text-[0.6875rem]"
+          >
+            <option value="">Automatisch (beste)</option>
+            {vorlesen.stimmen.map((v) => (
+              <option key={v.voiceURI} value={v.voiceURI}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </label>
       ) : null}
 
       <form

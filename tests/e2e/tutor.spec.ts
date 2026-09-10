@@ -135,7 +135,7 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("link", { name: "Gespräch beginnen" })).toBeVisible();
   });
 
-  test("das Eingabefeld klebt über der Fußleiste, der ↓-Knopf holt zurück ans Ende", async ({
+  test("Kopfzeile und Eingabefeld bleiben beim Scrollen angeheftet", async ({
     page,
     browserName,
   }) => {
@@ -148,6 +148,8 @@ test.describe("Tutor als Kind", () => {
 
     const feld = page.getByRole("textbox");
     await expect(feld).toBeVisible();
+    // Keine „Tutor"-Überschrift mehr (T-07b) – der aktive Reiter sagt das.
+    await expect(page.getByRole("heading", { name: "Tutor", level: 1 })).toHaveCount(0);
 
     // Der Inhalt läuft über – sonst prüft der Rest nichts.
     const scrollbar = await page.evaluate(() => {
@@ -155,6 +157,19 @@ test.describe("Tutor als Kind", () => {
       return m ? m.scrollHeight > m.clientHeight + 40 : false;
     });
     expect(scrollbar).toBe(true);
+
+    // Mitten in die Antwort scrollen: Der Zurück-Weg und der Fach-Chip bleiben
+    // oben in `main` kleben (vorher scrollten sie mit weg).
+    await page.evaluate(() => document.querySelector("main")?.scrollTo({ top: 300 }));
+    await page.waitForTimeout(150);
+    const kopfLuecke = await page.evaluate(() => {
+      const kopf = document.querySelector('a[href="/tutor"]')?.closest("div");
+      const main = document.querySelector("main");
+      if (!kopf || !main) return -1;
+      return Math.abs(kopf.getBoundingClientRect().top - main.getBoundingClientRect().top);
+    });
+    expect(kopfLuecke).toBeLessThan(2);
+    await expect(page.getByRole("main").getByText("Französisch", { exact: true })).toBeInViewport();
 
     // Nach ganz oben: Das Eingabefeld bleibt sichtbar (vorher wanderte es weg) …
     await page.evaluate(() => document.querySelector("main")?.scrollTo({ top: 0 }));

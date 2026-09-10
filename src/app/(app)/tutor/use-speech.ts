@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
+  deutscheStimmenSortiert,
   diktatAnhaengen,
   diktatVerfuegbar,
   spracherkennungKonstruktor,
@@ -20,6 +21,31 @@ import {
  */
 
 const VORLESEN_KEY = "tutr:vorlesen";
+const STIMME_KEY = "tutr:vorlesen-stimme";
+
+/**
+ * Etwas langsamer als die Vorgabe (T-07b). Die kompakten Systemstimmen sind
+ * bei normalem Tempo schwer zu folgen; 0,92 ist spürbar ruhiger, ohne
+ * gedehnt zu klingen.
+ */
+const VORLESE_TEMPO = 0.92;
+
+/**
+ * `speechSynthesis.getVoices()` gibt bei jedem Aufruf ein neues Array – für
+ * `useSyncExternalStore` wäre das eine Endlosschleife. Deshalb ein
+ * Modul-Cache, der nur ersetzt wird, wenn sich die Stimmenliste wirklich
+ * ändert (iOS lädt sie asynchron nach).
+ */
+let stimmenCache: readonly SpeechSynthesisVoice[] = [];
+function stimmenSnapshot(): readonly SpeechSynthesisVoice[] {
+  if (!vorleseVerfuegbar()) return stimmenCache;
+  const aktuell = window.speechSynthesis.getVoices();
+  const gleich =
+    aktuell.length === stimmenCache.length &&
+    aktuell.every((v, i) => v.voiceURI === stimmenCache[i]?.voiceURI);
+  if (!gleich) stimmenCache = aktuell;
+  return stimmenCache;
+}
 
 /** Fähigkeit, die es auf dem Server nicht gibt – über `useSyncExternalStore`, damit die Hydration sauber bleibt. */
 function useBrowserFaehigkeit(pruefe: () => boolean): boolean {
@@ -109,6 +135,15 @@ function lesePref(): boolean {
   }
 }
 
+/** Die vom Kind gewählte Stimme (`voiceURI`), oder `""` für „beste automatisch". */
+function leseStimmePref(): string {
+  try {
+    return window.localStorage.getItem(STIMME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 /** Damit ein Umschalten in einer Komponente auch die andere im selben Tab erreicht. */
 const prefHoerer = new Set<() => void>();
 
@@ -132,19 +167,36 @@ export function useVorlesen() {
     () => false,
   );
   const [sprichtId, setSprichtId] = useState<string | null>(null);
-  const stimmenRef = useRef<readonly SpeechSynthesisVoice[]>([]);
+
+  // Die Stimmenliste (iOS lädt sie asynchron) und die gewählte Stimme, beide
+  // über `useSyncExternalStore` – kein `setState` im Effekt.
+  const stimmen = useSyncExternalStore(
+    (onChange) => {
+      if (!vorleseVerfuegbar()) return () => {};
+      window.speechSynthesis.addEventListener("voiceschanged", onChange);
+      return () => window.speechSynthesis.removeEventListener("voiceschanged", onChange);
+    },
+    stimmenSnapshot,
+    () => stimmenCache,
+  );
+  const stimmeUri = useSyncExternalStore(
+    (onChange) => {
+      prefHoerer.add(onChange);
+      if (typeof window !== "undefined") window.addEventListener("storage", onChange);
+      return () => {
+        prefHoerer.delete(onChange);
+        if (typeof window !== "undefined") window.removeEventListener("storage", onChange);
+      };
+    },
+    leseStimmePref,
+    () => "",
+  );
+
+  const deutscheStimmen = deutscheStimmenSortiert(stimmen);
 
   useEffect(() => {
     if (!vorleseVerfuegbar()) return;
-    const ladeStimmen = () => {
-      stimmenRef.current = window.speechSynthesis.getVoices();
-    };
-    ladeStimmen();
-    window.speechSynthesis.addEventListener("voiceschanged", ladeStimmen);
-    return () => {
-      window.speechSynthesis.removeEventListener("voiceschanged", ladeStimmen);
-      window.speechSynthesis.cancel();
-    };
+    return () => window.speechSynthesis.cancel();
   }, []);
 
   const stop = useCallback(() => {
@@ -153,19 +205,36 @@ export function useVorlesen() {
     setSprichtId(null);
   }, []);
 
-  const liesVor = useCallback((id: string, text: string) => {
-    if (!vorleseVerfuegbar() || !text.trim()) return;
-    window.speechSynthesis.cancel();
+  const liesVor = useCallback(
+    (id: string, text: string) => {
+      if (!vorleseVerfuegbar() || !text.trim()) return;
+      window.speechSynthesis.cancel();
 
-    const rede = new SpeechSynthesisUtterance(text);
-    rede.lang = "de-DE";
-    const stimme = waehleDeutscheStimme(stimmenRef.current);
-    if (stimme) rede.voice = stimme;
-    rede.onend = () => setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
-    rede.onerror = () => setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+      const rede = new SpeechSynthesisUtterance(text);
+      rede.lang = "de-DE";
+      rede.rate = VORLESE_TEMPO;
+      const gewaehlt = stimmeUri
+        ? deutscheStimmen.find((v) => v.voiceURI === stimmeUri)
+        : undefined;
+      const stimme = gewaehlt ?? waehleDeutscheStimme(deutscheStimmen);
+      if (stimme) rede.voice = stimme;
+      rede.onend = () => setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+      rede.onerror = () => setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
 
-    setSprichtId(id);
-    window.speechSynthesis.speak(rede);
+      setSprichtId(id);
+      window.speechSynthesis.speak(rede);
+    },
+    [deutscheStimmen, stimmeUri],
+  );
+
+  const stimmeWaehlen = useCallback((uri: string) => {
+    try {
+      if (uri) window.localStorage.setItem(STIMME_KEY, uri);
+      else window.localStorage.removeItem(STIMME_KEY);
+    } catch {
+      // egal – dann merkt es sich der Browser nicht
+    }
+    for (const hoerer of prefHoerer) hoerer();
   }, []);
 
   const umschaltenImmer = useCallback(() => {
@@ -179,5 +248,17 @@ export function useVorlesen() {
     for (const hoerer of prefHoerer) hoerer();
   }, []);
 
-  return { verfuegbar, immerAn, sprichtId, liesVor, stop, umschaltenImmer };
+  return {
+    verfuegbar,
+    immerAn,
+    sprichtId,
+    liesVor,
+    stop,
+    umschaltenImmer,
+    /** Deutsche Stimmen, beste zuerst. Leer, bis der Browser sie geladen hat. */
+    stimmen: deutscheStimmen,
+    /** `voiceURI` der gewählten Stimme, `""` = automatisch die beste. */
+    stimmeUri,
+    stimmeWaehlen,
+  };
 }
