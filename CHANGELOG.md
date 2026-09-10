@@ -4,6 +4,18 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Changed
+
+- **V-10: Foto-Import sammelt erst, liest dann ein.** Die Kamera startete die Verarbeitung
+  bislang sofort bei der Auswahl – ein Bild, dann warten. Jetzt wie beim Laden aus der
+  Mediathek: so viele Bilder aufnehmen oder laden wie nötig, jedes einzeln noch drehen (↻,
+  für Seiten mit fehlender oder falscher EXIF-Orientierung) oder wieder wegnehmen (✕), und
+  den Lauf selbst mit „Einlesen (N)“ starten. Ein Server-Aufruf je Bild wie gehabt, jedes
+  Bild trägt seinen eigenen Zustand. Dazu zwei Prompt-Regeln für die Bilderkennung: ein
+  ganzer Satz ist keine Vokabelzeile (auch nicht mit Übersetzung – der Beispielsatz raus,
+  das Wort rein), und ein Synonym oder Verweis neben einer Vokabel (oft mit „=“) ist keine
+  eigene Zeile.
+
 ### Fixed
 
 - **V-07: „Gemischt“ mischt jetzt wirklich, und hochkant fotografierte Seiten werden
