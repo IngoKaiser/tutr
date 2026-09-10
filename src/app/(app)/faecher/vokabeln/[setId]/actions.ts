@@ -11,6 +11,9 @@ import { anthropicConfigured, databaseConfigured } from "@/lib/env";
 import { newCardColumns } from "@/lib/vocab/fsrs";
 import { parsePastedVocabulary } from "@/lib/vocab/paste";
 import { classifyPhotoImportError, extractedRowsToPastedRows } from "@/lib/vocab/photo";
+import { sortForReview, withDerivedUnsicher, type VocabRow } from "@/lib/vocab/review-list";
+
+export type { VocabRow };
 
 /**
  * Die Vokabelliste eines Sets (V-03a, ADR 0007 D2–D4).
@@ -42,55 +45,12 @@ async function requireStudentActor(): Promise<Actor | null> {
   return actor?.role === "student" ? actor : null;
 }
 
-export type VocabRow = {
-  id: string;
-  term: string;
-  translation: string;
-  unsicher: boolean;
-};
-
 export type SetDetail = {
   id: string;
   title: string;
   subjectName: string;
   items: VocabRow[];
 };
-
-/** Unsichere Zeilen zuerst (ADR 0007 D2 – „dahin gehört der Blick"), sonst alphabetisch. */
-function sortForReview(items: VocabRow[]): VocabRow[] {
-  return [...items].sort((a, b) => {
-    if (a.unsicher !== b.unsicher) return a.unsicher ? -1 : 1;
-    return a.term.localeCompare(b.term, "de");
-  });
-}
-
-/**
- * Die drei Gründe aus ADR 0007 D2, warum eine Zeile „prüfen" trägt.
- *
- * Zwei davon werden hier **abgeleitet** (ADR 0006 D7): ein leeres Feld und
- * dasselbe Wort mit verschiedenen Übersetzungen im Set. Der dritte –
- * niedrige Konfidenz der Erkennung – kommt als gespeicherte Spalte dazu:
- * Er ist eine Tatsache aus dem Moment des Imports, die sich später aus der
- * Zeile nicht mehr ablesen lässt („la trousse / das Fed" sieht vollständig
- * aus). Gefunden beim Testen von V-03b gegen die echte Bilderkennung.
- */
-function withDerivedUnsicher(
-  rows: { id: string; term: string; translation: string; recognition_uncertain: boolean }[],
-): VocabRow[] {
-  const termCounts = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const key = row.term.trim().toLowerCase();
-    const translations = termCounts.get(key) ?? new Set();
-    translations.add(row.translation.trim().toLowerCase());
-    termCounts.set(key, translations);
-  }
-  return rows.map(({ recognition_uncertain, ...row }) => {
-    const key = row.term.trim().toLowerCase();
-    const leer = row.term.trim() === "" || row.translation.trim() === "";
-    const uneinig = (termCounts.get(key)?.size ?? 0) > 1;
-    return { ...row, unsicher: leer || uneinig || recognition_uncertain };
-  });
-}
 
 export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
   const actor = await requireActor();
