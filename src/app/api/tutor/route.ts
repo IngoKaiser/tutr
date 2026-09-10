@@ -226,11 +226,23 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
 
     const usageId = await bucheNutzung(tx, "tutor", null);
 
+    // Jahrgang für die Tonlage (T-09). `grade_level` ist `not null`; der
+    // Fallback 8 greift nur, falls die Zeile wider Erwarten fehlt.
+    const [kind] = await tx.execute<{ grade_level: number }>(
+      sql`select grade_level from student where id = app.student_id()`,
+    );
+
     return {
       ok: true,
       sessionId,
       usageId,
-      system: tutorSystemPrompt({ subjectName, subjectLanguage, topicTitle, entryPoint }),
+      system: tutorSystemPrompt({
+        subjectName,
+        subjectLanguage,
+        topicTitle,
+        entryPoint,
+        gradeLevel: kind?.grade_level ?? 8,
+      }),
       verlauf: verlaufRows.map((r) => ({
         role: r.role === "tutor" ? "assistant" : "user",
         content: r.content,

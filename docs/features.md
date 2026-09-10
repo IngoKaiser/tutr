@@ -79,8 +79,8 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Sprachwächter (Tutor antwortet auf Deutsch, Fach-Ausnahme)                         | ✅    | T-02a   |
 |                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | ✅    | S-03b   |
 |                          | Chat-Shell: Übersicht + Gespräch, klebendes Eingabefeld, ↓-Knopf                   | ✅    | T-07    |
-|                          | Antworten als Markdown lesbar (Fettung, Listen)                                    | 🌑    | T-08    |
-|                          | Altersgerechte Ansprache nach Jahrgang                                             | 🌑    | T-09    |
+|                          | Antworten als Markdown lesbar (Fettung, Listen)                                    | ✅    | T-08    |
+|                          | Altersgerechte Ansprache nach Jahrgang                                             | ✅    | T-09    |
 |                          | Kontextpaket, Schichten mit Quellenangabe, Prompt Caching                          | 🌑    | T-01    |
 |                          | „Erklär es anders", Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter                                  | 🌑    | T-03    |
@@ -118,7 +118,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 4. ~~**T-02 + T-02a + S-03b**~~ — erledigt (Tutor-Chat schmal, streamend, mit Sprachwächter und Rate Limit von Anfang an)
 5. ~~**T-02b + T-02d**~~ — erledigt (Diktat und Vorlesen; die gesprochene Schleife, ohne neuen Dienst)
 6. ~~**T-07**~~ — erledigt (Chat-Shell: Übersicht + Gespräch, klebendes Eingabefeld, ↓-Knopf)
-7. **T-08 + T-09** — Markdown-Rendering und altersgerechte Ansprache; beides klein, beides sofort spürbar
+7. ~~**T-08 + T-09**~~ — erledigt (Markdown-Rendering; Ansprache nach `student.grade_level`)
 8. **T-03 schmal** — Hausaufgabe mit Hinweisleiter
 9. **H-01 schmal** — Heute mit echten Daten
 10. **V-04** — Set-Modus

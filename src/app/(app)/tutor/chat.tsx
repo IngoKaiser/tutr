@@ -10,6 +10,7 @@ import {
   SendenIcon,
   StoppIcon,
 } from "@/components/shell/icons";
+import { TutorMarkdown } from "@/components/shell/markdown";
 import { Block, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
 import { istEingeholt, naechsteLaenge } from "@/lib/tutor/stream-text";
 
@@ -176,14 +177,27 @@ function MessageBubble({
   return (
     <li className={`flex flex-col gap-1 ${istTutor ? "items-start" : "items-end"}`}>
       <div
-        className={`max-w-[85%] rounded-[10px] border px-3 py-2 text-sm whitespace-pre-wrap ${
+        className={`max-w-[85%] rounded-[10px] border px-3 py-2 text-sm ${
           istTutor
             ? "border-linie bg-papier text-tinte"
-            : "border-koenigsblau bg-koenigsblau-hell text-tinte"
+            : "border-koenigsblau bg-koenigsblau-hell text-tinte whitespace-pre-wrap"
         }`}
       >
-        {message.content}
-        {live ? <span className="text-tinte-leise"> ▍</span> : null}
+        {istTutor ? (
+          // Markdown erst rendern, wenn die Antwort steht (T-08). Während des
+          // Streamens Klartext: halbfertiges Markdown (`**` ohne Ende) würde
+          // sonst bei jedem Wort umspringen.
+          live ? (
+            <span className="whitespace-pre-wrap">
+              {message.content}
+              <span className="text-tinte-leise"> ▍</span>
+            </span>
+          ) : (
+            <TutorMarkdown>{message.content}</TutorMarkdown>
+          )
+        ) : (
+          message.content
+        )}
       </div>
       {istTutor && !live ? (
         <div className="flex items-center gap-2">
