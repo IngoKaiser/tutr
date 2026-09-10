@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
+import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
+import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 import type { VocabRow } from "@/lib/vocab/review-list";
 
 import { assignOrphanToSet, deleteOrphan, updateOrphan, type OrphanView } from "./actions";
@@ -16,6 +18,9 @@ const FIELD =
  * aufgeräumt. „Löschen" entfernt die Vokabel ganz, samt Lernstand.
  */
 export function OrphanList({ view, canManage }: { view: OrphanView; canManage: boolean }) {
+  const geloescht = useDeferredDelete<VocabRow>((id) => deleteOrphan(view.subjectId, id));
+  const sichtbar = view.items.filter((item) => !geloescht.istEntfernt(item.id));
+
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
@@ -34,16 +39,24 @@ export function OrphanList({ view, canManage }: { view: OrphanView; canManage: b
       ) : (
         <Block>
           <ul className="flex flex-col gap-2">
-            {view.items.map((item) => (
+            {sichtbar.map((item) => (
               <OrphanRow
                 key={item.id}
                 subjectId={view.subjectId}
                 item={item}
                 sets={view.sets}
                 canManage={canManage}
+                onDelete={() => geloescht.entfernen(item)}
               />
             ))}
           </ul>
+          <UndoLoeschen
+            eintraege={geloescht.pending.map((e) => ({
+              id: e.id,
+              label: e.term.trim() || "Vokabel",
+            }))}
+            onZurueck={(id) => geloescht.zuruecknehmen(id)}
+          />
         </Block>
       )}
     </div>
@@ -55,11 +68,14 @@ function OrphanRow({
   item,
   sets,
   canManage,
+  onDelete,
 }: {
   subjectId: string;
   item: VocabRow;
   sets: { id: string; title: string }[];
   canManage: boolean;
+  /** Löschen mit Rückgängig-Fenster (V-11) – vom `useDeferredDelete` der Liste. */
+  onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState(item.term);
@@ -69,7 +85,7 @@ function OrphanRow({
 
   if (!open) {
     return (
-      <li>
+      <SwipeRow onDelete={onDelete} disabled={!canManage}>
         <button
           type="button"
           onClick={() => canManage && setOpen(true)}
@@ -92,7 +108,7 @@ function OrphanRow({
             <span className="text-offen shrink-0 text-[0.6875rem] font-semibold">prüfen</span>
           ) : null}
         </button>
-      </li>
+      </SwipeRow>
     );
   }
 
@@ -107,12 +123,6 @@ function OrphanRow({
     if (!setId) return;
     startTransition(async () => {
       await assignOrphanToSet(subjectId, item.id, setId);
-    });
-  }
-
-  function remove() {
-    startTransition(async () => {
-      await deleteOrphan(subjectId, item.id);
     });
   }
 
@@ -140,11 +150,14 @@ function OrphanRow({
         </Button>
         <button
           type="button"
-          onClick={remove}
+          onClick={() => {
+            setOpen(false);
+            onDelete();
+          }}
           disabled={pending}
           className="text-tinte-leise hover:text-offen ml-auto text-xs font-medium disabled:opacity-50"
         >
-          Vokabel löschen
+          Löschen
         </button>
       </div>
 

@@ -55,6 +55,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Foto & Kamera → Vision → dieselbe Liste                                            | ✅    | V-03b   |
 |                          | Foto-Import als Minigalerie, echte Fehlerursachen                                  | ✅    | V-03c   |
 |                          | Foto-Import: erst sammeln dann „Einlesen“, drehen, einzeln entfernen               | ✅    | V-10    |
+|                          | Wischen zum Löschen mit Rückgängig-Fenster (Liste + Waisen)                        | ✅    | V-11    |
 |                          | Fachbindung im Modell (ADR 0008)                                                   | ✅    | V-05    |
 |                          | Vokabeln ohne Set sichtbar/löschbar machen                                         | ✅    | V-03d   |
 |                          | Set-Modus: ein Set gezielt vor der Arbeit üben                                     | 🌑    | V-04    |

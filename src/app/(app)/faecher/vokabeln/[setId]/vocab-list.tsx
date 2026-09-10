@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
+import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
+import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 import { prepareImageForUpload } from "@/lib/vocab/image";
 
 import {
@@ -36,7 +38,9 @@ export function VocabList({
   canManage: boolean;
   photoAvailable: boolean;
 }) {
-  const unsichereAnzahl = detail.items.filter((item) => item.unsicher).length;
+  const geloescht = useDeferredDelete<VocabRow>((id) => deleteItem(detail.id, id));
+  const sichtbar = detail.items.filter((item) => !geloescht.istEntfernt(item.id));
+  const unsichereAnzahl = sichtbar.filter((item) => item.unsicher).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -61,10 +65,23 @@ export function VocabList({
       ) : (
         <Block>
           <ul className="flex flex-col gap-2">
-            {detail.items.map((item) => (
-              <VocabRowItem key={item.id} setId={detail.id} item={item} canManage={canManage} />
+            {sichtbar.map((item) => (
+              <VocabRowItem
+                key={item.id}
+                setId={detail.id}
+                item={item}
+                canManage={canManage}
+                onDelete={() => geloescht.entfernen(item)}
+              />
             ))}
           </ul>
+          <UndoLoeschen
+            eintraege={geloescht.pending.map((e) => ({
+              id: e.id,
+              label: e.term.trim() || "Zeile",
+            }))}
+            onZurueck={(id) => geloescht.zuruecknehmen(id)}
+          />
         </Block>
       )}
     </div>
@@ -545,10 +562,13 @@ function VocabRowItem({
   setId,
   item,
   canManage,
+  onDelete,
 }: {
   setId: string;
   item: VocabRow;
   canManage: boolean;
+  /** Löschen mit Rückgängig-Fenster (V-11) – vom `useDeferredDelete` der Liste. */
+  onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState(item.term);
@@ -557,7 +577,7 @@ function VocabRowItem({
 
   if (!open) {
     return (
-      <li>
+      <SwipeRow onDelete={onDelete} disabled={!canManage}>
         <button
           type="button"
           onClick={() => canManage && setOpen(true)}
@@ -580,7 +600,7 @@ function VocabRowItem({
             <span className="text-offen shrink-0 text-[0.6875rem] font-semibold">prüfen</span>
           ) : null}
         </button>
-      </li>
+      </SwipeRow>
     );
   }
 
@@ -588,12 +608,6 @@ function VocabRowItem({
     startTransition(async () => {
       await updateItem(setId, item.id, term, translation);
       setOpen(false);
-    });
-  }
-
-  function remove() {
-    startTransition(async () => {
-      await deleteItem(setId, item.id);
     });
   }
 
@@ -620,11 +634,14 @@ function VocabRowItem({
         </Button>
         <button
           type="button"
-          onClick={remove}
+          onClick={() => {
+            setOpen(false);
+            onDelete();
+          }}
           disabled={pending}
           className="text-tinte-leise hover:text-offen ml-auto text-xs font-medium disabled:opacity-50"
         >
-          Das ist keine Vokabel – löschen
+          Löschen
         </button>
       </div>
     </li>
