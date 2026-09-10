@@ -26,6 +26,14 @@ type Phase = "wahl" | "uebung" | "fertig";
 type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
 
 /**
+ * Antwortart der Runde (V-08). `auto` lässt den FSRS-Zustand entscheiden
+ * (Multiple Choice bis `wiederholen`, dann Tippen – `modeForCardState`); die
+ * beiden anderen erzwingen eine Art für alle Karten. Für „das erste Level
+ * sitzt, ich will tippen", ohne auf FSRS zu warten.
+ */
+type AntwortWahl = "auto" | "mc" | "tippen";
+
+/**
  * Übungssession (V-02, fachgebunden seit V-06). Ein Client-Baustein statt
  * einer eigenen Route – es gibt nichts, worauf man tief verlinken müsste,
  * und der Zustand (Übersicht → Üben → Fertig) ist rein clientseitig.
@@ -180,6 +188,7 @@ function SubjectBlock({
   onStart: (subjectName: string, cards: SessionCardContent[]) => void;
 }) {
   const [direction, setDirection] = useState<DirectionChoice>("gemischt");
+  const [antwort, setAntwort] = useState<AntwortWahl>("auto");
   const [pending, startTransition] = useTransition();
   const [loadError, setLoadError] = useState(false);
 
@@ -200,22 +209,51 @@ function SubjectBlock({
         setLoadError(true);
         return;
       }
-      onStart(subject.subjectName, loaded);
+      // Die Antwortart wird hier auf die geladenen Karten geprägt. Der Server
+      // bewertet danach ohnehin nach `input.mode` (siehe `submitAnswer`) –
+      // eine erzwungene Art ist kein Umgehen der Prüfung, nur eine andere
+      // Frageform für dieselbe Karte.
+      const angepasst =
+        antwort === "auto" ? loaded : loaded.map((karte) => ({ ...karte, mode: antwort }));
+      onStart(subject.subjectName, angepasst);
     });
   }
 
   return (
     <Block title={subject.subjectName} trailing={`${subject.total} fällig`}>
+      {/* Lernstand über den ganzen Wortschatz, nicht nur die heute Fälligen
+          (V-08) – sonst stünde in „Sitzt" fast immer 0. */}
       <Stack
-        confident={subject.wiederholen}
-        practicing={subject.neu}
-        again={subject.erneutLernen}
+        items={[
+          { count: subject.neu, name: "Neu", tone: "leise" },
+          { count: subject.amUeben, name: "Am Üben", tone: "koenigsblau" },
+          { count: subject.sitzt, name: "Sitzt", tone: "sicher" },
+        ]}
       />
       {canStart ? (
         <>
           {labels ? (
-            <DirectionPicker value={direction} onChange={setDirection} labels={labels} />
+            <SegmentedPicker
+              ariaLabel="Richtung"
+              value={direction}
+              onChange={setDirection}
+              options={[
+                { value: "gemischt", label: "Gemischt" },
+                { value: "vorwaerts", label: labels.vorwaerts },
+                { value: "rueckwaerts", label: labels.rueckwaerts },
+              ]}
+            />
           ) : null}
+          <SegmentedPicker
+            ariaLabel="Antwortart"
+            value={antwort}
+            onChange={setAntwort}
+            options={[
+              { value: "auto", label: "Automatisch" },
+              { value: "mc", label: "Auswahl" },
+              { value: "tippen", label: "Tippen" },
+            ]}
+          />
           <Button onClick={start} disabled={pending}>
             {pending ? "Einen Moment …" : "Loslegen"}
           </Button>
@@ -230,27 +268,25 @@ function SubjectBlock({
   );
 }
 
-function DirectionPicker({
+/** Segmentierter Umschalter (Richtung, Antwortart – V-02/V-08). */
+function SegmentedPicker<T extends string>({
+  ariaLabel,
   value,
   onChange,
-  labels,
+  options,
 }: {
-  value: DirectionChoice;
-  onChange: (value: DirectionChoice) => void;
-  labels: { vorwaerts: string; rueckwaerts: string };
+  ariaLabel: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string }[];
 }) {
-  const OPTIONS: { value: DirectionChoice; label: string }[] = [
-    { value: "gemischt", label: "Gemischt" },
-    { value: "vorwaerts", label: labels.vorwaerts },
-    { value: "rueckwaerts", label: labels.rueckwaerts },
-  ];
   return (
     <div
       role="radiogroup"
-      aria-label="Richtung"
+      aria-label={ariaLabel}
       className="border-linie-stark flex overflow-hidden rounded-md border"
     >
-      {OPTIONS.map((option) => (
+      {options.map((option) => (
         <button
           key={option.value}
           type="button"

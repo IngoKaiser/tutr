@@ -18,7 +18,13 @@ export default function TodayPage() {
       </Block>
 
       <Block title="Fällig heute" trailing="34 Karten">
-        <Stack confident={12} practicing={15} again={7} />
+        <Stack
+          items={[
+            { count: 12, name: "Kann ich", tone: "sicher" },
+            { count: 15, name: "Übe ich", tone: "koenigsblau" },
+            { count: 7, name: "Nochmal", tone: "offen" },
+          ]}
+        />
         <Button quiet>Üben · etwa 12 Minuten</Button>
       </Block>
 
