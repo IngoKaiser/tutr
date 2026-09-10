@@ -77,15 +77,18 @@ export function VocabList({
               />
             ))}
           </ul>
-          <UndoLoeschen
-            eintraege={geloescht.pending.map((e) => ({
-              id: e.id,
-              label: e.term.trim() || "Zeile",
-            }))}
-            onZurueck={(id) => geloescht.zuruecknehmen(id)}
-          />
         </Block>
       )}
+
+      {/* Außerhalb des Blocks: `sticky` braucht als Bezug den scrollenden
+          `main`-Bereich, nicht die Karte drumherum (V-12). */}
+      <UndoLoeschen
+        eintraege={geloescht.pending.map((e) => ({
+          id: e.id,
+          label: e.term.trim() || "Zeile",
+        }))}
+        onZurueck={(id) => geloescht.zuruecknehmen(id)}
+      />
     </div>
   );
 }

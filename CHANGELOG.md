@@ -4,6 +4,17 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Fixed
+
+- **V-12: drei Nachschärfungen aus dem Gerätetest.** Der farbige Grund beim Wischen lag nur
+  unter dem „Löschen“-Knopf – wer weiter wischte, sah den Seitenhintergrund durchscheinen;
+  jetzt liegt er über die ganze Zeile. Die „Rückgängig“-Leiste stand am **Ende der Liste**
+  und war damit bei einer langen Vokabelliste nach einem versehentlichen Löschen gar nicht
+  zu sehen; sie klebt jetzt am unteren Rand. Und die Stimmenauswahl im Tutor erschien nur,
+  wenn das Gerät **mehr als eine** deutsche Stimme kennt – wer nur eine hat, sah nichts und
+  konnte nicht wissen, dass es etwas umzustellen gibt. Sie ist jetzt immer da und nennt den
+  Weg zu weiteren Stimmen (iOS gibt Siri-Stimmen grundsätzlich nicht an Webseiten).
+
 ### Added
 
 - **V-09: Vokabeln lassen sich als geprüft abhaken – und Ungeprüftes wird nicht abgefragt.**

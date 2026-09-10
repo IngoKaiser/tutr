@@ -56,15 +56,16 @@ export function OrphanList({ view, canManage }: { view: OrphanView; canManage: b
               />
             ))}
           </ul>
-          <UndoLoeschen
-            eintraege={geloescht.pending.map((e) => ({
-              id: e.id,
-              label: e.term.trim() || "Vokabel",
-            }))}
-            onZurueck={(id) => geloescht.zuruecknehmen(id)}
-          />
         </Block>
       )}
+
+      <UndoLoeschen
+        eintraege={geloescht.pending.map((e) => ({
+          id: e.id,
+          label: e.term.trim() || "Vokabel",
+        }))}
+        onZurueck={(id) => geloescht.zuruecknehmen(id)}
+      />
     </div>
   );
 }

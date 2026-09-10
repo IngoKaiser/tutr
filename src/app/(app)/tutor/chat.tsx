@@ -118,7 +118,7 @@ export function Conversation({
   return (
     <div className="flex flex-col gap-3">
       {/* Angeheftete Kopfzeile (T-07b): Weg zurück und Fach-Kontext bleiben
-          beim Scrollen sichtbar. Keine „Tutor"-Überschrift – der aktive
+          beim Scrollen sichtbar. Keine „Tutor“-Überschrift – der aktive
           Fußleisten-Reiter sagt das schon, und die h1 fraß nur Höhe.
           `-mx-4 px-4` + Hintergrund, damit durchgescrollte Bubbles nicht
           dahinter durchscheinen; `-mt-5` frisst das `py-5` der Hülle. */}
@@ -156,7 +156,7 @@ export function Conversation({
 
       {fehler ? <Notice>{fehler}</Notice> : null}
 
-      {/* Der Anker, an dem „bin ich unten?" gemessen wird. */}
+      {/* Der Anker, an dem „bin ich unten?“ gemessen wird. */}
       <div ref={sentinelRef} aria-hidden="true" className="h-px" />
 
       <Composer
@@ -344,25 +344,39 @@ function Composer({
         <span className="text-koenigsblau text-[0.6875rem] font-medium">tutr hört zu …</span>
       ) : null}
 
-      {/* Stimmenauswahl (T-07b): nur wenn Vorlesen an ist und das Gerät
-          mehr als eine deutsche Stimme kennt. Die Auswahl liegt im Browser
-          (localStorage), nicht auf dem Server. */}
-      {vorlesen.verfuegbar && vorlesen.immerAn && vorlesen.stimmen.length > 1 ? (
-        <label className="text-tinte-leise flex items-center gap-1.5 text-[0.6875rem]">
-          Stimme
-          <select
-            value={vorlesen.stimmeUri}
-            onChange={(e) => vorlesen.stimmeWaehlen(e.target.value)}
-            className="border-linie-stark bg-flaeche text-tinte min-w-0 flex-1 rounded-md border px-1.5 py-1 text-[0.6875rem]"
-          >
-            <option value="">Automatisch (beste)</option>
-            {vorlesen.stimmen.map((v) => (
-              <option key={v.voiceURI} value={v.voiceURI}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      {/* Stimmenauswahl (T-07b), seit V-12 **immer** sichtbar, sobald
+          Vorlesen an ist. Vorher hing sie an `stimmen.length > 1` – wer nur
+          eine deutsche Stimme installiert hat, sah gar nichts und konnte
+          nicht wissen, dass es überhaupt etwas umzustellen gibt. Genau das
+          war der Fall („warum höre ich immer Anna?“): Die Web Speech API
+          zeigt nur Stimmen, die auf dem Gerät geladen sind – Siri-Stimmen
+          gibt iOS Webseiten grundsätzlich nicht. Die Auswahl liegt im
+          Browser (localStorage), nicht auf dem Server. */}
+      {vorlesen.verfuegbar && vorlesen.immerAn ? (
+        vorlesen.stimmen.length > 1 ? (
+          <label className="text-tinte-leise flex items-center gap-1.5 text-[0.6875rem]">
+            Stimme
+            <select
+              value={vorlesen.stimmeUri}
+              onChange={(e) => vorlesen.stimmeWaehlen(e.target.value)}
+              className="border-linie-stark bg-flaeche text-tinte min-w-0 flex-1 rounded-md border px-1.5 py-1 text-[0.6875rem]"
+            >
+              <option value="">Automatisch (beste)</option>
+              {vorlesen.stimmen.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="text-tinte-leise text-[0.6875rem]">
+            Nur eine deutsche Stimme auf dem Gerät
+            {vorlesen.stimmen[0] ? ` (${vorlesen.stimmen[0].name})` : ""}. Weitere gibt es unter
+            Einstellungen › Bedienungshilfen › Gesprochene Inhalte › Stimmen › Deutsch – danach
+            steht hier eine Auswahl.
+          </span>
+        )
       ) : null}
 
       <form
@@ -465,7 +479,7 @@ function useSanfterText(ziel: string, fertig: boolean): string {
 }
 
 /**
- * „Klebt" der Blick am Ende? Ein `IntersectionObserver` auf einen Anker
+ * „Klebt“ der Blick am Ende? Ein `IntersectionObserver` auf einen Anker
  * unter der Liste beantwortet das, ohne den Scroll-Container zu kennen –
  * der liegt im Layout, nicht hier.
  */
@@ -499,7 +513,7 @@ function useAmEnde(abhaengigkeiten: readonly unknown[]) {
   return { amEnde, sentinelRef, nachUnten };
 }
 
-/** Liest eine neu hinzugekommene Tutor-Antwort vor, wenn „immer vorlesen" an ist (ADR 0011 D2). */
+/** Liest eine neu hinzugekommene Tutor-Antwort vor, wenn „immer vorlesen“ an ist (ADR 0011 D2). */
 function useAutoVorlesen(messages: ChatMessage[], vorlesen: VorlesenSteuerung) {
   const zuletztRef = useRef<string | null>(null);
   const { immerAn, liesVor } = vorlesen;
