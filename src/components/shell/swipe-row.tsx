@@ -4,12 +4,12 @@ import { useRef, useState, type ReactNode } from "react";
 
 /**
  * Eine Listenzeile, die sich nach links wegwischen lässt und dabei einen
- * „Löschen"-Knopf freilegt (V-11).
+ * „Löschen“-Knopf freilegt (V-11).
  *
  * Wischen ist der schnelle Weg; der freigelegte Knopf ist der verlässliche –
  * er ist ein echtes fokussierbares Ziel, sobald die Zeile offen steht, und
  * bleibt offen, bis er gedrückt oder daneben getippt wird. Ganz weit wischen
- * löscht direkt. Für Tastatur und Maus gibt es zusätzlich den „Löschen"-Knopf
+ * löscht direkt. Für Tastatur und Maus gibt es zusätzlich den „Löschen“-Knopf
  * im aufgeklappten Bearbeiten-Zustand der Zeile (siehe `vocab-list.tsx`).
  *
  * Kein Gesten-Framework: nur Pointer Events (Maus wie Finger). Eine
@@ -104,8 +104,11 @@ export function SwipeRow({
 
   return (
     <li className="relative overflow-hidden rounded-[9px]">
-      {/* Roter Grund samt Knopf, liegt hinter der Zeile. */}
-      <div className="bg-offen absolute inset-y-0 right-0 flex items-stretch">
+      {/* Der farbige Grund liegt über die **ganze** Zeile, nicht nur unter
+          dem Knopf (V-12): Sonst endet er an der Knopfkante, und wer weiter
+          wischt als der Knopf breit ist, sieht dahinter den Seitenhintergrund
+          durchscheinen – die Zeile wirkte „abgeschnitten“. */}
+      <div className="bg-offen absolute inset-0 flex items-stretch justify-end">
         <button
           type="button"
           onClick={loeschen}
@@ -148,6 +151,12 @@ export function SwipeRow({
 /**
  * Rückgängig-Leiste zu eben gelöschten Zeilen (V-11) – der sichtbare Teil
  * des Fensters aus `useDeferredDelete`. Eine Zeile je schwebender Löschung.
+ *
+ * **Klebt am unteren Rand** (`sticky`, V-12). Vorher stand sie am Ende der
+ * Liste: Wer oben in einer langen Vokabelliste versehentlich gelöscht hatte,
+ * bekam das Rückgängig nie zu sehen und hatte damit gar keine Wahl. Das
+ * scrollende Element ist `main` aus dem App-Rahmen, die Fußleiste ist dessen
+ * Geschwister – die Leiste landet also direkt darüber.
  */
 export function UndoLoeschen({
   eintraege,
@@ -158,11 +167,11 @@ export function UndoLoeschen({
 }) {
   if (eintraege.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-col gap-1.5">
+    <div className="sticky bottom-3 z-20 mt-2 flex flex-col gap-1.5">
       {eintraege.map((e) => (
         <div
           key={e.id}
-          className="border-linie bg-papier-tief flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2 text-[0.8125rem]"
+          className="border-linie-stark bg-flaeche flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2 text-[0.8125rem] shadow-lg"
         >
           <span className="text-tinte-leise truncate">„{e.label}“ gelöscht</span>
           <button
