@@ -18,6 +18,14 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **V-06a: die Übungszahl stimmt, die Richtung heißt richtig.** `/ueben` zählt jetzt **Vokabeln
+  statt Karten** – Ingos „Englisch" zeigt 83 fällig, nicht mehr 166 (das war 83 × 2 Richtungen).
+  „Gemischt" fragt jede fällige Vokabel je Runde genau einmal (die früher fällige Karte, bei
+  Gleichstand die vorwärts-Richtung); die angezeigte Zahl entspricht so der Zahl der Fragen.
+  Der Richtungsumschalter beschriftet sich aus `subject.language`: „EN → DE" / „DE → EN" statt
+  fest getipptem „FR → DE". Ein Fach ohne Zielsprache (Mathe, Geschichte) hat keine
+  Rückrichtung – dann erscheint der Umschalter gar nicht.
+
 - **F-16a: Fächerverwaltung.** Der Blocker aus `docs/roadmap.md` Stufe 0 ist behoben – ein Kind
   legt Fach und Schuljahr jetzt selbst an, ohne Elternteil ([ADR 0009](docs/adr/0009-schuljahr-als-sichtfenster.md)).
   Vorher stand `insert into subject` nur im Seed-Skript, und selbst mit Formular hätte nur ein

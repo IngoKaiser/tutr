@@ -62,7 +62,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Session: drei Stapel, MC + Tippen, Tippfehlertoleranz               | ✅    | V-02      |
 |                          | Rückmeldung richtig/fast/falsch, Ausstiegsknopf                     | ✅    | V-02      |
 |                          | Fachgebundenes Üben, fällige Karten je Fach                         | ✅    | V-06      |
-|                          | Zahl zeigt Vokabeln statt Karten; Richtung aus `subject.language`   | 🌑    | V-06a     |
+|                          | Zahl zeigt Vokabeln statt Karten; Richtung aus `subject.language`   | ✅    | V-06a     |
 |                          | Prüfungsmodus, Schwachstellen, Mix                                  | 🌑    | V-04      |
 | **Heute**                |                                                                     | 🌒    |           |
 |                          | Attrappe mit Platzhalter-Zahlen (F-07)                              | 🌒    | F-07      |
@@ -101,7 +101,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 
 ## Nächste Reihenfolge (aus `docs/roadmap.md`)
 
-1. **V-03d + V-06a** — Vokabeln ohne Set aufräumbar machen; Übungszahl und Richtung stimmen
+1. **V-03d** — Vokabeln ohne Set aufräumbar machen (V-06a erledigt: Übungszahl + Richtung stimmen)
 2. **K-01** — Prüfungskalender, Termine von Hand
 3. **T-01/T-02 schmal + T-02a + S-03** — Tutor-Chat, mit Sprachwächter und Rate Limit von Anfang an
 4. **T-03 schmal** — Hausaufgabe mit Hinweisleiter

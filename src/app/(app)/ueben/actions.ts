@@ -55,20 +55,29 @@ export type DueOverview = {
 export type DueBySubject = {
   subjectId: string;
   subjectName: string;
+  /** ISO-639-1 der Zielsprache, `null` bei einem Frage-Antwort-Fach (V-06a). */
+  language: string | null;
   total: number;
 } & DueOverview;
 
 /**
- * Fällige Karten je Fach (V-06, ADR 0008 D3) – **nie** eine Zahl über alles.
- * Niemand übt Französisch- und Spanischvokabeln in derselben Runde; eine
- * Übungssession läuft immer in genau einem Fach.
+ * Fällige Vokabeln je Fach (V-06, ADR 0008 D3; gezählt seit V-06a) – **nie**
+ * eine Zahl über alles. Niemand übt Französisch- und Spanischvokabeln in
+ * derselben Runde; eine Übungssession läuft immer in genau einem Fach.
+ *
+ * **Gezählt wird die Vokabel, nicht die Karte** (V-06a). Eine Vokabel hat
+ * zwei Karten (vorwärts/rückwärts), aber „Gemischt" fragt sie je Runde nur
+ * einmal – die frühere Zählung über `card` zeigte deshalb das Doppelte
+ * („166 fällig" statt 83). `distinct on` wählt je Vokabel die früher fällige
+ * Karte; deren Zustand steht dann für die Vokabel im Stapel. `coalesce(…,
+ * c.id)` hält Lernziel-Karten (M-03, `vocab_item_id` null) auseinander,
+ * statt sie alle zu einer Zeile zu verschmelzen.
  *
  * Das Fach kommt für beide Kartenquellen aus derselben Herkunft: Bei
- * Vokabelkarten über `vocab_item.subject_id` (n:1, V-05), bei Karten aus
- * Lernzielen (M-03, noch nicht gebaut) über `learning_objective → topic →
- * subject_id` (ebenfalls n:1) – nirgends eine eigene Spalte auf `card`
- * selbst (ADR 0008 D1). `coalesce` genügt, weil `card_exactly_one_source`
- * garantiert, dass nie beide Joins gleichzeitig treffen.
+ * Vokabelkarten über `vocab_item.subject_id` (n:1, V-05), bei Lernziel-Karten
+ * über `learning_objective → topic → subject_id` – nie eine eigene Spalte auf
+ * `card` (ADR 0008 D1). `card_exactly_one_source` garantiert, dass nie beide
+ * Joins gleichzeitig treffen.
  *
  * `null`, wenn nicht angemeldet oder ohne DB (CI-E2E). Ein leeres Array
  * heißt: nichts fällig, kein Fach zeigt einen Block.
@@ -77,18 +86,34 @@ export async function loadDueBySubject(): Promise<DueBySubject[] | null> {
   const actor = await requireActor();
   if (!actor) return null;
 
-  type Row = { subject_id: string; subject_name: string; state: CardStateValue; n: string };
+  type Row = {
+    subject_id: string;
+    subject_name: string;
+    language: string | null;
+    state: CardStateValue;
+    n: string;
+  };
 
   return withActor(actor, async (tx) => {
     const rows = await tx.execute<Row>(
-      sql`select s.id as subject_id, s.name as subject_name, c.state, count(*)::text as n
-          from card c
-          left join vocab_item vi on vi.id = c.vocab_item_id
-          left join learning_objective lo on lo.id = c.objective_id
-          left join topic t on t.id = lo.topic_id
-          join subject s on s.id = coalesce(vi.subject_id, t.subject_id)
-          where c.due_at <= now()
-          group by s.id, s.name, c.state`,
+      sql`select s.id as subject_id, s.name as subject_name, s.language, gewaehlt.state,
+                 count(*)::text as n
+          from (
+            select distinct on (coalesce(vi.subject_id, t.subject_id), coalesce(c.vocab_item_id, c.id))
+              coalesce(vi.subject_id, t.subject_id) as subj_id,
+              c.state
+            from card c
+            left join vocab_item vi on vi.id = c.vocab_item_id
+            left join learning_objective lo on lo.id = c.objective_id
+            left join topic t on t.id = lo.topic_id
+            where c.due_at <= now()
+            order by coalesce(vi.subject_id, t.subject_id),
+                     coalesce(c.vocab_item_id, c.id),
+                     c.due_at asc,
+                     c.direction asc nulls last
+          ) gewaehlt
+          join subject s on s.id = gewaehlt.subj_id
+          group by s.id, s.name, s.language, gewaehlt.state`,
     );
 
     const bySubject = new Map<string, DueBySubject>();
@@ -96,6 +121,7 @@ export async function loadDueBySubject(): Promise<DueBySubject[] | null> {
       const entry = bySubject.get(row.subject_id) ?? {
         subjectId: row.subject_id,
         subjectName: row.subject_name,
+        language: row.language,
         total: 0,
         wiederholen: 0,
         neu: 0,
@@ -131,7 +157,15 @@ export type SessionCardContent = {
  * genau diesen Karten, eine eigene Fach-Regel dort ist nicht nötig.
  *
  * `direction` filtert zusätzlich nach ADR 0007 D5 – `null` heißt gemischt
- * (die Voreinstellung).
+ * (die Voreinstellung). **Gemischt liefert je Vokabel genau eine Karte**
+ * (V-06a): die früher fällige, bei gleichem `due_at` die vorwärts-Karte.
+ * Sonst käme jede Vokabel zweimal in derselben Runde, und die angezeigte
+ * Zahl stimmte nicht mehr mit der Zahl der Fragen überein.
+ *
+ * `c.direction asc` heißt hier **vorwärts zuerst**: `vocab_direction` ist ein
+ * `pgEnum`, Postgres sortiert es nach Deklarationsreihenfolge
+ * (`["vorwaerts", "rueckwaerts"]`), nicht alphabetisch. Nicht auf `desc`
+ * „korrigieren" – das drehte die Vorzugsrichtung um.
  */
 export async function loadSessionCards(
   subjectId: string,
@@ -156,10 +190,15 @@ export async function loadSessionCards(
               from card c join vocab_item vi on vi.id = c.vocab_item_id
               where c.due_at <= now() and c.direction = ${direction} and vi.subject_id = ${subjectId}
               order by c.due_at`
-        : sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
-              from card c join vocab_item vi on vi.id = c.vocab_item_id
-              where c.due_at <= now() and vi.subject_id = ${subjectId}
-              order by c.due_at`,
+        : sql`select card_id, vocab_item_id, direction, state, term, translation from (
+                select distinct on (c.vocab_item_id)
+                  c.id as card_id, c.vocab_item_id, c.direction, c.state,
+                  vi.term, vi.translation, c.due_at
+                from card c join vocab_item vi on vi.id = c.vocab_item_id
+                where c.due_at <= now() and vi.subject_id = ${subjectId}
+                order by c.vocab_item_id, c.due_at asc, c.direction asc
+              ) gewaehlt
+              order by due_at`,
     );
     return rows.map((r) => ({
       cardId: r.card_id,
