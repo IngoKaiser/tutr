@@ -73,11 +73,11 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Themen an einen Termin hängen, Countdown, Prüfungsseite                            | 🌑    | P-01    |
 |                          | Klausurplan per Foto einlesen                                                      | 🌑    | K-03    |
 |                          | Datei-Import CSV/XLSX (SchulDock) + ICS                                            | 🌑    | K-04    |
-| **Tutor & Hausaufgaben** |                                                                                    | 🌒    |         |
+| **Tutor & Hausaufgaben** |                                                                                    | 🌓    |         |
 |                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                      | ✅    | T-01a   |
-|                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen"                        | 🌑    | T-02    |
-|                          | Sprachwächter (Tutor antwortet auf Deutsch)                                        | 🌑    | T-02a   |
-|                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | 🌑    | S-03b   |
+|                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen", Streaming             | ✅    | T-02    |
+|                          | Sprachwächter (Tutor antwortet auf Deutsch, Fach-Ausnahme)                         | ✅    | T-02a   |
+|                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | ✅    | S-03b   |
 |                          | Kontextpaket, Schichten mit Quellenangabe, Prompt Caching                          | 🌑    | T-01    |
 |                          | „Erklär es anders", Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter                                  | 🌑    | T-03    |
@@ -112,7 +112,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 1. ~~**V-03d + V-06a**~~ — erledigt (Vokabeln ohne Set aufräumbar; Übungszahl + Richtung stimmen)
 2. ~~**K-01**~~ — erledigt (Prüfungskalender, Termine von Hand: anlegen, bearbeiten, absagen, Historie)
 3. ~~**T-01a + T-01b**~~ — erledigt (ADR 0010 Tutor-Architektur, ADR 0011 Sprachweg; beide akzeptiert)
-4. **T-02 + T-02a + S-03b** — Tutor-Chat schmal, mit Sprachwächter und Rate Limit von Anfang an
+4. ~~**T-02 + T-02a + S-03b**~~ — erledigt (Tutor-Chat schmal, streamend, mit Sprachwächter und Rate Limit von Anfang an)
 5. **T-02b + T-02d** — Diktat und Vorlesen; die gesprochene Schleife, ohne neuen Dienst
 6. **T-03 schmal** — Hausaufgabe mit Hinweisleiter
 7. **H-01 schmal** — Heute mit echten Daten
