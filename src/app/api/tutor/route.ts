@@ -115,13 +115,22 @@ export async function POST(request: Request): Promise<Response> {
       stream
         .finalMessage()
         .then(async (final) => {
+          // `tutor_message.token_count` bleibt die addierte Zahl – ein
+          // Anzeigewert je Nachricht, keine Abrechnungsgrundlage. Der
+          // Kostendeckel in `ai_usage` braucht seit S-03c beide Zahlen
+          // getrennt, weil Ausgabe-Tokens fünfmal so teuer sind.
           const tokens = final.usage.input_tokens + final.usage.output_tokens;
           const deutsch = istDeutsch(volltext);
           await withActor(actor, async (tx) => {
             await tx.execute(sql`
               insert into tutor_message (student_id, session_id, role, content, token_count, language_ok)
               values (app.student_id(), ${vor.sessionId}, 'tutor', ${volltext}, ${tokens}, ${deutsch})`);
-            await ergaenzeTokenzahl(tx, vor.usageId, tokens);
+            await ergaenzeTokenzahl(
+              tx,
+              vor.usageId,
+              final.usage.input_tokens,
+              final.usage.output_tokens,
+            );
             await tx.execute(
               sql`update tutor_session set updated_at = now() where id = ${vor.sessionId}`,
             );
@@ -224,7 +233,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       insert into tutor_message (student_id, session_id, role, content)
       values (app.student_id(), ${sessionId}, 'nutzer', ${eingang.message})`);
 
-    const usageId = await bucheNutzung(tx, "tutor", null);
+    const usageId = await bucheNutzung(tx, "tutor");
 
     // Jahrgang für die Tonlage (T-09). `grade_level` ist `not null`; der
     // Fallback 8 greift nur, falls die Zeile wider Erwarten fehlt.

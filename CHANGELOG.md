@@ -6,6 +6,16 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **S-03c: der Kostendeckel für KI-Aufrufe rechnet jetzt in echtem Geld, nicht mehr in
+  Anfragen.** Bisher zählte der Schutz vor explodierenden Kosten (S-03b) schlicht
+  Anfragen – 20/Stunde, 60/Tag –, egal ob kurze oder lange Antwort. Jetzt rechnet
+  `ai_usage` mit den tatsächlichen Sonnet-Preisen (Ausgabe fünfmal teurer als Eingabe)
+  und deckelt in US-$: 0,30 $/Stunde, 1,00 $/Tag – und neu ein **Wochenfenster**,
+  5,00 $, das ganz ohne Zusatzaufwand aus der ohnehin siebentägigen Aufbewahrung fällt.
+  Bewusst noch **ohne** sichtbare Anzeige in der Oberfläche – erst der Deckel im Code,
+  eine Fortschrittsansicht (Tutor oder Einstellungen) ist ein eigener, noch offener
+  Schritt.
+
 - **T-11: das Textfeld im Tutor wächst mit, statt Text zu verschlucken.** Es stand fest auf
   einer Zeile – alles darüber hinaus war wortlos abgeschnitten, ohne Bildlaufleiste oder
   sonst einen Hinweis, dass mehr dasteht, als man sieht. Wächst jetzt mit dem Text bis zu
