@@ -128,3 +128,59 @@ export function PfeilRunterIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/**
+ * Abspielen (T-10). Wie `StoppIcon` eine **Fläche**, kein Umriss: Play und
+ * Pause sind die beiden Zustände desselben Knopfes, und ein Dreieck als
+ * Umriss läse sich neben dem gefüllten Pausenbalken wie ein anderes Symbol.
+ */
+export function PlayIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M8 5.5a1 1 0 0 1 1.53-.85l8 6.5a1 1 0 0 1 0 1.7l-8 6.5A1 1 0 0 1 8 18.5z" />
+    </svg>
+  );
+}
+
+/** Pause (T-10) – das Gegenstück zu `PlayIcon`, ebenfalls gefüllt. */
+export function PauseIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <rect x="7" y="5.5" width="3.5" height="13" rx="1" />
+      <rect x="13.5" y="5.5" width="3.5" height="13" rx="1" />
+    </svg>
+  );
+}
+
+/** Kopieren (T-10) – zwei versetzte Blätter, Umriss wie die übrigen Icons. */
+export function KopierenIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </Icon>
+  );
+}
+
+/** Häkchen (T-10) – kurze Rückmeldung „kopiert“, verschwindet von selbst. */
+export function HakenIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m5 12.5 4.5 4.5L19 7" />
+    </Icon>
+  );
+}

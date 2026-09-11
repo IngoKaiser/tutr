@@ -12,7 +12,7 @@ import { adminClient } from "./test-db";
  * - Für ein Elternteil gibt es hier nichts (ADR 0010 D2) – nur der Hinweis.
  * - Die Übersicht (`/tutor`) trägt Fachwahl, Einstieg und die Historie.
  * - Ein gespeichertes Gespräch (`/tutor/[id]`) rendert vollständig, hat einen
- *   Weg zurück zur Übersicht und den festen Hinweis „Allgemeinwissen".
+ *   Weg zurück zur Übersicht und den festen Hinweis „Allgemeinwissen“.
  * - Diktat füllt das Eingabefeld, Vorlesen merkt sich seinen Zustand.
  *
  * Der Sende-Weg (`POST /api/tutor`, Streaming, Sprachwächter, Rate Limit) ist
@@ -103,7 +103,7 @@ test.describe("Tutor als Kind", () => {
     await alsMia(page);
     await page.goto(`/tutor/${sessionId}`);
 
-    // Kontext-Chip mit dem Fach (§15) – ohne „ohne Thema"-Platzhalter.
+    // Kontext-Chip mit dem Fach (§15) – ohne „ohne Thema“-Platzhalter.
     await expect(page.getByText("Französisch", { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/ohne Thema/)).toHaveCount(0);
     await expect(page.getByText(/Ich verstehe die reflexiven Verben nicht/)).toBeVisible();
@@ -117,8 +117,12 @@ test.describe("Tutor als Kind", () => {
     await expect(punkt).toBeVisible();
     await expect(punkt).toHaveJSProperty("tagName", "LI");
 
-    // Vorlesen (T-02d): Knopf an der Antwort, Schalter merkt sich den Zustand.
+    // Aktionsleiste unter der Antwort (T-10): Kopieren und Vorlesen als
+    // Icon-Knöpfe. „Vorlesen“ steht beim Öffnen auf Play – ein gespeichertes
+    // Gespräch spricht nicht von selbst los, und nichts hängt auf „Stopp“.
+    await expect(page.getByRole("button", { name: "Antwort kopieren" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Vorlesen" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Vorlesen anhalten" })).toHaveCount(0);
     const schalter = page.getByRole("button", { name: /Antworten vorlesen/ });
     await expect(schalter).toHaveAttribute("aria-pressed", "false");
     await schalter.click();
@@ -148,7 +152,7 @@ test.describe("Tutor als Kind", () => {
 
     const feld = page.getByRole("textbox");
     await expect(feld).toBeVisible();
-    // Keine „Tutor"-Überschrift mehr (T-07b) – der aktive Reiter sagt das.
+    // Keine „Tutor“-Überschrift mehr (T-07b) – der aktive Reiter sagt das.
     await expect(page.getByRole("heading", { name: "Tutor", level: 1 })).toHaveCount(0);
 
     // Der Inhalt läuft über – sonst prüft der Rest nichts.
@@ -157,6 +161,17 @@ test.describe("Tutor als Kind", () => {
       return m ? m.scrollHeight > m.clientHeight + 40 : false;
     });
     expect(scrollbar).toBe(true);
+
+    // T-10: Das Gespräch geht **am Ende** auf, nicht am Anfang – dort, wo
+    // man weiterliest. Gemessen am Abstand zum unteren Rand von `main`.
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const m = document.querySelector("main");
+          return m ? m.scrollHeight - m.scrollTop - m.clientHeight : 0;
+        }),
+      )
+      .toBeLessThanOrEqual(64);
 
     // Mitten in die Antwort scrollen: Der Zurück-Weg und der Fach-Chip bleiben
     // oben in `main` kleben (vorher scrollten sie mit weg).
@@ -199,7 +214,7 @@ test.describe("Tutor als Kind", () => {
     // sich dann selbst, wie es die echte API bei `continuous = false` tut.
     // Bewusst ohne Klassensyntax mit privaten Feldern: Playwright transpiliert
     // das Init-Skript, und die Babel-Helfer dafür gibt es im Seitenkontext
-    // nicht („_classPrivateMethodInitSpec is not defined").
+    // nicht („_classPrivateMethodInitSpec is not defined“).
     await page.addInitScript(() => {
       type Rueckruf = { onresult: ((e: unknown) => void) | null; onend: (() => void) | null };
       function FakeRecognition(this: Rueckruf) {
@@ -239,7 +254,7 @@ test.describe("Tutor als Kind", () => {
 
     // Der erkannte Text landet im Feld – und bleibt dort editierbar.
     await expect(page.getByRole("textbox")).toHaveValue(/wie kürzt man Brüche/);
-    // Der Stub beendet sich selbst → „hört zu" ist wieder weg.
+    // Der Stub beendet sich selbst → „hört zu“ ist wieder weg.
     await expect(page.getByText(/tutr hört zu/)).toHaveCount(0);
     // Erst jetzt ist Absenden möglich.
     await expect(page.getByRole("button", { name: "Frage senden" })).toBeEnabled();

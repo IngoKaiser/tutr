@@ -8,7 +8,6 @@ import {
   diktatVerfuegbar,
   spracherkennungKonstruktor,
   vorleseVerfuegbar,
-  waehleDeutscheStimme,
   type SpeechRecognitionAehnlich,
 } from "@/lib/tutor/speech";
 
@@ -167,6 +166,7 @@ export function useVorlesen() {
     () => false,
   );
   const [sprichtId, setSprichtId] = useState<string | null>(null);
+  const [pausiert, setPausiert] = useState(false);
 
   // Die Stimmenliste (iOS lädt sie asynchron) und die gewählte Stimme, beide
   // über `useSyncExternalStore` – kein `setState` im Effekt.
@@ -203,6 +203,7 @@ export function useVorlesen() {
     if (!vorleseVerfuegbar()) return;
     window.speechSynthesis.cancel();
     setSprichtId(null);
+    setPausiert(false);
   }, []);
 
   const liesVor = useCallback(
@@ -213,19 +214,64 @@ export function useVorlesen() {
       const rede = new SpeechSynthesisUtterance(text);
       rede.lang = "de-DE";
       rede.rate = VORLESE_TEMPO;
+
+      /**
+       * **Nur eine ausdrücklich gewählte Stimme wird gesetzt** (T-10).
+       *
+       * Vorher stand hier `gewaehlt ?? waehleDeutscheStimme(...)` – also
+       * immer eine Stimme aus `getVoices()`. Genau das war der Fehler: Wer
+       * in den iOS-Einstellungen „Anna (Premium)" ausgewählt hat, hörte
+       * trotzdem die kompakte Anna, weil unsere Heuristik die Systemwahl
+       * **überschrieb**. Bleibt `utterance.voice` leer, nimmt das
+       * Betriebssystem die dort eingestellte Stimme – die bessere, und die,
+       * die das Kind erwartet. Die Heuristik aus T-07b bleibt für die
+       * Sortierung der Auswahlliste zuständig, nicht mehr für die Vorgabe.
+       */
       const gewaehlt = stimmeUri
         ? deutscheStimmen.find((v) => v.voiceURI === stimmeUri)
         : undefined;
-      const stimme = gewaehlt ?? waehleDeutscheStimme(deutscheStimmen);
-      if (stimme) rede.voice = stimme;
-      rede.onend = () => setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
-      rede.onerror = () => setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+      if (gewaehlt) rede.voice = gewaehlt;
+
+      rede.onend = () => {
+        setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+        setPausiert(false);
+      };
+      rede.onerror = () => {
+        setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+        setPausiert(false);
+      };
 
       setSprichtId(id);
+      setPausiert(false);
       window.speechSynthesis.speak(rede);
+
+      /**
+       * Notbremse gegen den hängenden „läuft gerade"-Zustand (T-10): iOS
+       * verwirft `speak()` ohne vorausgegangene Nutzergeste stillschweigend
+       * – dann feuert weder `onend` noch `onerror`, und der Knopf stünde
+       * für immer auf Pause. Kurz nachsehen, ob wirklich etwas läuft.
+       */
+      window.setTimeout(() => {
+        const laeuft = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+        if (!laeuft) setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+      }, 500);
     },
     [deutscheStimmen, stimmeUri],
   );
+
+  /** Anhalten, ohne die Stelle zu verlieren (T-10). */
+  const pause = useCallback(() => {
+    if (!vorleseVerfuegbar()) return;
+    window.speechSynthesis.pause();
+    setPausiert(true);
+  }, []);
+
+  /** Weiter, wo angehalten wurde. */
+  const weiter = useCallback(() => {
+    if (!vorleseVerfuegbar()) return;
+    window.speechSynthesis.resume();
+    setPausiert(false);
+  }, []);
 
   const stimmeWaehlen = useCallback((uri: string) => {
     try {
@@ -252,7 +298,11 @@ export function useVorlesen() {
     verfuegbar,
     immerAn,
     sprichtId,
+    /** Läuft gerade, ist aber angehalten (T-10). */
+    pausiert,
     liesVor,
+    pause,
+    weiter,
     stop,
     umschaltenImmer,
     /** Deutsche Stimmen, beste zuerst. Leer, bis der Browser sie geladen hat. */

@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
+  HakenIcon,
+  KopierenIcon,
   LautsprecherAusIcon,
   LautsprecherIcon,
   MikrofonIcon,
+  PauseIcon,
   PfeilRunterIcon,
+  PlayIcon,
   SendenIcon,
   StoppIcon,
 } from "@/components/shell/icons";
@@ -187,7 +191,29 @@ function MessageBubble({
   live?: boolean;
 }) {
   const istTutor = message.role === "tutor";
-  const spricht = vorlesen.sprichtId === message.id;
+  const laeuft = vorlesen.sprichtId === message.id && !vorlesen.pausiert;
+  const angehalten = vorlesen.sprichtId === message.id && vorlesen.pausiert;
+  const [kopiert, setKopiert] = useState(false);
+  const kopierTimer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (kopierTimer.current !== null) window.clearTimeout(kopierTimer.current);
+    },
+    [],
+  );
+
+  async function kopieren() {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setKopiert(true);
+      if (kopierTimer.current !== null) window.clearTimeout(kopierTimer.current);
+      kopierTimer.current = window.setTimeout(() => setKopiert(false), 1600);
+    } catch {
+      // Ohne Recht auf die Zwischenablage bleibt es beim Versuch – kein
+      // Grund, dem Kind eine Fehlermeldung hinzustellen.
+    }
+  }
   return (
     <li className={`flex flex-col gap-1 ${istTutor ? "items-start" : "items-end"}`}>
       <div
@@ -214,22 +240,63 @@ function MessageBubble({
         )}
       </div>
       {istTutor && !live ? (
-        <div className="flex items-center gap-2">
-          <span className="text-tinte-leise text-[0.6875rem]">{HERKUNFT}</span>
+        <div className="flex items-center gap-1">
+          <NachrichtAktion label="Antwort kopieren" onClick={() => void kopieren()}>
+            {kopiert ? <HakenIcon size={15} /> : <KopierenIcon size={15} />}
+          </NachrichtAktion>
           {vorlesen.verfuegbar ? (
-            <button
-              type="button"
-              onClick={() =>
-                spricht ? vorlesen.stop() : vorlesen.liesVor(message.id, message.content)
-              }
-              className="text-koenigsblau text-[0.6875rem] font-medium"
+            <NachrichtAktion
+              label={laeuft ? "Vorlesen anhalten" : angehalten ? "Weiterlesen" : "Vorlesen"}
+              aktiv={laeuft || angehalten}
+              onClick={() => {
+                if (laeuft) vorlesen.pause();
+                else if (angehalten) vorlesen.weiter();
+                else vorlesen.liesVor(message.id, message.content);
+              }}
             >
-              {spricht ? "Stopp" : "Vorlesen"}
-            </button>
+              {laeuft ? <PauseIcon size={15} /> : <PlayIcon size={15} />}
+            </NachrichtAktion>
           ) : null}
+          <span className="text-tinte-leise ml-1 text-[0.6875rem]">{HERKUNFT}</span>
         </div>
       ) : null}
     </li>
+  );
+}
+
+/**
+ * Ein kleiner Icon-Knopf unter einer Tutor-Antwort (T-10).
+ *
+ * Ersetzt die frühere Textschaltfläche „Vorlesen“/„Stopp“. Zwei Gründe:
+ * Der Zustand „läuft gerade“ gehört ins Symbol (Play/Pause), nicht in
+ * wechselnden Text – und zum Vorlesen kam mit dem Kopieren eine zweite
+ * Aktion dazu, für die zwei nebeneinanderstehende Wörter zu laut wären.
+ *
+ * Die Bedeutung trägt das `aria-label`, nicht das Icon (`icons.tsx`).
+ */
+function NachrichtAktion({
+  label,
+  onClick,
+  aktiv = false,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  aktiv?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`focus-visible:outline-koenigsblau flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
+        aktiv ? "text-koenigsblau" : "text-tinte-leise hover:text-koenigsblau"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -478,37 +545,71 @@ function useSanfterText(ziel: string, fertig: boolean): string {
   return ziel.slice(0, laenge);
 }
 
+/** So nah am Ende gilt noch als „unten“ (Pixel). */
+const ENDE_TOLERANZ = 64;
+
 /**
- * „Klebt“ der Blick am Ende? Ein `IntersectionObserver` auf einen Anker
- * unter der Liste beantwortet das, ohne den Scroll-Container zu kennen –
- * der liegt im Layout, nicht hier.
+ * „Klebt“ der Blick am Ende? (T-07, neu gebaut in T-10.)
+ *
+ * Gemessen wird jetzt direkt am **Scroll-Container** – das ist `main` aus
+ * dem App-Rahmen, gefunden über `closest()` vom Anker aus. Vorher hing das
+ * an einem `IntersectionObserver`: Der meldet nichts, solange das Dokument
+ * verborgen ist, und ließ den Pfeil nach unten damit auch dann aus, wenn er
+ * gebraucht wurde. Eine Abfrage von `scrollTop`/`scrollHeight` ist
+ * deterministisch, im Test nachvollziehbar und kennt keine solchen Löcher.
+ *
+ * Nebenwirkung, die eigentlich der Hauptpunkt ist: Mit dem Container in der
+ * Hand lässt sich ein Gespräch beim Öffnen **ganz nach unten** setzen –
+ * dorthin, wo man weiterliest.
  */
 function useAmEnde(abhaengigkeiten: readonly unknown[]) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [amEnde, setAmEnde] = useState(true);
 
-  useEffect(() => {
-    const anker = sentinelRef.current;
-    if (!anker) return;
-    const beobachter = new IntersectionObserver(
-      ([eintrag]) => setAmEnde(eintrag?.isIntersecting ?? true),
-      { rootMargin: "0px 0px 120px 0px" },
-    );
-    beobachter.observe(anker);
-    return () => beobachter.disconnect();
-  }, []);
+  const behaelter = useCallback(() => sentinelRef.current?.closest("main") ?? null, []);
 
-  const nachUnten = useCallback(() => {
-    sentinelRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, []);
+  const springAnsEnde = useCallback(
+    (sanft: boolean) => {
+      const el = behaelter();
+      if (!el) return;
+      el.scrollTo({ top: el.scrollHeight, behavior: sanft ? "smooth" : "auto" });
+    },
+    [behaelter],
+  );
+
+  /** Für den Pfeil-Knopf – ohne Argument, damit kein Klick-Ereignis durchrutscht. */
+  const nachUnten = useCallback(() => springAnsEnde(true), [springAnsEnde]);
+
+  useEffect(() => {
+    const el = behaelter();
+    if (!el) return;
+    const messen = () =>
+      setAmEnde(el.scrollHeight - el.scrollTop - el.clientHeight <= ENDE_TOLERANZ);
+    messen();
+    el.addEventListener("scroll", messen, { passive: true });
+    window.addEventListener("resize", messen);
+    return () => {
+      el.removeEventListener("scroll", messen);
+      window.removeEventListener("resize", messen);
+    };
+  }, [behaelter]);
+
+  // Beim Öffnen ans Ende, ohne Animation (T-10): Ein gespeichertes Gespräch
+  // soll dort aufgehen, wo es aufgehört hat, nicht am Anfang. Zweimal, weil
+  // Markdown und Schriften die Höhe nach dem ersten Layout noch ändern.
+  useLayoutEffect(() => {
+    springAnsEnde(false);
+    const id = requestAnimationFrame(() => springAnsEnde(false));
+    return () => cancelAnimationFrame(id);
+  }, [springAnsEnde]);
 
   // Solange der Blick unten klebt, mitscrollen – wer hochgescrollt hat, wird
   // nicht zurückgerissen (das ist der Punkt, an dem sich Chats unangenehm
   // anfühlen).
   useEffect(() => {
-    if (amEnde) sentinelRef.current?.scrollIntoView({ block: "end" });
+    if (amEnde) springAnsEnde(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bewusst an den übergebenen Werten statt an einer festen Liste
-  }, [amEnde, ...abhaengigkeiten]);
+  }, [amEnde, springAnsEnde, ...abhaengigkeiten]);
 
   return { amEnde, sentinelRef, nachUnten };
 }
@@ -516,10 +617,28 @@ function useAmEnde(abhaengigkeiten: readonly unknown[]) {
 /** Liest eine neu hinzugekommene Tutor-Antwort vor, wenn „immer vorlesen“ an ist (ADR 0011 D2). */
 function useAutoVorlesen(messages: ChatMessage[], vorlesen: VorlesenSteuerung) {
   const zuletztRef = useRef<string | null>(null);
+  const bereitRef = useRef(false);
   const { immerAn, liesVor } = vorlesen;
   useEffect(() => {
+    const erstesMal = !bereitRef.current;
+    bereitRef.current = true;
+
     const letzte = messages[messages.length - 1];
-    if (!letzte || letzte.role !== "tutor" || letzte.id === zuletztRef.current) return;
+    if (!letzte || letzte.role !== "tutor") return;
+
+    /**
+     * Beim Öffnen nur merken, nicht vorlesen (T-10). Ein gespeichertes
+     * Gespräch soll nicht von selbst lossprechen – und auf iOS wird ein
+     * `speak()` ohne vorausgegangene Nutzergeste ohnehin verworfen, wobei
+     * weder `onend` noch `onerror` feuert: Genau daher kam der Knopf, der
+     * beim Öffnen auf „Stopp“ stand, obwohl nichts lief.
+     */
+    if (erstesMal) {
+      zuletztRef.current = letzte.id;
+      return;
+    }
+
+    if (letzte.id === zuletztRef.current) return;
     zuletztRef.current = letzte.id;
     if (immerAn) liesVor(letzte.id, letzte.content);
   }, [messages, immerAn, liesVor]);
