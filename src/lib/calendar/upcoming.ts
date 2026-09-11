@@ -1,5 +1,5 @@
 /**
- * Termine sortieren und in Zeitfenster einteilen (K-01).
+ * Termine sortieren, in Zeitfenster einteilen und beschriften (K-01, H-01).
  *
  * Rein und unit-testbar: kennt keine Datenbank, nur ISO-Datumsstrings
  * (`YYYY-MM-DD`) und ein „heute". Rechnet in UTC, damit das Ergebnis nicht
@@ -28,6 +28,36 @@ export function daysUntil(dateISO: string, today: Date): number {
   const ziel = Date.UTC(y!, m! - 1, d!);
   const heute = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   return Math.round((ziel - heute) / TAG_MS);
+}
+
+/**
+ * Rückt der Termin nah genug heran, dass „Heute" ihn hervorhebt (H-01)?
+ *
+ * Eine Woche, weil das ungefähr der Zeitraum ist, in dem Vorbereitung noch
+ * etwas ändert – und weil ein Countdown, der vier Wochen lang hervorgehoben
+ * bleibt, nichts mehr unterscheidet. Vergangene Termine sind nie „bald";
+ * `naechsterTermin()` filtert sie zwar schon weg, aber die Regel soll für
+ * sich stimmen.
+ */
+export function istBald(days: number): boolean {
+  return days >= 0 && days <= 7;
+}
+
+/**
+ * Formatiert einen ISO-Tag als Kopfzeile, z. B. „Freitag, 11. September"
+ * (H-01). `timeZone: "UTC"` passt zu `daysUntil()`: Beide lesen denselben
+ * Tag aus demselben String, statt dass die Kopfzeile in einer Zeitzone
+ * rutscht, in der die Countdown-Rechnung nicht rutscht.
+ */
+const TAGES_FORMAT = new Intl.DateTimeFormat("de-DE", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "UTC",
+});
+
+export function langesDatum(dateISO: string): string {
+  return TAGES_FORMAT.format(new Date(`${dateISO}T00:00:00Z`));
 }
 
 /** „heute" · „morgen" · „in 5 Tagen" · „gestern" · „vor 3 Tagen". */

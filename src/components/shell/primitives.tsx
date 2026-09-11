@@ -185,6 +185,38 @@ export function Button({
   );
 }
 
+/**
+ * Ein Link, der aussieht wie ein `Button` (H-01).
+ *
+ * Auf „Heute" führt jede Handlung woandershin – üben, Termine, Hausaufgabe
+ * fotografieren. Das ist Navigation, kein Klick-Handler: Ein `<a>` kann man
+ * in einem neuen Tab öffnen, ein `<button onClick={router.push}>` nicht, und
+ * ohne JavaScript funktioniert er auch. Gleiche Optik wie `Button`, damit
+ * nicht auffällt, dass zwei verschiedene Elemente dahinterstecken.
+ */
+export function LinkButton({
+  href,
+  quiet = false,
+  children,
+}: {
+  href: string;
+  quiet?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`focus-visible:outline-koenigsblau block w-full rounded-[9px] border px-4 py-2.5 text-center text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
+        quiet
+          ? "border-linie-stark bg-flaeche text-tinte hover:bg-papier-tief"
+          : "bg-koenigsblau text-auf-koenigsblau border-transparent"
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export type StapelTon = "sicher" | "koenigsblau" | "offen" | "leise";
 
 const STAPEL_TON_KLASSE: Record<StapelTon, string> = {

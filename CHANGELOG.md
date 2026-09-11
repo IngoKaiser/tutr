@@ -26,6 +26,17 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **H-01: „Heute" zeigt echte Zahlen statt der Attrappe.** Der Startbildschirm stand seit F-07
+  mit erfundenen Beispieldaten da. Jetzt: die fälligen Vokabeln je Fach (dieselbe Zahl wie unter
+  „Üben", aus derselben Abfrage), der nächste Termin mit Countdown – hervorgehoben nur, wenn er
+  in höchstens einer Woche ist –, und der Kamera-Knopf aus §5, der seit T-03 tatsächlich irgendwo
+  hinführt: in den Hausaufgaben-Tutor, mit vorgewähltem Einstieg. Die Seite ist bewusst **Agenda
+  und nicht Werkzeug**: Sie beantwortet „was ist dran?" und startet die Orte, an denen gearbeitet
+  wird. Was §5 darüber hinaus vorsieht – Lernplan-Slot, Fördern-/Fordern-Karte, Sommer-Assistent –
+  fehlt weiter, weil die Module dahinter fehlen; ein Platzhalter neben einer echten Zahl wäre
+  genau die Unwahrheit, die §15 verbietet. Ein Elternteil sieht den Termin, aber keinen Lernstand
+  (ADR 0012 D3).
+
 - **S-03d: die Fortschrittsanzeige zum Kostendeckel.** War in S-03c bewusst offen gelassen –
   wer sieht sie, welche RLS. Jetzt: **nur das Kind**, dieselbe Richtung wie beim Tutor selbst
   (keine neue Elternzeile auf `ai_usage`). **Keine Dollarbeträge** in der Oberfläche, nur der

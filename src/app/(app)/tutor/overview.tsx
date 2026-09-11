@@ -24,7 +24,14 @@ const FIELD =
  * ersten Frage. So sammeln sich keine leeren Gespräche an, nur weil jemand
  * einmal geschaut hat.
  */
-export function TutorOverviewView({ overview }: { overview: TutorOverview | null }) {
+export function TutorOverviewView({
+  overview,
+  einstieg = "freie_frage",
+}: {
+  overview: TutorOverview | null;
+  /** Vorgewählter Einstieg aus `?einstieg=` – der Kamera-Knopf auf „Heute“ kommt so direkt auf „Hausaufgabe“ (H-01). */
+  einstieg?: Einstieg;
+}) {
   if (!overview) {
     return (
       <div className="flex flex-col gap-3">
@@ -38,7 +45,7 @@ export function TutorOverviewView({ overview }: { overview: TutorOverview | null
     <div className="flex flex-col gap-4">
       <PageHeader title="Tutor" />
       <AuslastungHinweis auslastung={overview.auslastung} />
-      <NeuesGespraech subjects={overview.subjects} />
+      <NeuesGespraech subjects={overview.subjects} einstieg={einstieg} />
       <Historie sessions={overview.sessions} />
     </div>
   );
@@ -62,9 +69,15 @@ function AuslastungHinweis({ auslastung }: { auslastung: TutorOverview["auslastu
 
 type Einstieg = "freie_frage" | "verstehen" | "hausaufgabe";
 
-function NeuesGespraech({ subjects }: { subjects: TutorOverview["subjects"] }) {
+function NeuesGespraech({
+  subjects,
+  einstieg,
+}: {
+  subjects: TutorOverview["subjects"];
+  einstieg: Einstieg;
+}) {
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
-  const [entryPoint, setEntryPoint] = useState<Einstieg>("freie_frage");
+  const [entryPoint, setEntryPoint] = useState<Einstieg>(einstieg);
 
   if (subjects.length === 0) {
     return (
