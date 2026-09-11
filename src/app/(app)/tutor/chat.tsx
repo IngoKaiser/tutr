@@ -3,26 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import {
-  HakenIcon,
-  KopierenIcon,
-  LautsprecherAusIcon,
-  LautsprecherIcon,
-  MikrofonIcon,
-  PauseIcon,
-  PfeilRunterIcon,
-  PlayIcon,
-  SendenIcon,
-  StoppIcon,
-} from "@/components/shell/icons";
+import { HakenIcon, KopierenIcon, PauseIcon, PlayIcon } from "@/components/shell/icons";
 import { TutorMarkdown } from "@/components/shell/markdown";
 import { Block, ContextChip, Notice } from "@/components/shell/primitives";
+import type { Auslastung } from "@/lib/ai/rate-limit";
+import type { PreparedImage } from "@/lib/image";
 import { istEingeholt, naechsteLaenge } from "@/lib/tutor/stream-text";
 
-import { useDiktat, useVorlesen } from "./use-speech";
-
-const FIELD_RAHMEN =
-  "border-linie-stark bg-flaeche focus-within:outline-koenigsblau rounded-[12px] border focus-within:outline-2 focus-within:outline-offset-1";
+import { ladeAuslastung } from "./actions";
+import { Composer, type ComposerAnhang } from "./composer";
+import { useVorlesen, type VorlesenSteuerung } from "./use-speech";
 
 /** Fester Hinweis unter jeder Tutor-Antwort (ADR 0010 D5) – der Server sagt das, nicht das Modell. */
 const HERKUNFT = "Allgemeinwissen — noch ohne dein Material und dein Lehrwerk.";
@@ -30,17 +20,7 @@ const HERKUNFT = "Allgemeinwissen — noch ohne dein Material und dein Lehrwerk.
 const NICHT_EINGERICHTET =
   "Der Tutor ist gerade nicht eingerichtet. Deine Vokabeln, Karten und der Prüfungskalender funktionieren weiter.";
 
-/** Einmaliger Hinweis vor der ersten Diktat-Nutzung (ADR 0011 D1). */
-const DIKTAT_HINWEIS_KEY = "tutr:diktat-hinweis";
-const DIKTAT_HINWEIS =
-  "Zum Diktieren schickt dein Browser die Aufnahme an seinen Hersteller (bei Chrome an Google, bei Safari an Apple) und gibt den Text zurück. Nichts davon läuft über tutr, und die Aufnahme wird nirgends gespeichert.";
-
 export type ChatMessage = { id: string; role: "nutzer" | "tutor"; content: string };
-type VorlesenSteuerung = ReturnType<typeof useVorlesen>;
-
-/** Runder 36er-Knopf für die Icons im Eingabefeld. Das Icon erbt die Farbe (`currentColor`). */
-const ICON_BUTTON =
-  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40";
 
 /**
  * Ein Tutor-Gespräch (T-02, umgebaut in T-07).
@@ -64,6 +44,7 @@ export function Conversation({
   entryPoint,
   initialMessages,
   available,
+  auslastung: anfangsAuslastung,
 }: {
   sessionId: string | null;
   subjectId: string;
@@ -73,6 +54,8 @@ export function Conversation({
   entryPoint: "freie_frage" | "verstehen";
   initialMessages: ChatMessage[];
   available: boolean;
+  /** Stand beim Öffnen der Seite; nach jeder Antwort frischt `ladeAuslastung()` ihn auf (S-03e). */
+  auslastung: Auslastung | null;
 }) {
   const [sessionId, setSessionId] = useState(anfangsId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -80,6 +63,8 @@ export function Conversation({
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [anhang, setAnhang] = useState<ComposerAnhang | null>(null);
+  const [auslastung, setAuslastung] = useState(anfangsAuslastung);
   const vorlesen = useVorlesen();
 
   // Geglätteter Textfluss: `zielText` ist, was angekommen ist, `streamText`,
@@ -90,17 +75,27 @@ export function Conversation({
 
   async function senden() {
     const frage = input.trim();
-    if (!frage || pending) return;
+    // Ein Foto allein ist eine gültige Frage – der Server nimmt es auch ohne
+    // Text an (`liesEingang()`), und „schau dir das mal an" ist genau das,
+    // wofür der Anhang da ist.
+    if ((!frage && !anhang) || pending) return;
     setInput("");
     setFehler(null);
     setPending(true);
-    setMessages((prev) => [...prev, { id: `lokal-${Date.now()}`, role: "nutzer", content: frage }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: `lokal-${Date.now()}`, role: "nutzer", content: frage || "(Foto)" },
+    ]);
     setZielText("");
+
+    const bild = anhang?.datei ?? null;
+    if (anhang) URL.revokeObjectURL(anhang.vorschauUrl);
+    setAnhang(null);
 
     try {
       const payload = sessionId
-        ? { sessionId, message: frage }
-        : { subjectId, entryPoint, message: frage };
+        ? { sessionId, message: frage, image: bild }
+        : { subjectId, entryPoint, message: frage, image: bild };
       const { text, neueSessionId } = await streameAntwort(payload, setZielText);
       setMessages((prev) => [...prev, { id: `tutor-${Date.now()}`, role: "tutor", content: text }]);
       if (!sessionId && neueSessionId) {
@@ -109,6 +104,10 @@ export function Conversation({
         // richtigen Gespräch, der Stream bleibt aber unangetastet.
         window.history.replaceState(null, "", `/tutor/${neueSessionId}`);
       }
+      // Der Pegel im Composer zeigt sonst bis zum nächsten Seitenaufruf den
+      // Stand von vorhin – gerade nach einer langen Antwort ist das die
+      // Zahl, die sich am meisten bewegt hat.
+      setAuslastung(await ladeAuslastung());
     } catch (problem) {
       setFehler(problem instanceof Error ? problem.message : "Da ging etwas schief.");
     } finally {
@@ -163,18 +162,27 @@ export function Conversation({
       {/* Der Anker, an dem „bin ich unten?“ gemessen wird. */}
       <div ref={sentinelRef} aria-hidden="true" className="h-px" />
 
-      <Composer
-        available={available}
-        pending={pending}
-        value={input}
-        sprache="de-DE"
-        zielsprache={subjectLanguage}
-        onChange={setInput}
-        onSend={() => void senden()}
-        vorlesen={vorlesen}
-        amEnde={amEnde}
-        nachUnten={nachUnten}
-      />
+      {available ? (
+        <Composer
+          wert={input}
+          onChange={setInput}
+          onSend={() => void senden()}
+          pending={pending}
+          platzhalter={
+            subjectLanguage ? "Frag etwas — auf Deutsch." : "Frag etwas oder sag, wo es hakt."
+          }
+          vorlesen={vorlesen}
+          auslastung={auslastung}
+          amEnde={amEnde}
+          nachUnten={nachUnten}
+          anhang={anhang}
+          onAnhang={setAnhang}
+        />
+      ) : (
+        <Block>
+          <Notice>{NICHT_EINGERICHTET}</Notice>
+        </Block>
+      )}
     </div>
   );
 }
@@ -297,216 +305,6 @@ function NachrichtAktion({
     >
       {children}
     </button>
-  );
-}
-
-// --- Eingabe ----------------------------------------------------------
-
-function Composer({
-  available,
-  pending,
-  value,
-  sprache,
-  zielsprache,
-  onChange,
-  onSend,
-  vorlesen,
-  amEnde,
-  nachUnten,
-}: {
-  available: boolean;
-  pending: boolean;
-  value: string;
-  sprache: string;
-  zielsprache: string | null;
-  onChange: (v: string) => void;
-  onSend: () => void;
-  vorlesen: VorlesenSteuerung;
-  amEnde: boolean;
-  nachUnten: () => void;
-}) {
-  const [hinweisOffen, setHinweisOffen] = useState(false);
-  const diktat = useDiktat({ sprache, onText: onChange });
-
-  function mikrofon() {
-    if (diktat.hoert) {
-      diktat.umschalten(value);
-      return;
-    }
-    let bestaetigt = false;
-    try {
-      bestaetigt = window.localStorage.getItem(DIKTAT_HINWEIS_KEY) === "1";
-    } catch {
-      // localStorage nicht verfügbar – dann den Hinweis lieber jedes Mal zeigen.
-    }
-    if (!bestaetigt) {
-      setHinweisOffen(true);
-      return;
-    }
-    vorlesen.stop();
-    diktat.umschalten(value);
-  }
-
-  function hinweisWeg() {
-    try {
-      window.localStorage.setItem(DIKTAT_HINWEIS_KEY, "1");
-    } catch {
-      // egal
-    }
-    setHinweisOffen(false);
-    vorlesen.stop();
-    diktat.umschalten(value);
-  }
-
-  if (!available) {
-    return (
-      <Block>
-        <Notice>{NICHT_EINGERICHTET}</Notice>
-      </Block>
-    );
-  }
-
-  const absendbar = value.trim().length > 0 && !pending;
-
-  return (
-    // `sticky bottom-0` im scrollenden `main`: klebt genau über der
-    // Fußleiste, ohne deren Höhe zu kennen. `-mx-4 px-4` lässt den
-    // Hintergrund bis an den Rand laufen, damit darunter kein Text
-    // durchscheint. `-mb-5` frisst das `py-5` der Hülle.
-    <div className="bg-papier border-linie sticky bottom-0 -mx-4 -mb-5 flex flex-col gap-2 border-t px-4 pt-2 pb-3">
-      {!amEnde ? (
-        <button
-          type="button"
-          onClick={nachUnten}
-          aria-label="Zum Ende springen"
-          className="border-linie-stark bg-flaeche text-tinte-weich hover:bg-papier-tief hover:text-tinte absolute -top-11 left-1/2 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border shadow-sm transition-colors"
-        >
-          <PfeilRunterIcon size={17} />
-        </button>
-      ) : null}
-
-      {hinweisOffen ? (
-        <Block>
-          <Notice>{DIKTAT_HINWEIS}</Notice>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={hinweisWeg}
-              className="bg-koenigsblau text-auf-koenigsblau rounded-[9px] px-4 py-2 text-sm font-semibold"
-            >
-              Verstanden, los
-            </button>
-            <button
-              type="button"
-              onClick={() => setHinweisOffen(false)}
-              className="border-linie-stark bg-flaeche text-tinte rounded-[9px] border px-4 py-2 text-sm font-semibold"
-            >
-              Doch tippen
-            </button>
-          </div>
-        </Block>
-      ) : null}
-
-      {diktat.hoert ? (
-        <span className="text-koenigsblau text-[0.6875rem] font-medium">tutr hört zu …</span>
-      ) : null}
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSend();
-        }}
-        className={`${FIELD_RAHMEN} flex items-end gap-1 py-1.5 pr-1.5 pl-3`}
-      >
-        {/*
-         * Wächst mit dem Text, bis zu einer Deckelhöhe – danach scrollt es
-         * (V-13). Vorher stand hier `rows={1}` ohne jede Anpassung: Alles ab
-         * der zweiten Zeile war einfach weg, ohne Bildlaufleiste oder
-         * anderen Hinweis, dass mehr dasteht, als sichtbar ist.
-         *
-         * Reines CSS, kein `useEffect`, kein `scrollHeight`-Messen: Ein
-         * unsichtbarer Zwilling mit demselben Text, derselben Schrift und
-         * demselben Innenabstand bekommt über CSS Grid dieselbe Zelle wie
-         * das Feld (`col-start-1 row-start-1`) – der Zwilling hat eine
-         * natürliche Höhe (er ist nur Text), das Feld übernimmt sie über
-         * die Zellhöhe. `value` ist ohnehin schon React-Zustand, der
-         * Zwilling bekommt ihn einfach mit, kein Zusatzcode nötig. Die
-         * Deckelhöhe (`max-h-40`) sitzt auf der gemeinsamen Hülle, die dann
-         * selbst scrollt – eine einzige Bildlaufleiste für beide Ebenen.
-         */}
-        <div className="grid max-h-40 min-h-9 min-w-0 flex-1 overflow-y-auto text-sm">
-          <div
-            aria-hidden="true"
-            className="invisible col-start-1 row-start-1 py-1.5 [overflow-wrap:anywhere] whitespace-pre-wrap"
-          >
-            {value ? `${value} ` : " "}
-          </div>
-          <textarea
-            value={value}
-            onChange={(e) => {
-              vorlesen.stop();
-              onChange(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSend();
-              }
-            }}
-            rows={1}
-            placeholder={
-              zielsprache ? "Frag etwas — auf Deutsch." : "Frag etwas oder sag, wo es hakt."
-            }
-            className="text-tinte placeholder:text-tinte-leise col-start-1 row-start-1 w-full resize-none overflow-hidden bg-transparent py-1.5 outline-none"
-          />
-        </div>
-
-        {vorlesen.verfuegbar ? (
-          <button
-            type="button"
-            onClick={vorlesen.umschaltenImmer}
-            aria-pressed={vorlesen.immerAn}
-            aria-label={vorlesen.immerAn ? "Antworten vorlesen: an" : "Antworten vorlesen: aus"}
-            className={`${ICON_BUTTON} ${
-              vorlesen.immerAn
-                ? "bg-koenigsblau-hell text-koenigsblau"
-                : "text-tinte-leise hover:bg-papier-tief"
-            }`}
-          >
-            {vorlesen.immerAn ? <LautsprecherIcon /> : <LautsprecherAusIcon />}
-          </button>
-        ) : null}
-
-        {diktat.verfuegbar ? (
-          <button
-            type="button"
-            onClick={mikrofon}
-            aria-pressed={diktat.hoert}
-            aria-label={diktat.hoert ? "Diktat beenden" : "Diktieren"}
-            className={`${ICON_BUTTON} ${
-              diktat.hoert
-                ? "bg-koenigsblau text-auf-koenigsblau"
-                : "text-tinte-leise hover:bg-papier-tief"
-            }`}
-          >
-            {diktat.hoert ? <StoppIcon size={16} /> : <MikrofonIcon />}
-          </button>
-        ) : null}
-
-        <button
-          type="submit"
-          disabled={!absendbar}
-          aria-label={pending ? "Der Tutor schreibt" : "Frage senden"}
-          className={`${ICON_BUTTON} ${
-            absendbar
-              ? "bg-koenigsblau text-auf-koenigsblau"
-              : "bg-papier-tief text-tinte-leise cursor-default"
-          }`}
-        >
-          <SendenIcon className={pending ? "animate-pulse" : undefined} />
-        </button>
-      </form>
-    </div>
   );
 }
 
@@ -635,9 +433,9 @@ function useAutoVorlesen(messages: ChatMessage[], vorlesen: VorlesenSteuerung) {
 
 // --- Stream lesen ----------------------------------------------------
 
-type SendePayload =
-  | { sessionId: string; message: string }
-  | { subjectId: string; entryPoint: "freie_frage" | "verstehen"; message: string };
+type SendePayload = { message: string; image: PreparedImage | null } & (
+  { sessionId: string } | { subjectId: string; entryPoint: "freie_frage" | "verstehen" }
+);
 
 /**
  * Schickt die Frage an `POST /api/tutor` und reicht den bisher angekommenen

@@ -177,8 +177,10 @@ async function StudentSettings() {
             macht der Tutor kurz Pause; deine Vokabeln, Karten und der Prüfungskalender laufen immer
             weiter.
           </Notice>
+          {/* Nur Tag und Woche (S-03e): Der Stundendeckel bleibt als Schutz
+              im Code, ist aber kein Zeitraum, in dem jemand plant – und er
+              meldet sich von selbst, wenn er greift. */}
           <div className="flex flex-col gap-3">
-            <Auslastungsbalken anteil={auslastung.stunde} label={FENSTER_LABEL.stunde} />
             <Auslastungsbalken anteil={auslastung.tag} label={FENSTER_LABEL.tag} />
             <Auslastungsbalken anteil={auslastung.woche} label={FENSTER_LABEL.woche} />
           </div>

@@ -86,7 +86,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Sprachwächter (Tutor antwortet auf Deutsch, Fach-Ausnahme)                         | ✅    | T-02a   |
 |                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | ✅    | S-03b   |
 |                          | Kostendeckel in echtem Geld statt Anfragenzahl, plus Wochenfenster                 | ✅    | S-03c   |
-|                          | Fortschrittsanzeige: dezent im Tutor, volle Übersicht in Einstellungen             | ✅    | S-03d   |
+|                          | Kostendeckel-Anzeige (Heute/Woche), Pegel im Eingabefeld statt auf der Übersicht   | ✅    | S-03d/e |
 |                          | Chat-Shell: Übersicht + Gespräch, klebendes Eingabefeld, ↓-Knopf                   | ✅    | T-07    |
 |                          | Antworten als Markdown lesbar (Fettung, Listen)                                    | ✅    | T-08    |
 |                          | Altersgerechte Ansprache nach Jahrgang                                             | ✅    | T-09    |
@@ -110,6 +110,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Pack `de-hh-gym-2023` importieren                                                  | 🌑    | T-05    |
 |                          | Chat-Leiste: Kopieren, Play/Pause, öffnet am Ende, Systemstimme                    | ✅    | T-10    |
 |                          | Textfeld wächst mit dem Text, keine Stimmenauswahl mehr im Chat                    | ✅    | T-11    |
+|                          | Ein Eingabefeld für alle Dialoge: 1–3 Zeilen, Knöpfe unten, Foto per Plus-Menü     | ✅    | T-12    |
 | **Betrieb**              |                                                                                    | 🌓    |         |
 |                          | Deploy `mytutr.de`, Domain, Preview/Production getrennt                            | ✅    | D-01    |
 |                          | E2E gegen die Test-Datenbank                                                       | ✅    | F-13    |

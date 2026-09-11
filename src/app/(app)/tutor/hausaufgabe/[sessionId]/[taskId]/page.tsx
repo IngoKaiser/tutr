@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { loginStatus } from "@/lib/auth/actor";
 import { anthropicConfigured } from "@/lib/env";
 
+import { ladeAuslastung } from "../../../actions";
 import { ladeAufgabe } from "../../actions";
 import { AufgabeChat } from "../../aufgabe-chat";
 
@@ -22,5 +23,11 @@ export default async function AufgabePage({
   const aufgabe = await ladeAufgabe(sessionId, taskId);
   if (!aufgabe) notFound();
 
-  return <AufgabeChat aufgabe={aufgabe} available={anthropicConfigured()} />;
+  return (
+    <AufgabeChat
+      aufgabe={aufgabe}
+      available={anthropicConfigured()}
+      auslastung={await ladeAuslastung()}
+    />
+  );
 }

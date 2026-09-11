@@ -235,3 +235,6 @@ export function useVorlesen() {
     umschaltenImmer,
   };
 }
+
+/** Was `useVorlesen()` zurückgibt – als Typ, damit der Composer sie durchreichen kann (T-12). */
+export type VorlesenSteuerung = ReturnType<typeof useVorlesen>;

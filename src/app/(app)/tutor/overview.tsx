@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Auslastungsbalken, Block, Notice, PageHeader } from "@/components/shell/primitives";
-import { FENSTER_LABEL, groesstesFenster } from "@/lib/ai/rate-limit";
+import { Block, Notice, PageHeader } from "@/components/shell/primitives";
 
 import type { TutorOverview } from "./actions";
 
@@ -44,25 +43,8 @@ export function TutorOverviewView({
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Tutor" />
-      <AuslastungHinweis auslastung={overview.auslastung} />
       <NeuesGespraech subjects={overview.subjects} einstieg={einstieg} />
       <Historie sessions={overview.sessions} />
-    </div>
-  );
-}
-
-/**
- * Der dezente Hinweis (S-03d): nur das straffste der drei Fenster, nur wenn
- * überhaupt etwas genutzt wurde – ein frisches Konto sieht hier nichts. Die
- * volle Übersicht mit allen drei Fenstern steht in „Einstellungen".
- */
-function AuslastungHinweis({ auslastung }: { auslastung: TutorOverview["auslastung"] }) {
-  const { fenster, anteil } = groesstesFenster(auslastung);
-  if (anteil <= 0) return null;
-
-  return (
-    <div className="max-w-40 self-end">
-      <Auslastungsbalken anteil={anteil} label={FENSTER_LABEL[fenster]} />
     </div>
   );
 }
