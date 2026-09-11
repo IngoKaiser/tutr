@@ -11,7 +11,6 @@ import {
   addFromPaste,
   addFromPhoto,
   addManualItem,
-  confirmItem,
   deleteItem,
   updateItem,
   type AddSummary,
@@ -609,21 +608,17 @@ function VocabRowItem({
     );
   }
 
+  /**
+   * Speichert – und **bestätigt damit zugleich** (V-13). `updateItem()`
+   * setzt `confirmed_at` unabhängig davon, ob sich Wort oder Übersetzung
+   * geändert haben: Die Felder stehen vorausgefüllt da, also heißt „Speichern"
+   * auf eine unveränderte Zeile bereits „passt so". Ein eigener zweiter Knopf
+   * dafür (`confirmItem()`) tat exakt dasselbe wie dieser hier – entfernt,
+   * nachdem das beim Testen als verwirrende Dopplung auffiel.
+   */
   function save() {
     startTransition(async () => {
       await updateItem(setId, item.id, term, translation);
-      setOpen(false);
-    });
-  }
-
-  /**
-   * „Passt so" – akzeptieren, ohne etwas zu ändern (V-09). Steht nur bei
-   * Zeilen, die ein „prüfen" tragen: der Fall `pasar`, wo beide
-   * Übersetzungen richtig sind und es nichts zu korrigieren gibt.
-   */
-  function confirm() {
-    startTransition(async () => {
-      await confirmItem(setId, item.id);
       setOpen(false);
     });
   }
@@ -646,11 +641,6 @@ function VocabRowItem({
         <Button onClick={save} disabled={pending}>
           {pending ? "…" : "Speichern"}
         </Button>
-        {item.unsicher ? (
-          <Button quiet onClick={confirm} disabled={pending}>
-            {pending ? "…" : "Passt so"}
-          </Button>
-        ) : null}
         <Button quiet onClick={() => setOpen(false)} disabled={pending}>
           Abbrechen
         </Button>

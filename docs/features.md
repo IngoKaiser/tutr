@@ -57,6 +57,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Foto-Import als Minigalerie, echte Fehlerursachen                                  | ✅    | V-03c   |
 |                          | Foto-Import: erst sammeln dann „Einlesen“, drehen, einzeln entfernen               | ✅    | V-10    |
 |                          | Wischen zum Löschen mit Rückgängig-Fenster (Liste + Waisen)                        | ✅    | V-11    |
+|                          | Erklärung des Lernrhythmus für Kinder (aufklappbar, SVG)                           | ✅    | V-13    |
 |                          | „Geprüft“-Zustand: akzeptierte Zeilen normal, Ungeprüftes nicht im Üben            | ✅    | V-09    |
 |                          | Fachbindung im Modell (ADR 0008)                                                   | ✅    | V-05    |
 |                          | Vokabeln ohne Set sichtbar/löschbar machen                                         | ✅    | V-03d   |

@@ -361,10 +361,13 @@ export async function updateItem(
       // aufgeklappt und gespeichert hat, hat daraufgeschaut – und genau das
       // war der Zweck der Markierung (V-03b, ADR 0007 D2). Seit V-09 setzt
       // dasselbe Speichern auch `confirmed_at`: Es beantwortet die Frage
-      // „stimmt das?" genauso wie ein ausdrückliches „Passt so", und ohne
-      // das bliebe eine korrigierte Doppel-Zeile (`pasar`) weiter markiert
-      // und vom Üben ausgeschlossen. Der Lernstand bleibt unberührt,
-      // `card`/`review` fasst diese Abfrage nicht an.
+      // „stimmt das?" – ohne das bliebe eine korrigierte Doppel-Zeile
+      // (`pasar`) weiter markiert und vom Üben ausgeschlossen (V-09). Die
+      // Felder stehen vorausgefüllt da: Auch ohne inhaltliche Änderung heißt
+      // „Speichern" auf eine unveränderte Zeile bereits „passt so" – ein
+      // eigener zweiter Knopf dafür tat exakt dasselbe und ist wieder raus
+      // (V-13). Der Lernstand bleibt unberührt, `card`/`review` fasst diese
+      // Abfrage nicht an.
       sql`update vocab_item
           set term = ${term.trim()}, translation = ${translation.trim()},
               recognition_uncertain = false, confirmed_at = now()
@@ -387,33 +390,6 @@ export async function deleteItem(setId: string, itemId: string): Promise<void> {
   if (!actor) return;
 
   await withActor(actor, (tx) => tx.execute(sql`delete from vocab_item where id = ${itemId}`));
-  revalidatePath(`/faecher/vokabeln/${setId}`);
-  revalidatePath("/faecher/vokabeln");
-}
-
-/**
- * „Passt so" – die Zeile ist geprüft und richtig (V-09).
- *
- * Für den Fall, in dem es **nichts zu korrigieren** gibt: `pasar` =
- * verbringen *und* passieren. Beide Zeilen stimmen, aber „gleiches Wort,
- * andere Übersetzung" wird abgeleitet und bliebe ohne diesen Weg für immer
- * ein „prüfen" – und die Vokabel damit für immer vom Üben ausgeschlossen.
- *
- * Bewusst getrennt von `updateItem()`, obwohl das dieselbe Spalte setzt:
- * Akzeptieren ohne Änderung soll nicht erzwingen, dass man Wort und
- * Übersetzung noch einmal durch die Formularfelder schickt.
- */
-export async function confirmItem(setId: string, itemId: string): Promise<void> {
-  const actor = await requireStudentActor();
-  if (!actor) return;
-
-  await withActor(actor, (tx) =>
-    tx.execute(
-      sql`update vocab_item
-          set confirmed_at = now(), recognition_uncertain = false
-          where id = ${itemId}`,
-    ),
-  );
   revalidatePath(`/faecher/vokabeln/${setId}`);
   revalidatePath("/faecher/vokabeln");
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 
+import { Lernrhythmus } from "@/components/shell/lernrhythmus";
 import { Block, Button, Notice, PageHeader, Stack } from "@/components/shell/primitives";
 import { directionLabels } from "@/lib/subjects/languages";
 import { buildMultipleChoiceOptions } from "@/lib/vocab/distractors";
@@ -159,6 +160,7 @@ export function PracticeSession({
                 onStart={startSession}
               />
             ))}
+            <Lernrhythmus />
           </>
         )}
 

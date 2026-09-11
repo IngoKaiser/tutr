@@ -4,7 +4,24 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Added
+
+- **V-13: der Lernrhythmus erklärt sich selbst.** Beim Testen aufgefallen: „Neu / Am Üben /
+  Sitzt“ und eine täglich wechselnde Fällig-Zahl sind ohne Erklärung nicht nachvollziehbar –
+  warum ist nicht jeden Tag alles dran? Ein aufklappbarer Hinweis unter den Fach-Blöcken auf
+  „Üben“ erklärt das Prinzip in einfachen Sätzen (kein Algorithmusname), mit einem kleinen
+  Diagramm: eine Vokabel, viermal hintereinander richtig gewusst, wachsende Pausen dazwischen
+  – und der Hinweis, dass eine falsche Antwort das umdreht.
+
 ### Fixed
+
+- **V-13: „Passt so“ war dasselbe wie „Speichern“ – raus.** Aus dem Testen: Ein eigener
+  zweiter Knopf zum Akzeptieren einer geprüften Zeile war überflüssig, weil „Speichern“
+  (mit den vorausgefüllten Feldern) `confirmed_at` schon immer mitsetzt, auch ganz ohne
+  inhaltliche Änderung. Entfernt, zusammen mit dem toten Server-Code dahinter.
+- **V-13: die Wisch-Kante beim Löschen.** Die verschiebbare Zeile trug einen eigenen,
+  eckigen Hintergrund, der genau an ihrer gerundeten rechten Ecke durchschimmerte, statt des
+  roten Löschen-Grunds dahinter. Jetzt zeigt sich in der Rundung, was wirklich dahinterliegt.
 
 - **T-10: der Tutor-Chat hört auf dich – und auf die Stimme, die du eingestellt hast.** Vier
   Dinge aus dem Gebrauch. **Die Stimme:** Die App setzte immer selbst eine Stimme aus der
