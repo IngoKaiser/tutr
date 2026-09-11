@@ -15,6 +15,26 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
   Dabei fiel auf, dass die Anmeldeseite bisher ganz ohne diese Prüfungen auslieferte — also
   ausgerechnet die Seite, auf der Fremde landen.
 
+### Added
+
+- **F-10a: eine eigene E2E-Suite prüft den echten Produktions-Bau, nicht nur `next dev`.**
+  Die reguläre Suite läuft seit F-05 gegen den Entwicklungsserver und überspringt die
+  Anmeldung über `TUTR_E2E_ACTOR` – bequem, aber blind für alles, was sich nur in
+  Produktion anders verhält. Genau das ist zweimal passiert: `/anmelden` wurde statisch
+  vorgerendert und bekam deshalb kein CSP-`nonce` (bei S-03a von Hand gefunden), und der
+  Proxy leitete `/_vercel/insights/script.js` auf `/anmelden` um, weil der Pfad im
+  `matcher` fehlte – ein Fund dieser neuen Suite selbst. `playwright.prod.config.ts`
+  baut und startet die App wirklich (`npm run build && npm run start`, Port 3101, gegen
+  `TEST_DATABASE_URL`) und meldet ein Kind per virtuellem Passkey-Authenticator an – die
+  einzige Rolle, die ohne Supabase-Secrets für die Test-Umgebung möglich ist. Geprüft:
+  die Tür ist ohne Sitzung wirklich zu, der Entwicklungs-Umschalter existiert nicht, die
+  CSP ist die strenge Fassung ohne `unsafe-eval`/`unsafe-inline`, jedes Skript trägt sein
+  `nonce`, und eine echte Anmeldung trägt durch alle fünf Bereiche. Neuer Befehl
+  `npm run test:e2e:prod`, neuer CI-Job `e2e-prod` (überspringt sich ohne
+  `TEST_DATABASE_URL`, wie der bestehende `db`-Job). **Der Elternweg fehlt noch (F-10b):**
+  eine echte Anmeldung per Magic Link bräuchte eigene Supabase-Zugangsdaten für das
+  Test-Projekt, die es bisher nicht gibt.
+
 ### Changed
 
 - **T-19: Die Gesprächsliste bleibt brauchbar, auch nach hundert Gesprächen.** Nach zwei Tagen

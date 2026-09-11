@@ -140,7 +140,15 @@ export const config = {
   //
   // Die Seiten ohne Anmeldung standen bis S-03a ebenfalls hier – sie stehen
   // jetzt in `OHNE_ANMELDUNG`, weil auch sie die CSP tragen müssen.
+  //
+  // `_vercel` ebenfalls außen vor (F-10a): Dort liegt das Skript der
+  // Web-Analytics (`<Analytics />` im Root-Layout). Ohne die Ausnahme
+  // beantwortet der Proxy es für jeden Nichtangemeldeten mit einer
+  // Weiterleitung auf `/anmelden` – der Browser bekommt HTML, wo er
+  // JavaScript erwartet, und meldet „Refused to execute script". Gefunden
+  // von der Produktions-Suite; im Entwicklungsserver war es unsichtbar,
+  // weil der Actor-Bypass die Weiterleitung nie auslöst.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest|robots.txt).*)",
+    "/((?!_next/static|_next/image|_vercel|favicon.ico|icon-.*\\.png|manifest.webmanifest|robots.txt).*)",
   ],
 };
