@@ -11,7 +11,10 @@ const securityHeaders = [
   // Crawler, die die robots.txt gar nicht erst lesen. Die App ist das
   // Lernkonto eines Kindes, keine Website.
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
-  // Content-Security-Policy folgt in Ticket S-03, sobald Supabase- und Anthropic-Origins feststehen.
+  // Die Content-Security-Policy steht **nicht** hier, sondern in `src/proxy.ts`
+  // (S-03a): Sie trägt ein `nonce`, das je Anfrage neu gewürfelt wird, und
+  // lässt sich deshalb nicht als feste Kopfzeile ausliefern. Gebaut wird sie
+  // in `src/lib/security/csp.ts`.
 ];
 
 const nextConfig: NextConfig = {

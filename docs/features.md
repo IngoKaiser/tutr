@@ -125,7 +125,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Web Analytics (aggregiert, ohne Kennung)                                           | ✅    | —       |
 |                          | Datenbankrunden je Seite: >30 → <10; Funktionsregion Frankfurt                     | ✅    | #44/#46 |
 |                          | Ladezeit-Untersuchung (Region war `iad1` – im Dashboard umgestellt)                | 🌔    | —       |
-|                          | Content-Security-Policy (offener Punkt in `next.config.ts` seit F-07)              | 🌑    | S-03a   |
+|                          | Content-Security-Policy mit nonce, ohne `unsafe-inline` für Skripte                | ✅    | S-03a   |
 |                          | E2E gegen den Produktions-Build (echte Anmeldung)                                  | 🌑    | F-10    |
 |                          | Dev-Tooling-Bumps (eslint 10, TS 7)                                                | 🌑    | F-08    |
 
@@ -144,8 +144,6 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 9. ~~**T-03 schmal**~~ — erledigt (Hausaufgabe mit Hinweisleiter, in zwei PRs: Fundament, dann Backend + Oberfläche)
 10. ~~**H-01 schmal**~~ — erledigt (Heute mit echten Zahlen: Fälliges je Fach, nächster Termin, Kamera-Knopf)
 11. **V-04** — Set-Modus
-
-`S-03a` (CSP) hängt an nichts und kann jederzeit dazwischen.
 
 Danach entscheidet die Rückmeldung aus echter Nutzung.
 

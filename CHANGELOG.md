@@ -4,6 +4,17 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Security
+
+- **S-03a: Der Browser führt nur noch Skripte aus, die von uns stammen.** Der Tutor zeigt Text
+  an, den ein Sprachmodell geschrieben hat — und Text aus fremder Quelle ist der Weg, auf dem
+  Schadcode in eine Seite kommt. Bisher lag dagegen nur eine Sperre (die Markdown-Anzeige
+  lässt kein HTML durch); jetzt liegt eine zweite dahinter: Jede Seite bekommt eine
+  Content-Security-Policy mit einem Einmal-Kennwort, das nur die eigenen Skripte tragen.
+  Eingeschleuste laufen nicht — auch dann nicht, wenn die erste Sperre einmal nachgibt.
+  Dabei fiel auf, dass die Anmeldeseite bisher ganz ohne diese Prüfungen auslieferte — also
+  ausgerechnet die Seite, auf der Fremde landen.
+
 ### Changed
 
 - **T-19: Die Gesprächsliste bleibt brauchbar, auch nach hundert Gesprächen.** Nach zwei Tagen
