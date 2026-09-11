@@ -220,7 +220,7 @@ export function ReadingText({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Eine Leiste „wie ausgelastet" (S-03c-Fortschrittsanzeige, Tutor/Einstellungen).
+ * Eine Leiste „wie ausgelastet" (S-03d-Fortschrittsanzeige, Tutor/Einstellungen).
  *
  * Bewusst kein Prozent-Verlauf in Rot/Gelb/Grün: Das läse sich wie ein
  * Dringlichkeits-Element (CLAUDE.md verbietet solche ausdrücklich), dabei

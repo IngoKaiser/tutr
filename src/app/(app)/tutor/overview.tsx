@@ -45,7 +45,7 @@ export function TutorOverviewView({ overview }: { overview: TutorOverview | null
 }
 
 /**
- * Der dezente Hinweis (S-03c): nur das straffste der drei Fenster, nur wenn
+ * Der dezente Hinweis (S-03d): nur das straffste der drei Fenster, nur wenn
  * überhaupt etwas genutzt wurde – ein frisches Konto sieht hier nichts. Die
  * volle Übersicht mit allen drei Fenstern steht in „Einstellungen".
  */

@@ -39,7 +39,7 @@ export type SessionSummary = {
 export type TutorOverview = {
   subjects: SubjectChoice[];
   sessions: SessionSummary[];
-  /** Wie ausgelastet der Kostendeckel gerade ist (S-03c) – für den dezenten Hinweis in der Übersicht. */
+  /** Wie ausgelastet der Kostendeckel gerade ist (S-03d) – für den dezenten Hinweis in der Übersicht. */
   auslastung: Auslastung;
 };
 

@@ -152,7 +152,7 @@ export default async function SettingsPage() {
 
 /**
  * Nur-Lese-Zeilen plus die einzige Aktion, die ein Kind hier sonst braucht
- * (F-06e, F-16a) – und, seit S-03c, die volle Fortschrittsanzeige: nur das
+ * (F-06e, F-16a) – und, seit S-03d, die volle Fortschrittsanzeige: nur das
  * Kind sieht `ai_usage`, dieselbe Richtung wie beim Tutor selbst.
  */
 async function StudentSettings() {

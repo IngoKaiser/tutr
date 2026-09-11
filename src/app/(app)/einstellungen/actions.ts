@@ -100,7 +100,7 @@ export async function loadActiveSchoolYearLabel(): Promise<string | null> {
 }
 
 /**
- * Die volle Fortschrittsanzeige (S-03c): alle drei Fenster, nur fürs Kind
+ * Die volle Fortschrittsanzeige (S-03d): alle drei Fenster, nur fürs Kind
  * selbst – dieselbe Richtung wie beim Tutor (kein Elternzugriff auf
  * `ai_usage`, ADR 0012 D3 sinngemäß: Kosten hängen direkt an der eigenen
  * Nutzung). Der dezente Hinweis in der Tutor-Übersicht zeigt nur das
