@@ -8,7 +8,6 @@ import { withActor, type Actor, type Transaction } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { classifyDuplicate, type ExistingVocabItem } from "@/lib/vocab/duplicates";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
-import { saniereFuerLog } from "@/lib/log";
 import { newCardColumns } from "@/lib/vocab/fsrs";
 import { parsePastedVocabulary } from "@/lib/vocab/paste";
 import { classifyPhotoImportError, extractedRowsToPastedRows } from "@/lib/vocab/photo";
@@ -315,9 +314,11 @@ export async function addFromPhoto(
     // unerwarteten Fehler `error.message` enthalten – beides ungeprüft in
     // ein Serverlog zu schreiben, ließe einen Zeilenumbruch darin eine
     // gefälschte Logzeile einschleusen (CodeQL `js/log-injection`).
-    // `saniereFuerLog()` sanitisiert die ganze zusammengesetzte Zeile in
-    // einem Aufruf, nicht jeden Baustein einzeln (siehe `lib/log.ts`).
-    console.error(saniereFuerLog(`Foto-Import gescheitert (Set ${setId}): ${ursache}`));
+    // `JSON.stringify()`: CodeQLs `LogInjectionQuery.qll` erkennt als
+    // Schranke entweder `String#replace(/\n/g, "")` wörtlich in genau dieser
+    // Form oder `JSON.stringify()` – Letzteres escaped zusätzlich
+    // Anführungszeichen und andere Steuerzeichen, nicht nur Zeilenumbrüche.
+    console.error(JSON.stringify(`Foto-Import gescheitert (Set ${setId}): ${ursache}`));
     return { ok: false, fehler };
   }
 

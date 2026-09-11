@@ -8,7 +8,6 @@ import { withActor, type Actor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
-import { saniereFuerLog } from "@/lib/log";
 import { pruefeUndErzeugeAbschluss } from "@/lib/tutor/hausaufgabe-abschluss";
 import { classifyHomeworkPhotoError } from "@/lib/tutor/hausaufgabe-foto";
 import type { HomeworkStatus } from "@/lib/tutor/hint-ladder";
@@ -114,13 +113,17 @@ export async function fotoZuAufgaben(
     // unerwarteten Fehler `error.message` enthalten – beides ungeprüft in
     // ein Serverlog zu schreiben, ließe einen Zeilenumbruch darin eine
     // gefälschte Logzeile einschleusen (CodeQL `js/log-injection`).
-    // `saniereFuerLog()` sanitisiert die **ganze** zusammengesetzte Zeile in
-    // einem Aufruf, nicht jeden Baustein einzeln – CodeQL erkannte den
-    // sanitisierten Anteil in der vorherigen Fassung (je ein Aufruf pro
-    // eingesetztem Wert, innerhalb des Template-Strings) nicht als
-    // Schranke und meldete die Zeile weiter (Alert #9 auf #71, trotz Fix).
+    // `JSON.stringify()` statt eines eigenen `.replace()`: CodeQLs
+    // `LogInjectionQuery.qll` erkennt als Schranke entweder einen
+    // `String#replace(/\n/g, "")`-Aufruf **wörtlich** in dieser Form (Muster
+    // `\n`, Ersetzung durch den leeren String – ein eigener Helfer mit
+    // anderem Muster/anderer Ersetzung, wie die vorherige Fassung, erfüllt
+    // das nicht) oder `JSON.stringify()`. Letzteres escaped zusätzlich noch
+    // Anführungszeichen und andere Steuerzeichen in `ursache`, nicht nur
+    // Zeilenumbrüche – die robustere Wahl für einen Wert, der aus
+    // `error.message` stammen kann.
     console.error(
-      saniereFuerLog(`Hausaufgaben-Foto gescheitert (Session ${sessionId}): ${ursache}`),
+      JSON.stringify(`Hausaufgaben-Foto gescheitert (Session ${sessionId}): ${ursache}`),
     );
     return { ok: false, fehler };
   }
