@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
-  deutscheStimmenSortiert,
   diktatAnhaengen,
   diktatVerfuegbar,
   spracherkennungKonstruktor,
@@ -20,7 +19,6 @@ import {
  */
 
 const VORLESEN_KEY = "tutr:vorlesen";
-const STIMME_KEY = "tutr:vorlesen-stimme";
 
 /**
  * Etwas langsamer als die Vorgabe (T-07b). Die kompakten Systemstimmen sind
@@ -28,23 +26,6 @@ const STIMME_KEY = "tutr:vorlesen-stimme";
  * gedehnt zu klingen.
  */
 const VORLESE_TEMPO = 0.92;
-
-/**
- * `speechSynthesis.getVoices()` gibt bei jedem Aufruf ein neues Array – für
- * `useSyncExternalStore` wäre das eine Endlosschleife. Deshalb ein
- * Modul-Cache, der nur ersetzt wird, wenn sich die Stimmenliste wirklich
- * ändert (iOS lädt sie asynchron nach).
- */
-let stimmenCache: readonly SpeechSynthesisVoice[] = [];
-function stimmenSnapshot(): readonly SpeechSynthesisVoice[] {
-  if (!vorleseVerfuegbar()) return stimmenCache;
-  const aktuell = window.speechSynthesis.getVoices();
-  const gleich =
-    aktuell.length === stimmenCache.length &&
-    aktuell.every((v, i) => v.voiceURI === stimmenCache[i]?.voiceURI);
-  if (!gleich) stimmenCache = aktuell;
-  return stimmenCache;
-}
 
 /** Fähigkeit, die es auf dem Server nicht gibt – über `useSyncExternalStore`, damit die Hydration sauber bleibt. */
 function useBrowserFaehigkeit(pruefe: () => boolean): boolean {
@@ -134,15 +115,6 @@ function lesePref(): boolean {
   }
 }
 
-/** Die vom Kind gewählte Stimme (`voiceURI`), oder `""` für „beste automatisch". */
-function leseStimmePref(): string {
-  try {
-    return window.localStorage.getItem(STIMME_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
 /** Damit ein Umschalten in einer Komponente auch die andere im selben Tab erreicht. */
 const prefHoerer = new Set<() => void>();
 
@@ -168,32 +140,6 @@ export function useVorlesen() {
   const [sprichtId, setSprichtId] = useState<string | null>(null);
   const [pausiert, setPausiert] = useState(false);
 
-  // Die Stimmenliste (iOS lädt sie asynchron) und die gewählte Stimme, beide
-  // über `useSyncExternalStore` – kein `setState` im Effekt.
-  const stimmen = useSyncExternalStore(
-    (onChange) => {
-      if (!vorleseVerfuegbar()) return () => {};
-      window.speechSynthesis.addEventListener("voiceschanged", onChange);
-      return () => window.speechSynthesis.removeEventListener("voiceschanged", onChange);
-    },
-    stimmenSnapshot,
-    () => stimmenCache,
-  );
-  const stimmeUri = useSyncExternalStore(
-    (onChange) => {
-      prefHoerer.add(onChange);
-      if (typeof window !== "undefined") window.addEventListener("storage", onChange);
-      return () => {
-        prefHoerer.delete(onChange);
-        if (typeof window !== "undefined") window.removeEventListener("storage", onChange);
-      };
-    },
-    leseStimmePref,
-    () => "",
-  );
-
-  const deutscheStimmen = deutscheStimmenSortiert(stimmen);
-
   useEffect(() => {
     if (!vorleseVerfuegbar()) return;
     return () => window.speechSynthesis.cancel();
@@ -206,58 +152,50 @@ export function useVorlesen() {
     setPausiert(false);
   }, []);
 
-  const liesVor = useCallback(
-    (id: string, text: string) => {
-      if (!vorleseVerfuegbar() || !text.trim()) return;
-      window.speechSynthesis.cancel();
+  const liesVor = useCallback((id: string, text: string) => {
+    if (!vorleseVerfuegbar() || !text.trim()) return;
+    window.speechSynthesis.cancel();
 
-      const rede = new SpeechSynthesisUtterance(text);
-      rede.lang = "de-DE";
-      rede.rate = VORLESE_TEMPO;
+    const rede = new SpeechSynthesisUtterance(text);
+    rede.lang = "de-DE";
+    rede.rate = VORLESE_TEMPO;
 
-      /**
-       * **Nur eine ausdrücklich gewählte Stimme wird gesetzt** (T-10).
-       *
-       * Vorher stand hier `gewaehlt ?? waehleDeutscheStimme(...)` – also
-       * immer eine Stimme aus `getVoices()`. Genau das war der Fehler: Wer
-       * in den iOS-Einstellungen „Anna (Premium)" ausgewählt hat, hörte
-       * trotzdem die kompakte Anna, weil unsere Heuristik die Systemwahl
-       * **überschrieb**. Bleibt `utterance.voice` leer, nimmt das
-       * Betriebssystem die dort eingestellte Stimme – die bessere, und die,
-       * die das Kind erwartet. Die Heuristik aus T-07b bleibt für die
-       * Sortierung der Auswahlliste zuständig, nicht mehr für die Vorgabe.
-       */
-      const gewaehlt = stimmeUri
-        ? deutscheStimmen.find((v) => v.voiceURI === stimmeUri)
-        : undefined;
-      if (gewaehlt) rede.voice = gewaehlt;
-
-      rede.onend = () => {
-        setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
-        setPausiert(false);
-      };
-      rede.onerror = () => {
-        setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
-        setPausiert(false);
-      };
-
-      setSprichtId(id);
+    /**
+     * **`utterance.voice` bleibt unangetastet** (T-10, aufgeräumt in V-13).
+     *
+     * Früher wählte hier eine eigene Heuristik aus `getVoices()` – und
+     * überschrieb damit, was in den iOS-Einstellungen als Stimme steht
+     * („Anna (Premium)" gewählt, trotzdem die kompakte Anna gehört). Ohne
+     * eigene Wahl nimmt das Betriebssystem seine dort eingestellte Stimme.
+     * Eine eigene Auswahl direkt im Chat (V-12) blieb dünn – kaum
+     * unterscheidbare Browser-Stimmen auf iOS – und ist wieder raus; eine
+     * echte Stimmenauswahl gehört, wenn überhaupt, nach „Einstellungen"
+     * und wartet auf die Cloud-TTS-Entscheidung (ADR 0013).
+     */
+    rede.onend = () => {
+      setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
       setPausiert(false);
-      window.speechSynthesis.speak(rede);
+    };
+    rede.onerror = () => {
+      setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+      setPausiert(false);
+    };
 
-      /**
-       * Notbremse gegen den hängenden „läuft gerade"-Zustand (T-10): iOS
-       * verwirft `speak()` ohne vorausgegangene Nutzergeste stillschweigend
-       * – dann feuert weder `onend` noch `onerror`, und der Knopf stünde
-       * für immer auf Pause. Kurz nachsehen, ob wirklich etwas läuft.
-       */
-      window.setTimeout(() => {
-        const laeuft = window.speechSynthesis.speaking || window.speechSynthesis.pending;
-        if (!laeuft) setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
-      }, 500);
-    },
-    [deutscheStimmen, stimmeUri],
-  );
+    setSprichtId(id);
+    setPausiert(false);
+    window.speechSynthesis.speak(rede);
+
+    /**
+     * Notbremse gegen den hängenden „läuft gerade"-Zustand (T-10): iOS
+     * verwirft `speak()` ohne vorausgegangene Nutzergeste stillschweigend
+     * – dann feuert weder `onend` noch `onerror`, und der Knopf stünde
+     * für immer auf Pause. Kurz nachsehen, ob wirklich etwas läuft.
+     */
+    window.setTimeout(() => {
+      const laeuft = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+      if (!laeuft) setSprichtId((jetzt) => (jetzt === id ? null : jetzt));
+    }, 500);
+  }, []);
 
   /** Anhalten, ohne die Stelle zu verlieren (T-10). */
   const pause = useCallback(() => {
@@ -271,16 +209,6 @@ export function useVorlesen() {
     if (!vorleseVerfuegbar()) return;
     window.speechSynthesis.resume();
     setPausiert(false);
-  }, []);
-
-  const stimmeWaehlen = useCallback((uri: string) => {
-    try {
-      if (uri) window.localStorage.setItem(STIMME_KEY, uri);
-      else window.localStorage.removeItem(STIMME_KEY);
-    } catch {
-      // egal – dann merkt es sich der Browser nicht
-    }
-    for (const hoerer of prefHoerer) hoerer();
   }, []);
 
   const umschaltenImmer = useCallback(() => {
@@ -305,10 +233,5 @@ export function useVorlesen() {
     weiter,
     stop,
     umschaltenImmer,
-    /** Deutsche Stimmen, beste zuerst. Leer, bis der Browser sie geladen hat. */
-    stimmen: deutscheStimmen,
-    /** `voiceURI` der gewählten Stimme, `""` = automatisch die beste. */
-    stimmeUri,
-    stimmeWaehlen,
   };
 }

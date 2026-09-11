@@ -57,6 +57,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Foto-Import als Minigalerie, echte Fehlerursachen                                  | ✅    | V-03c   |
 |                          | Foto-Import: erst sammeln dann „Einlesen“, drehen, einzeln entfernen               | ✅    | V-10    |
 |                          | Wischen zum Löschen mit Rückgängig-Fenster (Liste + Waisen)                        | ✅    | V-11    |
+|                          | Erklärung des Lernrhythmus für Kinder (aufklappbar, SVG)                           | ✅    | V-13    |
 |                          | „Geprüft“-Zustand: akzeptierte Zeilen normal, Ungeprüftes nicht im Üben            | ✅    | V-09    |
 |                          | Fachbindung im Modell (ADR 0008)                                                   | ✅    | V-05    |
 |                          | Vokabeln ohne Set sichtbar/löschbar machen                                         | ✅    | V-03d   |
@@ -106,6 +107,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Schema Kurrikulum-Pack                                                             | 🌑    | F-04g   |
 |                          | Pack `de-hh-gym-2023` importieren                                                  | 🌑    | T-05    |
 |                          | Chat-Leiste: Kopieren, Play/Pause, öffnet am Ende, Systemstimme                    | ✅    | T-10    |
+|                          | Textfeld wächst mit dem Text, keine Stimmenauswahl mehr im Chat                    | ✅    | T-11    |
 | **Betrieb**              |                                                                                    | 🌓    |         |
 |                          | Deploy `mytutr.de`, Domain, Preview/Production getrennt                            | ✅    | D-01    |
 |                          | E2E gegen die Test-Datenbank                                                       | ✅    | F-13    |

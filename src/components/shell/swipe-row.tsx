@@ -120,7 +120,17 @@ export function SwipeRow({
         </button>
       </div>
 
-      {/* Die eigentliche Zeile, verschiebbar. */}
+      {/*
+       * Die eigentliche Zeile, verschiebbar – **ohne eigenen Hintergrund**
+       * (V-13). Die stand hier vorher (`bg-papier`), undurchsichtig und
+       * eckig. Der Inhalt (die Zeile selbst) trägt seine eigene, gerundete
+       * Fläche (`border-offen bg-offen-hell` bei „prüfen", sonst
+       * `bg-papier`) – schob man ihn nach links, lag die eckige Hülle genau
+       * hinter seiner gerundeten rechten Ecke und schimmerte dort durch:
+       * eine kleine Kante zwischen Zeile und rotem Grund, statt eines
+       * sauberen Übergangs. Ohne eigenen Hintergrund zeigt sich in der
+       * Rundung jetzt, was wirklich dahinterliegt – der rote Grund.
+       */}
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -140,7 +150,7 @@ export function SwipeRow({
           transition: zieht ? "none" : "transform .18s ease",
           touchAction: "pan-y",
         }}
-        className="bg-papier relative"
+        className="relative"
       >
         {children}
       </div>

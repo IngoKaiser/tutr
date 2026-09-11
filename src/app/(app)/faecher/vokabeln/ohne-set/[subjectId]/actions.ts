@@ -126,7 +126,9 @@ export async function updateOrphan(
   await withActor(actor, (tx) =>
     tx.execute(
       // Wie in `[setId]/actions.ts`: Speichern heißt „ich hab draufgeschaut"
-      // und setzt deshalb auch `confirmed_at` (V-09).
+      // und setzt deshalb auch `confirmed_at` (V-09) – auch ohne inhaltliche
+      // Änderung, die Felder stehen ja vorausgefüllt da. Ein eigener Knopf
+      // „Passt so" dafür tat dasselbe und ist wieder raus (V-13).
       sql`update vocab_item
           set term = ${term.trim()}, translation = ${translation.trim()},
               recognition_uncertain = false, confirmed_at = now()
@@ -142,22 +144,6 @@ export async function deleteOrphan(subjectId: string, itemId: string): Promise<v
   if (!actor) return;
 
   await withActor(actor, (tx) => tx.execute(sql`delete from vocab_item where id = ${itemId}`));
-  revalidatePath(`/faecher/vokabeln/ohne-set/${subjectId}`);
-  revalidatePath("/faecher/vokabeln");
-}
-
-/** „Passt so" für eine Waise – siehe `confirmItem()` in `[setId]/actions.ts` (V-09). */
-export async function confirmOrphan(subjectId: string, itemId: string): Promise<void> {
-  const actor = await requireStudentActor();
-  if (!actor) return;
-
-  await withActor(actor, (tx) =>
-    tx.execute(
-      sql`update vocab_item
-          set confirmed_at = now(), recognition_uncertain = false
-          where id = ${itemId}`,
-    ),
-  );
   revalidatePath(`/faecher/vokabeln/ohne-set/${subjectId}`);
   revalidatePath("/faecher/vokabeln");
 }
