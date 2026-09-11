@@ -104,6 +104,89 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("link", { name: new RegExp(PREFIX) })).toBeVisible();
   });
 
+  test("frühere Gespräche lassen sich löschen, mit Rückgängig-Fenster (T-15)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+    if (!admin) throw new Error("Seed fehlgeschlagen – TEST_MIGRATION_DATABASE_URL?");
+
+    // Ein eigenes, hier angelegtes Gespräch – nicht das gemeinsame `sessionId`
+    // aus `beforeAll`, das andere Tests in dieser Datei noch brauchen. Dazu
+    // eine Hausaufgaben-Session: Sie hängt an derselben `tutor_session`-Zeile
+    // und muss sich genauso löschen lassen ("inklusive Hausaufgaben-Sessions,
+    // die derselben Liste angehören", PLAN.md T-15).
+    const titel = `${PREFIX} Zum Löschen`;
+    const haTitel = `${PREFIX} Hausaufgabe zum Löschen`;
+    const [row] = await admin<{ id: string }[]>`
+      insert into tutor_session (student_id, subject_id, title, entry_point)
+      values (${MIA}, ${FRANZOESISCH}, ${titel}, 'freie_frage')
+      returning id`;
+    await admin`
+      insert into tutor_message (student_id, session_id, role, content)
+      values (${MIA}, ${row!.id}, 'nutzer', ${titel})`;
+    await admin`
+      insert into tutor_session (student_id, subject_id, title, entry_point)
+      values (${MIA}, ${FRANZOESISCH}, ${haTitel}, 'hausaufgabe')`;
+
+    await alsMia(page);
+    await page.goto("/tutor");
+
+    const rueckgaengig = page.getByRole("button", { name: "Rückgängig" });
+
+    // Die Hausaufgaben-Session löschen – derselbe Weg, andere Zielroute –
+    // und gleich per Rückgängig zurückholen, damit danach wieder nur eine
+    // Löschung gleichzeitig schwebt (die `getByRole`-Suchen unten sind sonst
+    // nicht mehr eindeutig).
+    const haZeile = page.getByRole("link", { name: new RegExp(haTitel) });
+    await expect(haZeile).toBeVisible();
+    await expect(haZeile).toHaveAttribute("href", /\/tutor\/hausaufgabe\//);
+    await page
+      .locator("li", { has: haZeile })
+      .locator("button", { hasText: "Löschen" })
+      .dispatchEvent("click");
+    await expect(haZeile).toHaveCount(0);
+    await expect(page.getByText(/gelöscht/)).toContainText(haTitel);
+    await rueckgaengig.click();
+    await expect(haZeile).toBeVisible();
+    await expect(rueckgaengig).toHaveCount(0);
+
+    const zeile = page.getByRole("link", { name: new RegExp(titel) });
+    await expect(zeile).toBeVisible();
+
+    // Der „Löschen“-Knopf (`SwipeRow`, V-11) liegt hinter der Zeile und wird
+    // erst beim echten Wischen sichtbar. `.click()` – auch mit `force` – trifft
+    // an seinen Koordinaten trotzdem den `Link` obendrüber, denn das Browser-
+    // Hit-Testing für einen echten Klick schaut nicht auf Playwrights
+    // Sichtbarkeitsprüfung, sondern auf das oberste Element an der Stelle.
+    // `dispatchEvent("click")` löst das `onClick` direkt am Knoten aus, ohne
+    // über Bildschirmkoordinaten zu gehen – wie ein echter Wisch es am Ende
+    // auch tut (`SwipeRow`s Knopf hat `onClick`, keinen Pointer-Handler).
+    // Über `getByRole` ist der Knopf ohnehin nicht zu finden: Solange die
+    // Zeile geschlossen ist, steht `aria-hidden="true"` daran, und die Rolle
+    // fällt aus dem Accessibility-Baum.
+    const zeilenElement = page.locator("li", { has: zeile });
+    await zeilenElement.locator("button", { hasText: "Löschen" }).dispatchEvent("click");
+
+    await expect(zeile).toHaveCount(0);
+    await expect(rueckgaengig).toBeVisible();
+    await expect(page.getByText(/gelöscht/)).toContainText(titel);
+
+    // Rückgängig holt die Zeile zurück.
+    await rueckgaengig.click();
+    await expect(zeile).toBeVisible();
+    await expect(rueckgaengig).toHaveCount(0);
+
+    // Ohne Rückgängig verschwindet sie nach der Verzögerung dauerhaft – der
+    // Timer selbst ist in `use-deferred-delete.test.ts` durchgetestet, hier
+    // reicht die Bestätigung nach einem Reload.
+    await zeilenElement.locator("button", { hasText: "Löschen" }).dispatchEvent("click");
+    await expect(zeile).toHaveCount(0);
+    await page.waitForTimeout(5200);
+    await page.reload();
+    await expect(page.getByRole("link", { name: new RegExp(titel) })).toHaveCount(0);
+  });
+
   test("ein gespeichertes Gespräch rendert und führt zurück zur Übersicht", async ({
     page,
     browserName,

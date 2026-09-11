@@ -3,9 +3,11 @@
 import Link from "next/link";
 
 import { Block, Notice, PageHeader } from "@/components/shell/primitives";
+import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
+import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 import type { Auslastung } from "@/lib/ai/rate-limit";
 
-import type { TutorOverview } from "./actions";
+import { deleteTutorSession, type SessionSummary, type TutorOverview } from "./actions";
 import { Conversation } from "./chat";
 
 /**
@@ -25,6 +27,15 @@ import { Conversation } from "./chat";
  * Angelegt wird die Session **nicht** hier: Die Zeile in der Datenbank
  * entsteht erst mit der ersten Frage, drüben im Sendeweg. So sammeln sich
  * keine leeren Gespräche an, nur weil jemand einmal geschaut hat.
+ *
+ * **Wischen zum Löschen** (T-15): dieselben Bausteine wie bei den
+ * Vokabelsets (V-11) – `SwipeRow` für die Geste, `useDeferredDelete` fürs
+ * Rückgängig-Fenster. Der Hook lebt hier statt in `Historie`, weil sowohl
+ * die Liste (`istEntfernt` zum Ausblenden) als auch die Rückgängig-Leiste
+ * (`pending`) davon wissen müssen, und beide über `leerInhalt` in
+ * `Conversation` hineingereicht werden. Gilt für Hausaufgaben-Sessions
+ * genauso wie für freie Gespräche – `deleteTutorSession()` kennt den
+ * Unterschied nicht, beide hängen an derselben `tutor_session`-Zeile.
  */
 export function TutorOverviewView({
   overview,
@@ -35,6 +46,10 @@ export function TutorOverviewView({
   available: boolean;
   auslastung: Auslastung | null;
 }) {
+  // Immer aufgerufen, auch ohne `overview` (Hooks-Regel) – der Rückgabewert
+  // bleibt dann einfach ungenutzt.
+  const geloescht = useDeferredDelete<SessionSummary>((id) => deleteTutorSession(id));
+
   if (!overview) {
     return (
       <div className="flex flex-col gap-3">
@@ -45,6 +60,8 @@ export function TutorOverviewView({
       </div>
     );
   }
+
+  const sichtbar = overview.sessions.filter((s) => !geloescht.istEntfernt(s.id));
 
   return (
     <Conversation
@@ -58,12 +75,33 @@ export function TutorOverviewView({
       available={available}
       auslastung={auslastung}
       alleFaecher={overview.subjects}
-      leerInhalt={<Historie sessions={overview.sessions} />}
+      leerInhalt={
+        <>
+          <Historie sessions={sichtbar} onLoeschen={(s) => geloescht.entfernen(s)} />
+          {/* Sitzt in derselben scrollenden Fläche wie die Historie
+              (`verlaufRef` in `chat.tsx`), nicht außerhalb: `sticky` braucht
+              als Bezug genau diesen Scrollbereich (V-12), und der ist seit
+              T-12a nicht mehr `main`. */}
+          <UndoLoeschen
+            eintraege={geloescht.pending.map((e) => ({
+              id: e.id,
+              label: e.title.trim() || "Gespräch",
+            }))}
+            onZurueck={(id) => geloescht.zuruecknehmen(id)}
+          />
+        </>
+      }
     />
   );
 }
 
-function Historie({ sessions }: { sessions: TutorOverview["sessions"] }) {
+function Historie({
+  sessions,
+  onLoeschen,
+}: {
+  sessions: TutorOverview["sessions"];
+  onLoeschen: (session: SessionSummary) => void;
+}) {
   if (sessions.length === 0) {
     return (
       <Notice>Noch keine Gespräche. Schreib einfach los – die erste Frage startet eins.</Notice>
@@ -90,22 +128,35 @@ function Historie({ sessions }: { sessions: TutorOverview["sessions"] }) {
     <div className="flex flex-col gap-3">
       <Ueberschrift>Frühere Gespräche</Ueberschrift>
       {faecher.map((fach) => (
-        <FachGruppe key={fach} titel={fach} sessions={nachFach.get(fach) ?? []} />
+        <FachGruppe
+          key={fach}
+          titel={fach}
+          sessions={nachFach.get(fach) ?? []}
+          onLoeschen={onLoeschen}
+        />
       ))}
       {ohneFach.length > 0 ? (
-        <FachGruppe titel="Noch nicht einsortiert" sessions={ohneFach} />
+        <FachGruppe titel="Noch nicht einsortiert" sessions={ohneFach} onLoeschen={onLoeschen} />
       ) : null}
     </div>
   );
 }
 
-function FachGruppe({ titel, sessions }: { titel: string; sessions: TutorOverview["sessions"] }) {
+function FachGruppe({
+  titel,
+  sessions,
+  onLoeschen,
+}: {
+  titel: string;
+  sessions: TutorOverview["sessions"];
+  onLoeschen: (session: SessionSummary) => void;
+}) {
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-tinte-weich text-[0.75rem] font-medium">{titel}</span>
       <ul className="flex flex-col gap-1.5">
         {sessions.map((s) => (
-          <li key={s.id}>
+          <SwipeRow key={s.id} onDelete={() => onLoeschen(s)}>
             <Link
               href={s.hausaufgabe ? `/tutor/hausaufgabe/${s.id}` : `/tutor/${s.id}`}
               className="border-linie bg-papier hover:bg-papier-tief flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2.5"
@@ -115,7 +166,7 @@ function FachGruppe({ titel, sessions }: { titel: string; sessions: TutorOvervie
                 {kurzDatum(s.updatedAt)}
               </span>
             </Link>
-          </li>
+          </SwipeRow>
         ))}
       </ul>
     </div>
