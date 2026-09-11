@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { tonNachJahrgang, tutorSystemPrompt } from "./tutor";
+import { hausaufgabeSystemPrompt } from "./hausaufgabe";
+import { formelRegeln, tonNachJahrgang, tutorSystemPrompt } from "./tutor";
 
 describe("tonNachJahrgang", () => {
   it("Jahrgang 5–7: kurze Sätze, Alltagsbeispiel zuerst", () => {
@@ -74,5 +75,65 @@ describe("tutorSystemPrompt", () => {
   it("blendet den Verstehen-Block nur beim passenden Einstieg ein", () => {
     expect(tutorSystemPrompt(basis)).toMatch(/EINSTIEG: FREIE FRAGE/);
     expect(tutorSystemPrompt({ ...basis, entryPoint: "verstehen" })).toMatch(/EINSTIEG: VERSTEHEN/);
+  });
+});
+
+describe("formelRegeln – wie Rechenwege auszusehen haben (T-14)", () => {
+  const regeln = formelRegeln().join("\n");
+
+  it("verlangt einen Rechenschritt je Zeile", () => {
+    // Der Fund aus dem Testen: zwei Umformungen in einer Zeile, nur durch
+    // Fettung getrennt.
+    expect(regeln).toMatch(/[Ee]in Rechenschritt je Zeile/);
+    expect(regeln).toMatch(/[Nn]ie zwei Umformungen/);
+  });
+
+  it("zeigt die Schulheft-Schreibweise als wörtliches Beispiel", () => {
+    // Ein Modell übernimmt eine Form zuverlässiger, wenn es sie sieht,
+    // statt sie beschrieben zu bekommen.
+    expect(regeln).toContain("\\begin{aligned}");
+    expect(regeln).toContain("\\mid -4x");
+    expect(regeln).toContain("\\end{aligned}");
+  });
+
+  it("verlangt $$ auf eigenen Zeilen – sonst bleibt die Formel inline", () => {
+    // Von `markdown.test.tsx` bestätigt: `$$…$$` mitten im Absatz wird
+    // nicht abgesetzt.
+    expect(regeln).toMatch(/eigenen.{0,3} Zeilen/);
+  });
+
+  it("nennt Einheiten und \\ce{…} für die Naturwissenschaften", () => {
+    expect(regeln).toMatch(/Einheiten immer mitführen/);
+    expect(regeln).toContain("\\ce{");
+  });
+
+  it("verbietet ASCII-Strukturformeln, statt sie zu versuchen", () => {
+    // KaTeX kann Summenformeln, aber keine Skelettformeln – lieber eine
+    // ehrliche Beschreibung als eine Zeichnung aus Bindestrichen.
+    expect(regeln).toMatch(/Strukturformeln/);
+    expect(regeln).toMatch(/ASCII/);
+  });
+});
+
+describe("beide Prompts tragen dieselben Formelregeln", () => {
+  it("freier Chat und Hausaufgaben-Zug erklären Rechenwege gleich", () => {
+    const chat = tutorSystemPrompt({
+      subjectName: "Mathematik",
+      subjectLanguage: null,
+      topicTitle: null,
+      entryPoint: "freie_frage",
+      gradeLevel: 8,
+    });
+    const hausaufgabe = hausaufgabeSystemPrompt({
+      subjectName: "Mathematik",
+      gradeLevel: 8,
+      aufgabe: "7x - 9 = 4x + 15",
+      zug: { art: "loesung_zeigen" },
+    });
+
+    for (const prompt of [chat, hausaufgabe]) {
+      expect(prompt).toMatch(/FORMELN UND RECHENWEGE/);
+      expect(prompt).toContain("\\begin{aligned}");
+    }
   });
 });

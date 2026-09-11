@@ -140,8 +140,11 @@ export function AufgabeChat({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="bg-papier border-linie sticky top-0 z-10 -mx-4 -mt-5 flex items-center gap-3 border-b px-4 py-2">
+    // Drei Zonen wie im freien Chat (T-12a): Kopfzeile fest, nur die Mitte
+    // scrollt, Eingabefeld fest. `position: sticky` im scrollenden `main`
+    // rutschte auf dem iPhone mit nach oben. Zur Höhe siehe `chat.tsx`.
+    <div className="flex h-[calc(100cqh-2.5rem)] min-h-0 flex-col">
+      <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
         <Link
           href={`/tutor/hausaufgabe/${aufgabe.sessionId}`}
           className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
@@ -152,57 +155,60 @@ export function AufgabeChat({
         <ContextChip subject={aufgabe.subjectName} />
       </div>
 
-      <Block>
-        <div className="flex items-baseline gap-2">
-          {aufgabe.label ? (
-            <span className="text-tinte-leise shrink-0 text-[0.75rem] font-semibold tabular-nums">
-              {aufgabe.label}
-            </span>
-          ) : null}
-          <span className="text-tinte text-[0.9375rem]">{aufgabe.prompt}</span>
-        </div>
-        <span className="text-tinte-leise text-[0.75rem]">
-          {STATUS_LABEL[stand.status]} · Versuch {stand.attempts} · Hinweis {stand.hintLevel}/4
-        </span>
-      </Block>
+      {/* Die einzige scrollende Fläche – Aufgabenstellung, Verlauf, Fehler. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
+        <Block>
+          <div className="flex items-baseline gap-2">
+            {aufgabe.label ? (
+              <span className="text-tinte-leise shrink-0 text-[0.75rem] font-semibold tabular-nums">
+                {aufgabe.label}
+              </span>
+            ) : null}
+            <span className="text-tinte text-[0.9375rem]">{aufgabe.prompt}</span>
+          </div>
+          <span className="text-tinte-leise text-[0.75rem]">
+            {STATUS_LABEL[stand.status]} · Versuch {stand.attempts} · Hinweis {stand.hintLevel}/4
+          </span>
+        </Block>
 
-      {messages.length === 0 && !streamText ? (
-        <Notice>
-          Erklär, wo du stehst, oder versuch dich schon an der Aufgabe – ein Foto vom Rechenweg geht
-          auch.
-        </Notice>
-      ) : (
-        <ol className="flex flex-col gap-2.5">
-          {messages.map((m) => (
-            <li
-              key={m.id}
-              className={`flex flex-col gap-1 ${m.role === "tutor" ? "items-start" : "items-end"}`}
-            >
-              <div
-                className={`max-w-[85%] rounded-[10px] border px-3 py-2 text-sm ${
-                  m.role === "tutor"
-                    ? "border-linie bg-papier text-tinte"
-                    : "border-koenigsblau bg-koenigsblau-hell text-tinte whitespace-pre-wrap"
-                }`}
+        {messages.length === 0 && !streamText ? (
+          <Notice>
+            Erklär, wo du stehst, oder versuch dich schon an der Aufgabe – ein Foto vom Rechenweg
+            geht auch.
+          </Notice>
+        ) : (
+          <ol className="flex flex-col gap-2.5">
+            {messages.map((m) => (
+              <li
+                key={m.id}
+                className={`flex flex-col gap-1 ${m.role === "tutor" ? "items-start" : "items-end"}`}
               >
-                {m.role === "tutor" ? <TutorMarkdown>{m.content}</TutorMarkdown> : m.content}
-              </div>
-            </li>
-          ))}
-          {streamText ? (
-            <li className="flex flex-col items-start gap-1">
-              <div className="border-linie bg-papier text-tinte max-w-[85%] rounded-[10px] border px-3 py-2 text-sm">
-                <span className="whitespace-pre-wrap">
-                  {streamText}
-                  <span className="text-tinte-leise"> ▍</span>
-                </span>
-              </div>
-            </li>
-          ) : null}
-        </ol>
-      )}
+                <div
+                  className={`max-w-[85%] rounded-[10px] border px-3 py-2 text-sm ${
+                    m.role === "tutor"
+                      ? "border-linie bg-papier text-tinte"
+                      : "border-koenigsblau bg-koenigsblau-hell text-tinte whitespace-pre-wrap"
+                  }`}
+                >
+                  {m.role === "tutor" ? <TutorMarkdown>{m.content}</TutorMarkdown> : m.content}
+                </div>
+              </li>
+            ))}
+            {streamText ? (
+              <li className="flex flex-col items-start gap-1">
+                <div className="border-linie bg-papier text-tinte max-w-[85%] rounded-[10px] border px-3 py-2 text-sm">
+                  <span className="whitespace-pre-wrap">
+                    {streamText}
+                    <span className="text-tinte-leise"> ▍</span>
+                  </span>
+                </div>
+              </li>
+            ) : null}
+          </ol>
+        )}
 
-      {fehler ? <Notice>{fehler}</Notice> : null}
+        {fehler ? <Notice>{fehler}</Notice> : null}
+      </div>
 
       {abgeschlossen ? (
         <Block emphasized title="Aufgabe erledigt">

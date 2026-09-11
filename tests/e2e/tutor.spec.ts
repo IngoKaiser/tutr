@@ -139,7 +139,7 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("link", { name: "Gespräch beginnen" })).toBeVisible();
   });
 
-  test("Kopfzeile und Eingabefeld bleiben beim Scrollen angeheftet", async ({
+  test("Nur der Verlauf scrollt – Kopfzeile und Eingabefeld stehen fest", async ({
     page,
     browserName,
   }) => {
@@ -155,27 +155,35 @@ test.describe("Tutor als Kind", () => {
     // Keine „Tutor“-Überschrift mehr (T-07b) – der aktive Reiter sagt das.
     await expect(page.getByRole("heading", { name: "Tutor", level: 1 })).toHaveCount(0);
 
-    // Der Inhalt läuft über – sonst prüft der Rest nichts.
+    // **Gescrollt wird der Verlauf, nicht `main`** (T-12a): Kopfzeile und
+    // Eingabefeld liegen als feste Zonen daneben, nicht als `sticky` darin.
+    // Auf dem iPhone rutschte das klebende Eingabefeld sonst beim Scrollen
+    // mit nach oben.
+    const verlauf = () => page.locator("main div.overflow-y-auto").first();
+
     const scrollbar = await page.evaluate(() => {
+      const v = document.querySelector("main div.overflow-y-auto");
       const m = document.querySelector("main");
-      return m ? m.scrollHeight > m.clientHeight + 40 : false;
+      return {
+        verlaufScrollt: v ? v.scrollHeight > v.clientHeight + 40 : false,
+        mainScrolltNicht: m ? m.scrollHeight <= m.clientHeight + 1 : false,
+      };
     });
-    expect(scrollbar).toBe(true);
+    expect(scrollbar).toEqual({ verlaufScrollt: true, mainScrolltNicht: true });
 
     // T-10: Das Gespräch geht **am Ende** auf, nicht am Anfang – dort, wo
-    // man weiterliest. Gemessen am Abstand zum unteren Rand von `main`.
+    // man weiterliest.
     await expect
       .poll(() =>
         page.evaluate(() => {
-          const m = document.querySelector("main");
-          return m ? m.scrollHeight - m.scrollTop - m.clientHeight : 0;
+          const v = document.querySelector("main div.overflow-y-auto");
+          return v ? v.scrollHeight - v.scrollTop - v.clientHeight : 0;
         }),
       )
       .toBeLessThanOrEqual(64);
 
-    // Mitten in die Antwort scrollen: Der Zurück-Weg und der Fach-Chip bleiben
-    // oben in `main` kleben (vorher scrollten sie mit weg).
-    await page.evaluate(() => document.querySelector("main")?.scrollTo({ top: 300 }));
+    // Mitten in die Antwort scrollen: Zurück-Weg und Fach-Chip bleiben oben.
+    await verlauf().evaluate((el) => el.scrollTo({ top: 300 }));
     await page.waitForTimeout(150);
     const kopfLuecke = await page.evaluate(() => {
       const kopf = document.querySelector('a[href="/tutor"]')?.closest("div");
@@ -187,7 +195,7 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("main").getByText("Französisch", { exact: true })).toBeInViewport();
 
     // Nach ganz oben: Das Eingabefeld bleibt sichtbar (vorher wanderte es weg) …
-    await page.evaluate(() => document.querySelector("main")?.scrollTo({ top: 0 }));
+    await verlauf().evaluate((el) => el.scrollTo({ top: 0 }));
     await expect(feld).toBeInViewport();
 
     // … und der Sprung ans Ende erscheint.

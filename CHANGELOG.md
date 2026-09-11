@@ -26,6 +26,14 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **T-14: Rechenwege sind endlich lesbar.** Beim Testen einer Mathe-Hausaufgabe standen zwei
+  Umformungen hintereinander in einer Zeile, unterscheidbar nur durch die Fettung. Jetzt bleibt ein
+  Zeilenumbruch ein Zeilenumbruch, Formeln werden mit **KaTeX** gesetzt statt als Fließtext
+  dahingeschrieben, und der Tutor schreibt Rechenwege in der Schreibweise aus dem Schulheft: eine
+  Umformung je Zeile, die Operation rechts daneben (`| −4x`). In Physik und Chemie führt er Einheiten
+  mit, Reaktionsgleichungen setzt er mit `\ce{…}`. Strukturformeln kann er weiterhin nicht zeichnen –
+  das sagt er jetzt, statt es mit Bindestrichen zu versuchen.
+
 - **T-12: ein Eingabefeld für alle Tutor-Dialoge.** Aus dem Testen am Gerät: Beim Diktieren wuchs
   das Feld über den halben Bildschirm, weil die Knöpfe **neben** dem Text saßen und ihn auf halbe
   Breite drängten. Jetzt liegt der Text oben über die volle Breite und die Knöpfe stehen darunter;
@@ -85,6 +93,21 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
   – und der Hinweis, dass eine falsche Antwort das umdreht.
 
 ### Fixed
+
+- **Beim Scrollen im Chat wanderte das Eingabefeld mit nach oben.** Auf dem iPhone zog ein Wisch
+  über die Nachrichten das Textfeld mit und ließ eine leere Fläche darunter stehen. Gescrollt wurde
+  bis hierher der ganze Inhaltsbereich; Kopfzeile und Eingabefeld klebten nur per `position: sticky`
+  darin, und das hält beim Schwung-Scrollen auf iOS nicht verlässlich. Jetzt scrollt **nur noch der
+  Verlauf** – Kopfzeile und Eingabefeld stehen daneben fest, statt mitzufahren und sich wieder
+  zurückzuhängen. Gilt für den freien Chat und den Hausaufgaben-Dialog gleichermaßen; alle anderen
+  Seiten scrollen unverändert.
+
+- **Der Tutor verweigerte die Lösung, obwohl die App sie schon verbucht hatte.** Die Fachtabelle aus
+  §4a (bei Mathematik das Ergebnis nicht vor zwei Versuchen nennen) stand auch dann im Systemprompt,
+  wenn die Hinweisleiter längst entschieden hatte, dass die Lösung jetzt gezeigt wird. Das Modell
+  löste den Widerspruch zugunsten der Zurückhaltung auf und fragte zurück – während die Aufgabe
+  bereits als „Lösung gezeigt“ markiert wurde. Das Kind verlor die Aufgabe, ohne etwas bekommen zu
+  haben. Der einschränkende Satz steht jetzt nur noch dort, wo er gilt.
 
 - **Log-Injection in zwei Fehlerprotokollen (CodeQL `js/log-injection`).** `console.error()`
   beim Foto-Import (Vokabeln, Hausaufgaben) schrieb eine ID aus der Anfrage und eine

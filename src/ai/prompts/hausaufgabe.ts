@@ -1,7 +1,7 @@
 import { hausaufgabeFachHinweis } from "@/lib/tutor/hausaufgabe-fach";
 import type { Zug } from "@/lib/tutor/hint-ladder";
 
-import { tonNachJahrgang } from "./tutor";
+import { formelRegeln, tonNachJahrgang } from "./tutor";
 
 /**
  * Systemprompt für einen Hausaufgaben-Zug (T-03 PR 2, Konzept §4a; ADR 0011 D3).
@@ -46,16 +46,46 @@ export function hausaufgabeSystemPrompt({
     "",
     "IN DIESEM FACH",
     `- Was du tust: ${fach.tut}`,
-    `- Was du nicht tust: ${fach.tutNicht}`,
+    // `tutNicht` steht nur dort, wo es gilt (T-14). Die Fachtabelle sagt bei
+    // Mathematik „das Ergebnis vor zwei dokumentierten Versuchen nicht
+    // nennen“ – ein Satz, der einem `loesung_zeigen`-Zug direkt
+    // widerspricht. Beim Testen hat das Modell genau diesen Widerspruch
+    // zugunsten der Zurückhaltung aufgelöst: Es fragte zurück, statt die
+    // verlangte Lösung zu zeigen. Die App hatte die Aufgabe da schon als
+    // „Lösung gezeigt“ verbucht – das Kind verlor sie, ohne etwas bekommen
+    // zu haben. **Der Zug ist die Autorität**, nicht die Fachtabelle: Sie
+    // beschreibt das Wie, der Zug entscheidet das Ob.
+    ...(zugErlaubtLoesung(zug) ? [] : [`- Was du nicht tust: ${fach.tutNicht}`]),
     "",
     "FORMAT",
     "- Kurze Absätze, **Schlüsselbegriffe** fett, sparsam. Keine Überschriften.",
     "- Kein Lob ohne Grund.",
+    "",
+    // Dieselben Regeln wie im freien Chat (T-14). Hier wiegen sie schwerer:
+    // Ein Rechenweg ist der Kern einer Hausaufgaben-Antwort, und genau an
+    // ihm ist beim Testen aufgefallen, dass zwei Umformungen in einer Zeile
+    // landeten.
+    ...formelRegeln(),
   ];
 
   zeilen.push("", ...zugAnweisung(zug));
 
   return zeilen.join("\n");
+}
+
+/**
+ * Darf in diesem Zug die Lösung fallen? Zwei Fälle: der ausdrückliche
+ * `loesung_zeigen`-Zug und ein zweiter Versuch, der danebenliegen darf
+ * (§4a: „wenn zwei dokumentierte Versuche daneben liegen“).
+ *
+ * Steuert nur, ob der einschränkende Fach-Hinweis mitgeschickt wird – die
+ * Entscheidung selbst hat `naechsterZug()` längst getroffen
+ * (`lib/tutor/hint-ladder.ts`, ADR 0011 D3).
+ */
+function zugErlaubtLoesung(zug: Zug): boolean {
+  return (
+    zug.art === "loesung_zeigen" || (zug.art === "versuch_pruefen" && zug.darfLoesungWennFalsch)
+  );
 }
 
 function zugAnweisung(zug: Zug): string[] {

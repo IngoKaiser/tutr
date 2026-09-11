@@ -1,17 +1,42 @@
 "use client";
 
+import "katex/dist/katex.min.css";
+// Erweitert KaTeX um `\ce{…}` für Summenformeln und Reaktionsgleichungen
+// (T-14). Muss **vor** dem ersten Rendern geladen sein; der Import registriert
+// die Makros global auf der KaTeX-Instanz, die `rehype-katex` benutzt.
+import "katex/contrib/mhchem";
+import rehypeKatex from "rehype-katex";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 
 /**
- * Markdown für Tutor-Antworten (T-08).
+ * Markdown für Tutor-Antworten (T-08, Formeln und Zeilenumbrüche in T-14).
  *
  * Das Modell schreibt strukturiert (`**fett**`, Listen, Absätze); vorher
  * stand das wörtlich im Chat. `react-markdown` rendert es – **ohne rohes
  * HTML**: Die Bibliothek interpretiert HTML im Text standardmäßig nicht
  * (dafür bräuchte es `rehype-raw`), damit ist der Weg XSS-frei, ohne dass
- * wir sanitizen müssten. `remark-gfm` ergänzt Tabellen, Durchstreichen und
- * Aufgabenlisten.
+ * wir sanitizen müssten.
+ *
+ * **Vier Plugins, drei davon aus T-14:**
+ *
+ * - `remark-gfm` – Tabellen, Durchstreichen, Aufgabenlisten (T-08).
+ * - `remark-breaks` – **ein** Zeilenumbruch ist ein Zeilenumbruch. In
+ *   Standard-Markdown fällt er weg, Absätze entstehen nur mit Leerzeile.
+ *   Genau daran klebten Rechenschritte aneinander: Das Modell schrieb
+ *   `7x − 4x − 9 = 15` und `3x − 9 = 15` auf zwei Zeilen, gerendert stand
+ *   beides hintereinander in einer, nur durch Fettung unterscheidbar
+ *   (gefunden beim Testen einer Hausaufgabe). Das Plugin arbeitet auf dem
+ *   Syntaxbaum und lässt Code-Blöcke und Tabellen in Ruhe – eine
+ *   Textersetzung auf dem Rohtext hätte genau die zerlegt.
+ * - `remark-math` + `rehype-katex` – `$…$` und `$$…$$` werden zu echtem
+ *   Formelsatz. KaTeX lag seit F-01 als Abhängigkeit im Projekt, ohne je
+ *   benutzt zu werden; CLAUDE.md verlangt es ausdrücklich („Formeln mit
+ *   KaTeX. Kein MathJax."). `throwOnError: false` ist wichtig: Eine
+ *   Modellantwort mit kaputtem LaTeX soll die rote Stelle zeigen, nicht die
+ *   ganze Seite mitreißen.
  *
  * Die `components`-Abbildung bindet jedes Element an die Designtokens –
  * keine Prosa-Serifenschrift wie bei `ReadingText`, sondern der normale
@@ -75,8 +100,17 @@ const components: Components = {
 
 export function TutorMarkdown({ children }: { children: string }) {
   return (
-    <div className="text-sm">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+    // `[&_.katex-display]:overflow-x-auto`: Eine abgesetzte Gleichung kann
+    // breiter sein als die Sprechblase – auf dem Handy fast immer. Sie
+    // scrollt dann in sich, statt die Blase zu sprengen oder die ganze Seite
+    // seitlich schiebbar zu machen. Der engere Abstand darüber/darunter
+    // (Standard sind 1em) hält den Chat kompakt.
+    <div className="text-sm [&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
+        components={components}
+      >
         {children}
       </ReactMarkdown>
     </div>

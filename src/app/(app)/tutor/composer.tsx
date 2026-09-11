@@ -154,10 +154,14 @@ export function Composer({
   const absendbar = (wert.trim().length > 0 || anhang !== null) && !pending;
 
   return (
-    // `sticky bottom-0` im scrollenden `main`: klebt über der Fußleiste,
-    // ohne deren Höhe zu kennen. `-mx-4 px-4` lässt den Hintergrund bis an
-    // den Rand laufen, `-mb-5` frisst das `py-5` der Hülle.
-    <div className="bg-papier border-linie sticky bottom-0 -mx-4 -mb-5 flex flex-col gap-2 border-t px-4 pt-2 pb-3">
+    // **Kein `sticky`** (T-12a): Der Composer liegt als festes Geschwister
+    // neben dem Scrollbereich, nicht darin. Vorher klebte er per
+    // `sticky bottom-0` im scrollenden `main` – auf dem iPhone rutschte er
+    // beim Scrollen mit nach oben und ließ eine leere Fläche darunter
+    // stehen. `shrink-0`, damit ihn ein langer Verlauf nicht zusammendrückt;
+    // `-mx-4 px-4` lässt den Hintergrund bis an den Rand laufen, `-mb-5`
+    // frisst das `py-5` der Hülle.
+    <div className="bg-papier border-linie relative -mx-4 -mb-5 flex shrink-0 flex-col gap-2 border-t px-4 pt-2 pb-3">
       {nachUnten && amEnde === false ? (
         <button
           type="button"
