@@ -90,6 +90,10 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Kostendeckel-Anzeige (Heute/Woche), Pegel im Eingabefeld statt auf der Übersicht   | ✅    | S-03d/e |
 |                          | Chat-Shell: Übersicht + Gespräch, nur der Verlauf scrollt, ↓-Knopf                 | ✅    | T-12a   |
 |                          | Frühere Gespräche wischend löschen, mit Rückgängig-Fenster                         | ✅    | T-15    |
+|                          | Gesprächstitel vom Modell statt abgeschnittener erster Frage (ADR 0014)            | ✅    | T-19a   |
+|                          | Nächste Frage setzt dasselbe Gespräch fort (30 min, gleiches Fach)                 | ✅    | T-19b   |
+|                          | „Zuletzt“ auf der Startseite, Archiv „Alle Gespräche“ mit Suche                    | ✅    | T-19c   |
+|                          | Sichtbares Aufräum-Angebot im Archiv (nie automatisch)                             | 🌑    | T-19d   |
 |                          | Antworten als Markdown lesbar (Fettung, Listen)                                    | ✅    | T-08    |
 |                          | Formelsatz (KaTeX/mhchem), ein Rechenschritt je Zeile, echte Zeilenumbrüche        | ✅    | T-14    |
 |                          | Altersgerechte Ansprache nach Jahrgang                                             | ✅    | T-09    |

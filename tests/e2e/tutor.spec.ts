@@ -31,6 +31,15 @@ const FRANZOESISCH = "00000000-0000-4000-8000-00000000d020";
 
 const PREFIX = `e2e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
+/**
+ * Die Gesprächszeilen einer Liste – ohne den Weg ins Archiv, der als Link
+ * daneben steht (T-19c). Gezählt wird über `href`, nicht über den Text: Die
+ * Titel gehören anderen Tests, die parallel laufen.
+ */
+function gespraechsZeilen(page: Page) {
+  return page.getByRole("main").locator('a[href^="/tutor/"]:not([href="/tutor/gespraeche"])');
+}
+
 /** Tutor-Verläufe sieht nur das Kind (ADR 0004 D4) – in die Kind-Sicht wechseln. */
 async function alsMia(page: Page) {
   await page.goto("/heute");
@@ -101,7 +110,14 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("textbox")).toBeVisible();
 
     // … und die Historie steht daneben, genau wie zuvor unter dem Formular.
-    await expect(page.getByRole("link", { name: new RegExp(PREFIX) })).toBeVisible();
+    //
+    // **Welches** Gespräch dort steht, sagt dieser Test nicht mehr: `/tutor`
+    // zeigt seit T-19c nur die letzten sechs (ADR 0014 D3), und wie viele
+    // Gespräche die parallel laufenden Specs für Mia gerade anlegen, ist
+    // nicht vorhersagbar. Dass das eigene wiederzufinden ist, prüft der
+    // Archiv-Block unten.
+    await expect(page.getByText("Zuletzt")).toBeVisible();
+    await expect(gespraechsZeilen(page).first()).toBeVisible();
   });
 
   test("Kopfzeile, Scrollbereich und Hausaufgaben-Weg auf der Übersicht (T-16)", async ({
@@ -316,8 +332,11 @@ test.describe("Tutor als Kind", () => {
       "true",
     );
 
-    // Der Weg zurück (primitives.tsx: jede Unterseite trägt einen `back`).
-    await page.getByRole("main").getByRole("link", { name: "Gespräche" }).click();
+    // Der Weg zurück (primitives.tsx: jede Unterseite trägt einen `back`) –
+    // „Tutor“, weil das Label die Zielseite so benennt, wie sie oben heißt
+    // (T-18). Bis T-19c hieß er „Gespräche“, und seitdem gibt es eine Seite,
+    // die wirklich so heißt.
+    await page.getByRole("main").getByRole("link", { name: "Tutor", exact: true }).click();
     await expect(page).toHaveURL(/\/tutor$/);
     // Zurück auf der Übersicht: das Eingabefeld für ein neues Gespräch
     // (ADR 0013 D1) – kein „Gespräch beginnen“-Knopf mehr.
@@ -553,5 +572,82 @@ test.describe("Tutor als Kind", () => {
     const pegel = page.getByRole("img", { name: /genutzt/ });
     await expect(pegel).toBeVisible();
     await expect(pegel).toHaveAttribute("aria-label", /^(Heute|Diese Woche): \d+ % genutzt$/);
+  });
+});
+
+/**
+ * „Zuletzt" auf `/tutor`, das Archiv unter `/tutor/gespraeche` (T-19c,
+ * ADR 0014 D3).
+ *
+ * Eigener Block mit eigenem Präfix: Dieser Test braucht **mehr** Gespräche,
+ * als die Startseite zeigt – und genau das würde den Lösch-Test oben stören,
+ * der auf die erste Zeile der Liste zielt.
+ */
+test.describe("Gesprächs-Archiv als Kind", () => {
+  test.skip(!WITH_DB, "Braucht eine Datenbank – mit RUN_DB_TESTS=1 ausführen.");
+
+  const ARCHIV = `${PREFIX}arc`;
+  /** Eins mehr als die sechs, die `/tutor` zeigt – sonst gibt es nichts zu archivieren. */
+  const ANZAHL = 8;
+  let admin: postgres.Sql | undefined;
+
+  test.beforeAll(async () => {
+    admin = adminClient();
+    if (!admin) return;
+    for (let i = 0; i < ANZAHL; i++) {
+      // Das letzte Gespräch trägt ein Wort, das in keinem anderen vorkommt –
+      // daran prüft die Suche, dass sie wirklich filtert.
+      const titel = i === ANZAHL - 1 ? `${ARCHIV} Photosynthese` : `${ARCHIV} Gespraech ${i}`;
+      await admin`
+        insert into tutor_session (student_id, subject_id, title, entry_point)
+        values (${MIA}, ${FRANZOESISCH}, ${titel}, 'freie_frage')`;
+    }
+  });
+
+  test.afterAll(async () => {
+    if (!admin) return;
+    await admin`delete from tutor_session where title like ${ARCHIV + "%"}`;
+    await admin.end();
+  });
+
+  test("die Startseite zeigt „Zuletzt“, das Archiv den Rest – mit Suche", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+
+    await alsMia(page);
+    await page.goto("/tutor");
+
+    // Sechs Zeilen, nicht mehr: Das Eingabefeld ist das Hauptelement der
+    // Seite (ADR 0013 D1) und soll nicht nach unten rutschen. Gezählt wird
+    // über `href` statt über die Titel – welche sechs es sind, hängt davon
+    // ab, was parallel laufende Specs gerade anlegen; dass es genau sechs
+    // sind, hängt davon nicht ab.
+    await expect(gespraechsZeilen(page)).toHaveCount(6);
+    await expect(page.getByText("Zuletzt")).toBeVisible();
+
+    // Der Weg ins Archiv erscheint nur, weil dort mehr steht als hier.
+    const alle = page.getByRole("link", { name: /Alle Gespräche/ });
+    await expect(alle).toBeVisible();
+    await alle.click();
+
+    await expect(page).toHaveURL(/\/tutor\/gespraeche$/);
+    await expect(page.getByRole("heading", { name: "Alle Gespräche", level: 1 })).toBeVisible();
+    // Jetzt stehen alle da, nach Fach gruppiert (ADR 0013 D6 gilt hier weiter).
+    await expect(page.getByRole("link", { name: new RegExp(ARCHIV) })).toHaveCount(ANZAHL);
+    await expect(page.getByText("Französisch", { exact: true }).first()).toBeVisible();
+
+    // Die Suche filtert im Browser, über Titel und Fach.
+    const suche = page.getByPlaceholder("Suchen – Titel oder Fach");
+    await suche.fill("photosynthese");
+    await expect(page.getByRole("link", { name: new RegExp(ARCHIV) })).toHaveCount(1);
+
+    // Ohne Rücksicht auf Akzente – „franzosisch" findet „Französisch".
+    await suche.fill("franzosisch");
+    await expect(page.getByRole("link", { name: new RegExp(ARCHIV) })).toHaveCount(ANZAHL);
+
+    await suche.fill("gibtesnicht");
+    await expect(page.getByText(/Nichts gefunden/)).toBeVisible();
   });
 });

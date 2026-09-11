@@ -3,7 +3,7 @@
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { withActor, type Actor } from "@/db/actor";
+import { withActor, type Actor, type Transaction } from "@/db/actor";
 import { ladeGesamtauslastung, type Auslastung } from "@/lib/ai/rate-limit";
 import { loginStatus } from "@/lib/auth/actor";
 import { databaseConfigured } from "@/lib/env";
@@ -40,46 +40,99 @@ export type SessionSummary = {
 export type TutorOverview = {
   subjects: SubjectChoice[];
   sessions: SessionSummary[];
+  /**
+   * Wie viele Gespräche es insgesamt gibt (ADR 0014 D3) – `sessions` zeigt
+   * auf `/tutor` nur die letzten `ZULETZT_ANZAHL`. Die Startseite braucht die
+   * Zahl, um den Weg ins Archiv **nur dann** anzubieten, wenn dort mehr steht
+   * als hier: Ein Link auf „alles" neben einer Liste, die schon alles ist,
+   * wäre ein Versprechen auf nichts.
+   */
+  gesamt: number;
 };
 
-/** Fächer des aktiven Schuljahres und die bisherigen Gespräche. `null` ohne Kind-Anmeldung/DB. */
+/**
+ * So viele Gespräche stehen auf `/tutor` (ADR 0014 D3).
+ *
+ * Kurz genug, dass das Eingabefeld – das eigentliche Hauptelement der Seite
+ * (ADR 0013 D1) – nicht nach unten rutscht. Der Rest steht im Archiv.
+ *
+ * Nicht exportiert: In einer `"use server"`-Datei darf **jeder** Export eine
+ * asynchrone Funktion sein, sonst bricht der Build. Die Oberfläche braucht
+ * die Zahl auch nicht – sie vergleicht `gesamt` mit dem, was sie bekommen hat.
+ */
+const ZULETZT_ANZAHL = 6;
+
+/** Eine Obergrenze fürs Archiv, damit auch ein Schuljahr voller Gespräche eine endliche Abfrage bleibt. */
+const ARCHIV_ANZAHL = 500;
+
+type SessionRow = {
+  id: string;
+  title: string;
+  subject_name: string | null;
+  updated_at: string;
+  entry_point: string;
+};
+
+/** Die immer gleiche Abfrage; `limit` ist der einzige Unterschied zwischen Startseite und Archiv. */
+async function ladeSessions(tx: Transaction, limit: number): Promise<SessionSummary[]> {
+  // `left join`, nicht `join`: Ein Gespräch ohne Fach (ADR 0013 D3) darf in
+  // der Historie nicht einfach fehlen.
+  const rows = await tx.execute<SessionRow>(sql`
+    select ts.id, ts.title, s.name as subject_name, ts.updated_at, ts.entry_point
+    from tutor_session ts
+    left join subject s on s.id = ts.subject_id
+    order by ts.updated_at desc
+    limit ${limit}`);
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    subjectName: r.subject_name,
+    updatedAt: r.updated_at,
+    hausaufgabe: r.entry_point === "hausaufgabe",
+  }));
+}
+
+async function ladeFaecher(tx: Transaction): Promise<SubjectChoice[]> {
+  const rows = await tx.execute<{ id: string; name: string; language: string | null }>(sql`
+    select s.id, s.name, s.language from subject s
+    join school_year_subject sys on sys.subject_id = s.id
+    join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
+    order by s.name`);
+  return rows.map((r) => ({ id: r.id, name: r.name, language: r.language }));
+}
+
+/**
+ * Fächer des aktiven Schuljahres und die zuletzt geführten Gespräche.
+ * `null` ohne Kind-Anmeldung/DB.
+ */
 export async function loadTutorOverview(): Promise<TutorOverview | null> {
   const actor = await requireStudentActor();
   if (!actor) return null;
 
   return withActor(actor, async (tx) => {
-    const subjects = await tx.execute<{ id: string; name: string; language: string | null }>(sql`
-      select s.id, s.name, s.language from subject s
-      join school_year_subject sys on sys.subject_id = s.id
-      join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
-      order by s.name`);
+    const [subjects, sessions, anzahl] = await Promise.all([
+      ladeFaecher(tx),
+      ladeSessions(tx, ZULETZT_ANZAHL),
+      tx.execute<{ anzahl: number }>(sql`select count(*)::int as anzahl from tutor_session`),
+    ]);
 
-    // `left join`, nicht `join`: Ein Gespräch ohne Fach (ADR 0013 D3) darf
-    // in der Historie nicht einfach fehlen.
-    const sessions = await tx.execute<{
-      id: string;
-      title: string;
-      subject_name: string | null;
-      updated_at: string;
-      entry_point: string;
-    }>(sql`
-      select ts.id, ts.title, s.name as subject_name, ts.updated_at, ts.entry_point
-      from tutor_session ts
-      left join subject s on s.id = ts.subject_id
-      order by ts.updated_at desc
-      limit 20`);
-
-    return {
-      subjects: subjects.map((r) => ({ id: r.id, name: r.name, language: r.language })),
-      sessions: sessions.map((r) => ({
-        id: r.id,
-        title: r.title,
-        subjectName: r.subject_name,
-        updatedAt: r.updated_at,
-        hausaufgabe: r.entry_point === "hausaufgabe",
-      })),
-    };
+    return { subjects, sessions, gesamt: anzahl[0]?.anzahl ?? sessions.length };
   });
+}
+
+/**
+ * Die volle Liste für `/tutor/gespraeche` (ADR 0014 D3).
+ *
+ * Alles auf einmal statt seitenweise: Gesucht wird im Browser über die Titel,
+ * und eine Suche, die nur die geladene Seite durchsieht, findet das Falsche.
+ * Bei `ARCHIV_ANZAHL` Zeilen à Titel und Datum ist das eine überschaubare
+ * Menge – wird es das nicht mehr, ist das der Moment für T-19d.
+ */
+export async function loadAlleGespraeche(): Promise<SessionSummary[] | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+  return withActor(actor, (tx) => ladeSessions(tx, ARCHIV_ANZAHL));
 }
 
 export type TutorMessageView = {
@@ -182,6 +235,7 @@ export async function deleteTutorSession(sessionId: string): Promise<void> {
     tx.execute(sql`delete from tutor_session where id = ${sessionId}`),
   );
   revalidatePath("/tutor");
+  revalidatePath("/tutor/gespraeche");
 }
 
 /**

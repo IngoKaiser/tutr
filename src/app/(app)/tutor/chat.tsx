@@ -207,7 +207,12 @@ export function Conversation({
           und im Hausaufgaben-Dialog zweimal fast gleich im Code. */}
       <ChatKopf
         titel={leer && !sessionId ? "Tutor" : undefined}
-        zurueck={leer && !sessionId ? undefined : { href: "/tutor", label: "Gespräche" }}
+        // „Tutor", nicht „Gespräche": Das Label benennt die Zielseite so, wie
+        // sie oben heißt (T-18) – und seit T-19c gibt es eine Seite, die
+        // wirklich „Alle Gespräche" heißt. Zwei Rückwege mit demselben Namen
+        // auf verschiedene Seiten wären genau das Durcheinander, gegen das
+        // T-18 angetreten ist.
+        zurueck={leer && !sessionId ? undefined : { href: "/tutor", label: "Tutor" }}
       >
         {sessionId ? (
           <FachChip
