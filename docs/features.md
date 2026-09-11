@@ -89,6 +89,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Kostendeckel in echtem Geld statt Anfragenzahl, plus Wochenfenster                 | ✅    | S-03c   |
 |                          | Kostendeckel-Anzeige (Heute/Woche), Pegel im Eingabefeld statt auf der Übersicht   | ✅    | S-03d/e |
 |                          | Chat-Shell: Übersicht + Gespräch, nur der Verlauf scrollt, ↓-Knopf                 | ✅    | T-12a   |
+|                          | Frühere Gespräche wischend löschen, mit Rückgängig-Fenster                         | ✅    | T-15    |
 |                          | Antworten als Markdown lesbar (Fettung, Listen)                                    | ✅    | T-08    |
 |                          | Formelsatz (KaTeX/mhchem), ein Rechenschritt je Zeile, echte Zeilenumbrüche        | ✅    | T-14    |
 |                          | Altersgerechte Ansprache nach Jahrgang                                             | ✅    | T-09    |

@@ -41,6 +41,12 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **T-15: frühere Tutor-Gespräche lassen sich wischend löschen.** Genau wie bei den
+  Vokabelsets – dieselben Bausteine (`SwipeRow`, `useDeferredDelete`, V-11): Die Zeile
+  verschwindet sofort, eine Rückgängig-Leiste am unteren Rand der Liste hält sie fünf
+  Sekunden lang zurück, bevor sie wirklich gelöscht wird. Gilt für freie Gespräche genauso
+  wie für Hausaufgaben-Sessions – beide hängen an derselben Zeile.
+
 - **T-14: Rechenwege sind endlich lesbar.** Beim Testen einer Mathe-Hausaufgabe standen zwei
   Umformungen hintereinander in einer Zeile, unterscheidbar nur durch die Fettung. Jetzt bleibt ein
   Zeilenumbruch ein Zeilenumbruch, Formeln werden mit **KaTeX** gesetzt statt als Fließtext
