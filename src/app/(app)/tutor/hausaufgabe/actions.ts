@@ -114,8 +114,13 @@ export async function fotoZuAufgaben(
     // unerwarteten Fehler `error.message` enthalten – beides ungeprüft in
     // ein Serverlog zu schreiben, ließe einen Zeilenumbruch darin eine
     // gefälschte Logzeile einschleusen (CodeQL `js/log-injection`).
+    // `saniereFuerLog()` sanitisiert die **ganze** zusammengesetzte Zeile in
+    // einem Aufruf, nicht jeden Baustein einzeln – CodeQL erkannte den
+    // sanitisierten Anteil in der vorherigen Fassung (je ein Aufruf pro
+    // eingesetztem Wert, innerhalb des Template-Strings) nicht als
+    // Schranke und meldete die Zeile weiter (Alert #9 auf #71, trotz Fix).
     console.error(
-      `Hausaufgaben-Foto gescheitert (Session ${saniereFuerLog(sessionId)}): ${saniereFuerLog(ursache)}`,
+      saniereFuerLog(`Hausaufgaben-Foto gescheitert (Session ${sessionId}): ${ursache}`),
     );
     return { ok: false, fehler };
   }
