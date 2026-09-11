@@ -2,16 +2,18 @@ import { sql } from "drizzle-orm";
 
 import {
   klassifiziereVersuch,
+  ordneFachZu,
   streamTutorReply,
   type InlineImage,
   type TutorTurn,
 } from "@/ai/client";
 import { hausaufgabeSystemPrompt } from "@/ai/prompts/hausaufgabe";
 import { tutorSystemPrompt } from "@/ai/prompts/tutor";
-import { withActor, type Actor } from "@/db/actor";
+import { withActor, type Actor, type Transaction } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
+import { loeseFachZuordnungAuf, type FachOption } from "@/lib/tutor/fach-zuordnung";
 import { pruefeUndErzeugeAbschluss } from "@/lib/tutor/hausaufgabe-abschluss";
 import { istDeutsch } from "@/lib/tutor/language-guard";
 import {
@@ -120,6 +122,16 @@ type Vorarbeit =
       system: string;
       verlauf: TutorTurn[];
       usageId: string;
+      /**
+       * Tokens der Fach-Zuordnung (T-13, ADR 0013 D2), die zusammen mit der
+       * Streaming-Antwort in `ai_usage` gebucht werden – derselbe Kniff wie
+       * bei `klassifiziereVersuch()` unten: eine Zeile, ein Zug, aber zwei
+       * Modellaufrufe. `tutor_message.token_count` bekommt nur die
+       * Streaming-Tokens, `ai_usage` beide zusammen. `null`, wenn keine
+       * Zuordnung nötig war (bestehendes Gespräch, explizite Fachwahl, keine
+       * Fächer vorhanden, oder die Zuordnung selbst ist ausgefallen).
+       */
+      zuordnungTokens: { input: number; output: number } | null;
       /** Nur bei einem Hausaufgaben-Zug gesetzt (T-03 PR 2) – steuert das Schreiben nach dem Stream. */
       hausaufgabe: {
         taskId: string;
@@ -186,16 +198,17 @@ export async function POST(request: Request): Promise<Response> {
               final.usage,
             );
           } else {
+            // ADR 0013 D2: Fiel bei der ersten Nachricht dieses Gesprächs
+            // eine Fach-Zuordnung an, zählt sie in `ai_usage` mit – aber
+            // nicht in `tutor_message.token_count`, das bleibt der reine
+            // Verbrauch der Antwort selbst.
+            const eingabeGesamt = final.usage.input_tokens + (vor.zuordnungTokens?.input ?? 0);
+            const ausgabeGesamt = final.usage.output_tokens + (vor.zuordnungTokens?.output ?? 0);
             await withActor(actor, async (tx) => {
               await tx.execute(sql`
                 insert into tutor_message (student_id, session_id, role, content, token_count, language_ok)
                 values (app.student_id(), ${vor.sessionId}, 'tutor', ${volltext}, ${tokens}, ${deutsch})`);
-              await ergaenzeTokenzahl(
-                tx,
-                vor.usageId,
-                final.usage.input_tokens,
-                final.usage.output_tokens,
-              );
+              await ergaenzeTokenzahl(tx, vor.usageId, eingabeGesamt, ausgabeGesamt);
               await tx.execute(
                 sql`update tutor_session set updated_at = now() where id = ${vor.sessionId}`,
               );
@@ -223,6 +236,14 @@ export async function POST(request: Request): Promise<Response> {
   });
 }
 
+/** Die Fächer des Kindes im aktuellen Schuljahr – die Auswahl für die Fach-Zuordnung (ADR 0013 D2). */
+async function ladeFaecherFuerZuordnung(tx: Transaction): Promise<FachOption[]> {
+  return tx.execute<FachOption>(sql`
+    select s.id, s.name, s.language from subject s
+    join school_year_subject sys on sys.subject_id = s.id
+    join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'`);
+}
+
 /**
  * Schritte 1 und 2 in einer Transaktion: Limit prüfen, Session auflösen
  * oder anlegen, bisherige Nachrichten laden, Nutzernachricht schreiben,
@@ -232,10 +253,52 @@ export async function POST(request: Request): Promise<Response> {
  * eigener Systemprompt aus dem `Zug`, Verlauf nur der einen Aufgabe, kein
  * `subjectId`/`entryPoint` aus der Anfrage (die Aufgabe kennt ihr Fach
  * schon über ihre Session).
+ *
+ * **ADR 0013 D1/D2:** Ein neues Gespräch ohne mitgeschicktes Fach löst vor
+ * der eigentlichen Transaktion eine Fach-Zuordnung aus – ein Modellaufruf
+ * gehört nicht in eine offen gehaltene Transaktion (dasselbe Muster wie bei
+ * `fotoZuAufgaben()`, `hausaufgabe/actions.ts`). Deshalb zwei kurze
+ * `withActor()`-Aufrufe statt einem: erst Limit prüfen und Fächer laden,
+ * dann – außerhalb jeder Transaktion – die Zuordnung, dann die eigentliche
+ * Transaktion mit dem Ergebnis. Eine explizite Fachwahl (`eingang.subjectId`,
+ * der Übergangspfad, solange die Oberfläche ihn noch anbietet) oder ein
+ * bestehendes Gespräch brauchen das nicht und bleiben bei der einen
+ * Transaktion wie zuvor.
  */
 async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
   if (eingang.taskId) {
     return bereiteHausaufgabeVor(actor, eingang.taskId, eingang);
+  }
+
+  let zuordnung: FachOption | null = null;
+  let zuordnungTokens: { input: number; output: number } | null = null;
+
+  if (!eingang.sessionId && !eingang.subjectId) {
+    // Limit **vor** dem Zuordnungsaufruf prüfen (wie vor jedem
+    // Modellaufruf) – die Zuordnung selbst ist schon ein bezahlter Aufruf.
+    // Die eigentliche Transaktion unten prüft ein zweites Mal, das ist die
+    // reguläre Prüfung vor dem Streamen.
+    const vorab = await withActor(actor, async (tx) => {
+      const limit = await pruefeUndZaehle(tx, "tutor");
+      if (!limit.erlaubt) return { ok: false as const, status: 429, nachricht: limit.nachricht };
+      return { ok: true as const, faecher: await ladeFaecherFuerZuordnung(tx) };
+    });
+    if (!vorab.ok) return vorab;
+
+    if (vorab.faecher.length > 0) {
+      try {
+        const antwort = await ordneFachZu({
+          faecher: vorab.faecher.map((f) => f.name),
+          nachricht: eingang.message,
+        });
+        zuordnungTokens = { input: antwort.inputTokens, output: antwort.outputTokens };
+        zuordnung = loeseFachZuordnungAuf(antwort.fach, vorab.faecher);
+      } catch {
+        // Netzwerk, Timeout, keine verwertbare Antwort: Das Gespräch
+        // startet ohne Fach (strengste Sprachregel, ADR 0013 D5) statt am
+        // ersten Wort zu scheitern.
+      }
+    }
   }
 
   return withActor(actor, async (tx): Promise<Vorarbeit> => {
@@ -245,14 +308,17 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
     }
 
     let sessionId: string;
-    let subjectName: string;
+    let subjectName: string | null;
     let subjectLanguage: string | null;
     let topicTitle: string | null;
     let entryPoint: "freie_frage" | "verstehen";
 
     if (eingang.sessionId) {
+      // `left join`, nicht `join`: Ein Gespräch ohne Fach (noch nicht
+      // zugeordnet, ADR 0013 D3) hat kein `subject_id` – ein `join` fände
+      // dann keine Zeile und meldete fälschlich „gibt es nicht".
       const [row] = await tx.execute<{
-        subject_name: string;
+        subject_name: string | null;
         subject_language: string | null;
         topic_title: string | null;
         entry_point: string;
@@ -260,7 +326,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
         select s.name as subject_name, s.language as subject_language,
                t.title as topic_title, ts.entry_point
         from tutor_session ts
-        join subject s on s.id = ts.subject_id
+        left join subject s on s.id = ts.subject_id
         left join topic t on t.id = ts.topic_id
         where ts.id = ${eingang.sessionId}`);
       if (!row) return { ok: false, status: 404, nachricht: "Dieses Gespräch gibt es nicht." };
@@ -270,8 +336,10 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       subjectLanguage = row.subject_language;
       topicTitle = row.topic_title;
       entryPoint = row.entry_point === "verstehen" ? "verstehen" : "freie_frage";
-    } else {
-      if (!eingang.subjectId || !EINSTIEGE.has(eingang.entryPoint)) {
+    } else if (eingang.subjectId) {
+      // Explizite Fachwahl – der Übergangspfad, solange die Oberfläche sie
+      // noch anbietet (bis T-13 PR 2). Unverändert gegenüber vorher.
+      if (!EINSTIEGE.has(eingang.entryPoint)) {
         return { ok: false, status: 400, nachricht: "Wähle zuerst ein Fach und einen Einstieg." };
       }
       const [subject] = await tx.execute<{ name: string; language: string | null }>(sql`
@@ -297,6 +365,21 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
         values (app.student_id(), ${eingang.subjectId}, ${kuerzeTitel(eingang.message)}, ${entryPoint})
         returning id`);
       sessionId = neu!.id;
+    } else {
+      // Kein Fach mitgeschickt (ADR 0013 D1): das Ergebnis der Zuordnung von
+      // oben, oder `null` (keine Fächer vorhanden, „unklar", oder die
+      // Zuordnung ist ausgefallen). „Verstehen" ist keine eigene Wahl mehr –
+      // die Kachel dafür entfällt mit der Fachwahl (D1).
+      entryPoint = "freie_frage";
+      subjectName = zuordnung?.name ?? null;
+      subjectLanguage = zuordnung?.language ?? null;
+      topicTitle = null;
+
+      const [neu] = await tx.execute<{ id: string }>(sql`
+        insert into tutor_session (student_id, subject_id, title, entry_point)
+        values (app.student_id(), ${zuordnung?.id ?? null}, ${kuerzeTitel(eingang.message)}, ${entryPoint})
+        returning id`);
+      sessionId = neu!.id;
     }
 
     const verlaufRows = await tx.execute<{ role: "nutzer" | "tutor"; content: string }>(sql`
@@ -320,6 +403,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       ok: true,
       sessionId,
       usageId,
+      zuordnungTokens,
       system: tutorSystemPrompt({
         subjectName,
         subjectLanguage,
@@ -413,6 +497,7 @@ async function bereiteHausaufgabeVor(
       ok: true,
       sessionId: row.session_id,
       usageId,
+      zuordnungTokens: null,
       system: hausaufgabeSystemPrompt({
         subjectName: row.subject_name,
         gradeLevel: row.grade_level,

@@ -25,8 +25,14 @@
  */
 
 export type TutorPromptContext = {
-  /** Immer gesetzt – ohne Fach kein Chat (ADR 0010 D6). */
-  subjectName: string;
+  /**
+   * `null`, solange das Gespräch noch keinem Fach zugeordnet ist (ADR 0013
+   * D1/D3) – bei der ersten Nachricht eines neuen Gesprächs, bevor die
+   * Fach-Zuordnung greift, oder dauerhaft, wenn sie „unklar" ergab. Ohne
+   * Fach gilt die strengste Sprachregel (D5): `subjectLanguage` ist dann
+   * ebenfalls `null`, siehe unten.
+   */
+  subjectName: string | null;
   /**
    * Zielsprache des Fachs aus `subject.language` (`"fr"`, `"en"`, …) oder
    * `null` für Sachfächer. Steuert die eine erlaubte Ausnahme vom
@@ -128,7 +134,12 @@ export function tutorSystemPrompt({
   gradeLevel,
 }: TutorPromptContext): string {
   const zeilen: string[] = [
-    `Du bist der Lern-Tutor von tutr und hilfst jemandem bei einem Schulfach. Sprich die Person mit „du" an. Fach: ${subjectName}.`,
+    subjectName
+      ? `Du bist der Lern-Tutor von tutr und hilfst jemandem bei einem Schulfach. Sprich die Person mit „du" an. Fach: ${subjectName}.`
+      : // ADR 0013 D1: Das Gespräch ist noch keinem Fach zugeordnet - die App
+        // ordnet im Hintergrund zu (oder das Kind später selbst über den
+        // Kontext-Chip). Das Modell soll nicht danach fragen.
+        `Du bist der Lern-Tutor von tutr und hilfst jemandem bei einem Schulfach. Sprich die Person mit „du" an. Das Fach ist noch nicht bekannt – frag nicht danach, das klärt sich im Hintergrund.`,
     ...(topicTitle ? [`Thema: ${topicTitle}.`] : []),
     "",
     "SPRACHE",

@@ -99,6 +99,21 @@ describe.skipIf(!testDbAvailable())(
       expect(fremdeSicht).toHaveLength(0);
     });
 
+    test("Ein Gespräch ohne Fach ist erlaubt – „noch nicht einsortiert“ (ADR 0013 D3)", async () => {
+      const [session] = await runWithActor(app.db, student(A.studentId), async (tx) => {
+        const [s] = await tx.execute<{ id: string; subject_id: string | null }>(sql`
+        insert into tutor_session (student_id, title, entry_point)
+        values (${A.studentId}, 'Eine Frage ohne Fach', 'freie_frage')
+        returning id, subject_id`);
+        await tx.execute(sql`
+        insert into tutor_message (student_id, session_id, role, content)
+        values (${A.studentId}, ${s!.id}, 'nutzer', 'Eine Frage ohne Fach')`);
+        return [s];
+      });
+      expect(session?.id).toBeTruthy();
+      expect(session?.subject_id).toBeNull();
+    });
+
     test("Ein Elternteil sieht keine Gespräche – es gibt keine Eltern-Policy (ADR 0004 D3)", async () => {
       const elternSicht = await runWithActor(app.db, parent(A.studentId), (tx) =>
         tx.execute(sql`select id from tutor_session`),

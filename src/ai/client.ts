@@ -4,6 +4,11 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { aiEnv } from "@/lib/env";
 
 import {
+  fachZuordnungSystemPrompt,
+  fachZuordnungUserPrompt,
+  type FachZuordnungContext,
+} from "./prompts/fach-zuordnung";
+import {
   hausaufgabeZusammenfassungSystemPrompt,
   hausaufgabeZusammenfassungUserPrompt,
   type HausaufgabeZusammenfassungContext,
@@ -23,6 +28,7 @@ import {
   vocabExtractionUserPrompt,
   type VocabExtractionContext,
 } from "./prompts/vocab-extraction";
+import { fachZuordnungSchema, type FachZuordnungErgebnis } from "./schemas/fach-zuordnung";
 import {
   hausaufgabenZusammenfassungSchema,
   type HausaufgabenZusammenfassung,
@@ -263,6 +269,47 @@ export async function klassifiziereVersuch(
   }
   return {
     urteil: message.parsed_output.urteil,
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  };
+}
+
+export type FachZuordnungResult = {
+  fach: FachZuordnungErgebnis;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+/**
+ * Ordnet die erste Nachricht eines neuen Gesprächs einem Fach zu (T-13,
+ * ADR 0013 D2). Haiku, nicht Sonnet (CLAUDE.md: „Haiku für Klassifikation") –
+ * die Auswahl ist geschlossen (`fachZuordnungSchema()`, aus `faecher`
+ * gebaut), keine eigene fachliche Einschätzung.
+ *
+ * Läuft **vor** dem Streamen, nicht daneben: Der Systemprompt der
+ * eigentlichen Antwort braucht `subjectLanguage`, um zu wissen, ob die
+ * Zielsprache erlaubt ist (ADR 0010 D3) – parallel liefe ausgerechnet die
+ * erste Antwort in einem Sprachenfach ohne ein einziges fremdsprachiges
+ * Beispiel (ADR 0013 D2, D5).
+ *
+ * Wirft, wenn das Modell nichts Verwertbares liefert; der Aufrufer
+ * (`api/tutor/route.ts`) fängt das ab und startet das Gespräch konservativ
+ * ohne Fach, statt am ersten Wort zu scheitern.
+ */
+export async function ordneFachZu(context: FachZuordnungContext): Promise<FachZuordnungResult> {
+  const message = await anthropic().messages.parse({
+    model: KLASSIFIKATION_MODEL,
+    max_tokens: 20,
+    system: fachZuordnungSystemPrompt(context),
+    output_config: { format: zodOutputFormat(fachZuordnungSchema(context.faecher)) },
+    messages: [{ role: "user", content: fachZuordnungUserPrompt(context) }],
+  });
+
+  if (!message.parsed_output) {
+    throw new Error("Die Fach-Zuordnung hat keine verwertbare Antwort geliefert.");
+  }
+  return {
+    fach: message.parsed_output.fach,
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
   };

@@ -29,13 +29,23 @@ import { student } from "./student";
  * Zugriff, strukturell, nicht nur in der UI. `0070-tutor.sql` legt deshalb
  * bewusst nur `_student`-Policies an.
  *
- * **Fachbindung:** `tutor_session.subjectId` ist Pflicht – ohne Fach ist
- * weder die Antwortsprache (ADR 0010 D3) noch eine spätere Schicht
- * bestimmbar. `topicId` ist nullbar und bleibt in Stufe 1 leer (es gibt
- * keine Themen-Oberfläche, ADR 0010 D6); der zusammengesetzte Fremdschlüssel
- * gegen `(topic.id, topic.subject_id)` entsteht aber jetzt, damit ein Thema
- * später nur noch gesetzt werden muss und strukturell zum Fach der Session
- * passen **muss** (§15 Fehler 2).
+ * **Fachbindung (geändert durch [ADR 0013](../../../docs/adr/0013-tutor-beginnt-mit-dem-dialog.md)
+ * D3):** `tutor_session.subjectId` ist seit T-13 **nullbar** – `null` heißt
+ * „noch nicht einsortiert", nicht „ohne Fach". Der Tutor startet ohne
+ * Fachwahl; eine Fach-Zuordnung (`lib/tutor/fach-zuordnung.ts`) ordnet die
+ * erste Nachricht zu, oder das Kind wählt selbst über den Kontext-Chip nach.
+ * Ohne Fach gilt die strengste Sprachregel (kein Zielsprachen-Zugeständnis,
+ * ADR 0013 D5) – die spätere Schicht (§10) bleibt für so lange ebenfalls
+ * unbestimmt. Der zusammengesetzte Fremdschlüssel gegen `(subject.id,
+ * subject.student_id)` wirkt weiterhin, sobald ein Wert gesetzt ist –
+ * `MATCH SIMPLE` (Postgres-Default für zusammengesetzte Fremdschlüssel)
+ * prüft nur, wenn keine Schlüsselspalte `null` ist, genau wie bei `topicId`.
+ *
+ * `topicId` ist nullbar und bleibt in Stufe 1 leer (es gibt keine
+ * Themen-Oberfläche, ADR 0010 D6); der zusammengesetzte Fremdschlüssel gegen
+ * `(topic.id, topic.subject_id)` entsteht aber jetzt, damit ein Thema später
+ * nur noch gesetzt werden muss und strukturell zum Fach der Session passen
+ * **muss** (§15 Fehler 2).
  */
 
 /** Die sieben Einstiege aus §4. Stufe 1 bietet nur `freie_frage` und `verstehen` an. */
@@ -62,7 +72,8 @@ export const tutorSession = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     studentId: uuid("student_id").notNull(),
-    subjectId: uuid("subject_id").notNull(),
+    /** Nullbar seit T-13 (ADR 0013 D3) – `null` heißt „noch nicht einsortiert". */
+    subjectId: uuid("subject_id"),
     topicId: uuid("topic_id"),
     /**
      * Aus der ersten Frage gekürzt, nicht vom Modell vergeben (ADR 0010,
