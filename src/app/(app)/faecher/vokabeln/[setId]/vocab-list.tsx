@@ -47,7 +47,7 @@ export function VocabList({
       <PageHeader
         title={detail.title}
         trailing={detail.subjectName}
-        back={{ href: "/faecher/vokabeln", label: "Vokabelsets" }}
+        back={{ href: "/faecher/vokabeln", label: "Vokabeln" }}
       />
 
       {unsichereAnzahl > 0 ? (

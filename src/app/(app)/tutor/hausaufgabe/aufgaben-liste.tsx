@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Block, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
+import { Block, Notice, PageHeader } from "@/components/shell/primitives";
 import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
 import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 
@@ -76,8 +76,15 @@ export function AufgabenListe({ liste }: { liste: HausaufgabenListe }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader title="Hausaufgabe" back={{ href: "/tutor", label: "Tutor" }} />
-      <ContextChip subject={liste.subjectName} />
+      {/* Das Fach als `trailing`, nicht als Chip (T-18): Der `ContextChip`
+          gehört den Chat-Ansichten, wo er das Fach auch ändern lässt. Auf
+          einer `PageHeader`-Seite steht der Kontext rechts oben – so wie in
+          der Vokabelliste und auf „Heute" auch. */}
+      <PageHeader
+        title="Hausaufgabe"
+        trailing={liste.subjectName ?? undefined}
+        back={{ href: "/tutor", label: "Tutor" }}
+      />
 
       {liste.zusammenfassung ? (
         <Block emphasized title="Fertig">

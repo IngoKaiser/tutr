@@ -44,6 +44,34 @@ test("Alle fünf Bereiche stehen jederzeit zur Wahl", async ({ page }) => {
   await expect(links).toHaveCount(5);
 });
 
+/**
+ * Die Regel aus `primitives.tsx`: **Jede Seite unterhalb eines
+ * Fußleisten-Bereichs trägt einen Rückweg** – und er benennt die Zielseite so,
+ * wie sie oben heißt. Dreimal vergessen worden (zuletzt bei den Einstellungen,
+ * T-18), deshalb steht sie jetzt auch als Test da.
+ *
+ * Hier nur die Seiten, die ohne Testdaten erreichbar sind; die tieferen
+ * (Vokabelset, Gespräch, Aufgabe) prüfen ihre eigenen Specs.
+ */
+const UNTERSEITEN = [
+  { path: "/faecher/vokabeln", titel: "Vokabeln", zurueck: "Fächer" },
+  // Kein Fußleisten-Bereich, hängt im Kopfbereich – und stand deshalb lange
+  // ganz ohne Ausgang da (T-18).
+  { path: "/einstellungen", titel: "Einstellungen", zurueck: "Heute" },
+] as const;
+
+for (const seite of UNTERSEITEN) {
+  test(`${seite.titel} führt zurück zu „${seite.zurueck}“`, async ({ page }) => {
+    await page.goto(seite.path);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(seite.titel);
+
+    const zurueck = page.getByRole("main").getByRole("link", { name: seite.zurueck });
+    await expect(zurueck).toBeVisible();
+    await zurueck.click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(seite.zurueck);
+  });
+}
+
 test("Manifest ist gültig und startet auf Heute", async ({ request }) => {
   const res = await request.get("/manifest.webmanifest");
   expect(res.ok()).toBe(true);

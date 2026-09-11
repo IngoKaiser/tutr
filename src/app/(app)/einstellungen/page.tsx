@@ -21,6 +21,16 @@ import { RecoveryLink } from "./recovery-link";
 export const metadata = { title: "Einstellungen · tutr" };
 
 /**
+ * Der Rückweg (T-18). Die Einstellungen sind **kein** Fußleisten-Bereich –
+ * sie hängen im Kopfbereich und standen deshalb lange ganz ohne Ausgang da:
+ * Wer hier landete, kam nur über die Fußleiste wieder heraus. „Heute" ist
+ * das Ziel, weil die App dort startet (`manifest`), nicht weil man
+ * zwangsläufig von dort kam – ein echter Link auf die Elternseite, kein
+ * Browser-Zurück (siehe `PageHeader`).
+ */
+const HEUTE = { href: "/heute", label: "Heute" };
+
+/**
  * Kindliste, Geräteliste des gerade gewählten Kindes, Löschen (F-06b, F-06e).
  *
  * Zwei völlig verschiedene Ansichten unter einer Route statt zwei Routen:
@@ -51,7 +61,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Einstellungen" trailing={currentStudent?.firstName} />
+      <PageHeader title="Einstellungen" trailing={currentStudent?.firstName} back={HEUTE} />
 
       <div className="flex flex-col gap-3">
         <Block title="Kinder">
@@ -164,7 +174,7 @@ async function StudentSettings() {
 
   return (
     <>
-      <PageHeader title="Einstellungen" trailing={firstName ?? undefined} />
+      <PageHeader title="Einstellungen" trailing={firstName ?? undefined} back={HEUTE} />
       {schoolYearLabel ? (
         <Block title="Schuljahr" trailing={schoolYearLabel}>
           <Notice>Deine Fächer legst du unter „Fächer&quot; an.</Notice>

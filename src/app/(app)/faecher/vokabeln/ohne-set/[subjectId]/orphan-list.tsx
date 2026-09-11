@@ -26,7 +26,7 @@ export function OrphanList({ view, canManage }: { view: OrphanView; canManage: b
       <PageHeader
         title="Ohne Set"
         trailing={view.subjectName}
-        back={{ href: "/faecher/vokabeln", label: "Vokabelsets" }}
+        back={{ href: "/faecher/vokabeln", label: "Vokabeln" }}
       />
 
       <Notice>

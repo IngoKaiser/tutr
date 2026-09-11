@@ -145,7 +145,7 @@ export function FotoAufnahme({ available }: { available: boolean }) {
   if (!available) {
     return (
       <div className="flex flex-col gap-3">
-        <PageHeader title="Hausaufgabe" back={{ href: "/tutor", label: "Tutor" }} />
+        <PageHeader title="Neue Hausaufgabe" back={{ href: "/tutor", label: "Tutor" }} />
         <Notice>{NICHT_EINGERICHTET}</Notice>
       </div>
     );
@@ -158,7 +158,7 @@ export function FotoAufnahme({ available }: { available: boolean }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader title="Hausaufgabe" back={{ href: "/tutor", label: "Tutor" }} />
+      <PageHeader title="Neue Hausaufgabe" back={{ href: "/tutor", label: "Tutor" }} />
       {/* Kein Chip vor dem ersten Foto (D7) - vorher gibt es noch nichts
           zuzuordnen, und "Fach wählen" wäre wieder die Frage, die diese
           ganze Änderung vermeiden soll. */}

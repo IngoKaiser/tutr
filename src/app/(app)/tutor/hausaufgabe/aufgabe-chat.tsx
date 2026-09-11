@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { TutorMarkdown } from "@/components/shell/markdown";
-import { Block, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
+import { Block, ChatKopf, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
 import type { Auslastung } from "@/lib/ai/rate-limit";
 
 import { ladeAuslastung } from "../actions";
@@ -19,7 +19,7 @@ const STATUS_LABEL: Record<AufgabeDetail["status"], string> = {
   in_arbeit: "in Arbeit",
   geloest: "gelöst",
   loesung_gezeigt: "Lösung gezeigt",
-  uebersprungen: "übersprungen",
+  uebersprungen: "gehört nicht dazu",
 };
 
 const ABGESCHLOSSEN = new Set<AufgabeDetail["status"]>([
@@ -131,7 +131,7 @@ export function AufgabeChat({
     return (
       <div className="flex flex-col gap-3">
         <PageHeader
-          title="Hausaufgabe"
+          title="Aufgabe"
           back={{ href: `/tutor/hausaufgabe/${aufgabe.sessionId}`, label: "Aufgabenliste" }}
         />
         <Notice>{NICHT_EINGERICHTET}</Notice>
@@ -144,16 +144,13 @@ export function AufgabeChat({
     // scrollt, Eingabefeld fest. `position: sticky` im scrollenden `main`
     // rutschte auf dem iPhone mit nach oben. Zur Höhe siehe `chat.tsx`.
     <div className="flex h-[calc(100cqh-2.5rem)] min-h-0 flex-col">
-      <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
-        <Link
-          href={`/tutor/hausaufgabe/${aufgabe.sessionId}`}
-          className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
-        >
-          <span aria-hidden="true">‹</span>
-          Aufgabenliste
-        </Link>
+      {/* Dieselbe Leiste wie im freien Chat (T-18) – sie stand hier zweimal
+          fast gleich im Code. */}
+      <ChatKopf
+        zurueck={{ href: `/tutor/hausaufgabe/${aufgabe.sessionId}`, label: "Aufgabenliste" }}
+      >
         <ContextChip subject={aufgabe.subjectName} />
-      </div>
+      </ChatKopf>
 
       {/* Die einzige scrollende Fläche – Aufgabenstellung, Verlauf, Fehler. */}
       {/* `-mx-4 px-4` wie im freien Chat (T-16): Der Scrollbereich reicht bis

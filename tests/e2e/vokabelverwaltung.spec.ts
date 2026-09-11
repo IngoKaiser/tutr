@@ -172,7 +172,10 @@ test.describe("Vokabelverwaltung", () => {
     // Die Fußleiste kennt nur die fünf Bereiche; ohne diesen Link käme man aus
     // einer Unterseite nur über /faecher wieder heraus.
     const inhalt = page.getByRole("main");
-    await inhalt.getByRole("link", { name: "Vokabelsets" }).click();
+    // „Vokabeln", nicht „Vokabelsets" (T-18): Der Rückweg benennt die
+    // Zielseite so, wie sie oben heißt – vorher stand hier ein Name, den es
+    // auf der Seite dahinter gar nicht gab.
+    await inhalt.getByRole("link", { name: "Vokabeln" }).click();
     await expect(page.getByRole("link", { name: new RegExp(SET_TITLE) })).toBeVisible({
       timeout: 10_000,
     });

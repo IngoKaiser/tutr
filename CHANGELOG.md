@@ -6,6 +6,16 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **T-18: Überschriften und Rückwege sind überall gleich aufgebaut.** „Wie komme ich zurück
+  eine Ebene höher?" hatte je nach Seite eine andere Antwort – und die Einstellungen hatten
+  gar keine: Sie sind kein Reiter in der Fußleiste, wer dort landete, kam nur über Umwege
+  wieder heraus. Jetzt trägt jede Seite unterhalb eines Bereichs einen Rückweg, und der
+  benennt das Ziel so, wie die Seite dort oben heißt (aus einem Vokabelset ging es zurück zu
+  „Vokabelsets" – eine Seite, die es unter dem Namen nicht gibt). Drei Seiten hießen
+  übereinander alle „Hausaufgabe"; jetzt heißen sie „Neue Hausaufgabe", „Hausaufgabe" und
+  „Aufgabe". Unter der Haube teilen sich die beiden Chat-Ansichten eine gemeinsame Kopfzeile,
+  statt sie doppelt zu führen.
+
 - **T-17: Aus „Überspringen" wird „Gehört nicht dazu" – und lässt sich zurücknehmen.** Der
   Knopf stand neben jeder Hausaufgabe und ließ sich versehentlich treffen, ohne Weg zurück.
   Dahinter steckte aber eine größere Frage: Wofür ist Überspringen da? Für genau einen Fall –

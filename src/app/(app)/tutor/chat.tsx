@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { HakenIcon, KopierenIcon, PauseIcon, PlayIcon } from "@/components/shell/icons";
 import { TutorMarkdown } from "@/components/shell/markdown";
-import { Block, ContextChip, Notice } from "@/components/shell/primitives";
+import { Block, ChatKopf, ContextChip, Notice } from "@/components/shell/primitives";
 import type { Auslastung } from "@/lib/ai/rate-limit";
 import type { PreparedImage } from "@/lib/image";
 import { istEingeholt, naechsteLaenge } from "@/lib/tutor/stream-text";
@@ -193,36 +192,26 @@ export function Conversation({
           hängt weiter an `sessionId` – ohne Session gibt es nichts
           zuzuordnen.
 
-          `-mx-4 px-4` lässt den Hintergrund bis an den Rand laufen, `-mt-5`
-          frisst das `py-5` der Hülle. */}
-      <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
-        {leer && !sessionId ? (
-          <h1 className="text-lg font-semibold tracking-tight">Tutor</h1>
-        ) : (
-          <>
-            <Link
-              href="/tutor"
-              className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
-            >
-              <span aria-hidden="true">‹</span>
-              Gespräche
-            </Link>
-            {sessionId ? (
-              <FachChip
-                sessionId={sessionId}
-                subjectName={subjectName}
-                topicTitle={topicTitle}
-                alleFaecher={alleFaecher}
-                onGewaehlt={(fach) => {
-                  setSubjectId(fach.id);
-                  setSubjectName(fach.name);
-                  setSubjectLanguage(fach.language);
-                }}
-              />
-            ) : null}
-          </>
-        )}
-      </div>
+          Die Leiste selbst steckt seit T-18 in `ChatKopf` – sie stand hier
+          und im Hausaufgaben-Dialog zweimal fast gleich im Code. */}
+      <ChatKopf
+        titel={leer && !sessionId ? "Tutor" : undefined}
+        zurueck={leer && !sessionId ? undefined : { href: "/tutor", label: "Gespräche" }}
+      >
+        {sessionId ? (
+          <FachChip
+            sessionId={sessionId}
+            subjectName={subjectName}
+            topicTitle={topicTitle}
+            alleFaecher={alleFaecher}
+            onGewaehlt={(fach) => {
+              setSubjectId(fach.id);
+              setSubjectName(fach.name);
+              setSubjectLanguage(fach.language);
+            }}
+          />
+        ) : null}
+      </ChatKopf>
 
       {/* Die einzige scrollende Fläche. `min-h-0`, sonst weigert sich das
           Flex-Kind zu schrumpfen und schiebt den Composer aus dem Bild.
