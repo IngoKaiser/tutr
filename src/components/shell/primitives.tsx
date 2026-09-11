@@ -12,12 +12,20 @@ import Link from "next/link";
  * Fußleiste kennt nur die fünf Bereiche und keine Tiefe darunter; ohne diesen
  * Link gäbe es aus einer Unterseite keinen Ausgang außer dem Umweg über die
  * Fußleiste. Dass die Regel hier steht und nicht in jedem Ticket neu bedacht
- * wird, ist Absicht: Sie ist zweimal vergessen worden.
+ * wird, ist Absicht: Sie ist zweimal vergessen worden – und ein drittes Mal
+ * bei den Einstellungen, die gar kein Fußleisten-Bereich sind und trotzdem
+ * lange ohne Ausgang dastanden (T-18).
  *
  * Ein echter Link auf die Elternseite, kein Browser-Zurück: In der
  * installierten PWA gibt es keine Browserleiste, und „zurück" landet dort, wo
  * man herkam, nicht dort, wo man hingehört. `label` benennt deshalb das Ziel
- * („Vokabelsets"), nicht die Richtung („Zurück").
+ * – und zwar **so, wie die Zielseite heißt** (T-18): „Vokabeln", nicht
+ * „Vokabelsets", wenn die Seite oben „Vokabeln" stehen hat.
+ *
+ * `trailing` trägt den Kontext, zu dem die Seite gehört – meist das Fach.
+ * Ein `ContextChip` gehört **nicht** hierher: Der ist den Chat-Ansichten
+ * vorbehalten (`ChatKopf`), wo er das Fach nicht nur zeigt, sondern ändern
+ * lässt.
  */
 export function PageHeader({
   title,
@@ -43,6 +51,51 @@ export function PageHeader({
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {trailing ? <span className="text-tinte-leise text-xs">{trailing}</span> : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Die Kopfzeile der Chat-Ansichten (T-07b, zusammengeführt in T-18).
+ *
+ * **Warum die Chats nicht `PageHeader` benutzen:** Dort ist Höhe das knappste
+ * Gut – über dem Verlauf steht sonst eine 2xl-Überschrift plus eigener
+ * Rückweg-Zeile, und beides schiebt das Gespräch aus dem Bild. Diese Leiste
+ * bringt Rückweg und Kontext in **eine** Zeile, klebt am oberen Rand des
+ * Chat-Rahmens (`-mx-4 -mt-5`, dieselbe Rechnung wie beim Composer unten) und
+ * scrollt nicht mit (T-12a).
+ *
+ * Bis T-18 stand sie zweimal fast gleich im Code – einmal im freien Chat,
+ * einmal im Hausaufgaben-Dialog. Zwei Kopien derselben Leiste laufen
+ * auseinander, sobald eine davon angefasst wird; genau das war passiert.
+ *
+ * Entweder `zurueck` (eine Ebene höher) oder `titel` (wenn es nichts gibt,
+ * wohin man zurückginge – `/tutor` vor dem ersten Gespräch). `children` ist
+ * der Platz für den Kontext-Chip daneben.
+ */
+export function ChatKopf({
+  titel,
+  zurueck,
+  children,
+}: {
+  titel?: string;
+  zurueck?: { href: string; label: string };
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
+      {zurueck ? (
+        <Link
+          href={zurueck.href}
+          className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
+        >
+          <span aria-hidden="true">‹</span>
+          {zurueck.label}
+        </Link>
+      ) : titel ? (
+        <h1 className="text-lg font-semibold tracking-tight">{titel}</h1>
+      ) : null}
+      {children}
     </div>
   );
 }
