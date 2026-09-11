@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { withActor, type Actor } from "@/db/actor";
+import { ladeGesamtauslastung, type Auslastung } from "@/lib/ai/rate-limit";
 import { loginStatus } from "@/lib/auth/actor";
 import { databaseConfigured } from "@/lib/env";
 
@@ -38,6 +39,8 @@ export type SessionSummary = {
 export type TutorOverview = {
   subjects: SubjectChoice[];
   sessions: SessionSummary[];
+  /** Wie ausgelastet der Kostendeckel gerade ist (S-03d) – für den dezenten Hinweis in der Übersicht. */
+  auslastung: Auslastung;
 };
 
 /** Fächer des aktiven Schuljahres und die bisherigen Gespräche. `null` ohne Kind-Anmeldung/DB. */
@@ -65,6 +68,8 @@ export async function loadTutorOverview(): Promise<TutorOverview | null> {
       order by ts.updated_at desc
       limit 20`);
 
+    const auslastung = await ladeGesamtauslastung(tx);
+
     return {
       subjects: subjects.map((r) => ({ id: r.id, name: r.name, language: r.language })),
       sessions: sessions.map((r) => ({
@@ -74,6 +79,7 @@ export async function loadTutorOverview(): Promise<TutorOverview | null> {
         updatedAt: r.updated_at,
         hausaufgabe: r.entry_point === "hausaufgabe",
       })),
+      auslastung,
     };
   });
 }

@@ -219,6 +219,44 @@ export function ReadingText({ children }: { children: React.ReactNode }) {
   return <p className="font-lese text-tinte-weich text-[0.9375rem] leading-relaxed">{children}</p>;
 }
 
+/**
+ * Eine Leiste „wie ausgelastet" (S-03d-Fortschrittsanzeige, Tutor/Einstellungen).
+ *
+ * Bewusst kein Prozent-Verlauf in Rot/Gelb/Grün: Das läse sich wie ein
+ * Dringlichkeits-Element (CLAUDE.md verbietet solche ausdrücklich), dabei
+ * ist das hier eine ruhige Information, keine Warnung – eine volle Leiste
+ * bedeutet eine kurze Pause, nicht einen Fehler. Eine Farbe für jeden Stand.
+ * Kein US-$-Betrag (`kostenUsd()` bleibt intern) – nur der Anteil am Deckel.
+ */
+export function Auslastungsbalken({
+  anteil,
+  label,
+}: {
+  /** 0–1, wie `lib/ai/rate-limit.ts` `Auslastung`. */
+  anteil: number;
+  label: string;
+}) {
+  const prozent = Math.round(Math.min(1, Math.max(0, anteil)) * 100);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-tinte-weich text-[0.75rem]">{label}</span>
+        <span className="text-tinte-leise text-[0.6875rem] tabular-nums">{prozent} %</span>
+      </div>
+      <span
+        role="img"
+        aria-label={`${label}: ${prozent} % ausgelastet`}
+        className="bg-papier-tief block h-1.5 overflow-hidden rounded-full"
+      >
+        <span
+          className="bg-koenigsblau block h-full rounded-full"
+          style={{ width: `${prozent}%` }}
+        />
+      </span>
+    </div>
+  );
+}
+
 export function Notice({ children }: { children: React.ReactNode }) {
   return <p className="text-tinte-weich text-[0.8125rem] leading-normal">{children}</p>;
 }

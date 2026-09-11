@@ -26,6 +26,15 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **S-03d: die Fortschrittsanzeige zum Kostendeckel.** War in S-03c bewusst offen gelassen –
+  wer sieht sie, welche RLS. Jetzt: **nur das Kind**, dieselbe Richtung wie beim Tutor selbst
+  (keine neue Elternzeile auf `ai_usage`). **Keine Dollarbeträge** in der Oberfläche, nur der
+  Anteil je Fenster (Stunde/Tag/Woche) als ruhige Leiste, eine Farbe für jeden Stand – ein
+  Kontostand-Gefühl oder ein Dringlichkeits-Element (von CLAUDE.md ausdrücklich verboten) sollte
+  daraus nicht werden. Ein dezenter Hinweis oben rechts in der Tutor-Übersicht zeigt nur das
+  straffste der drei Fenster, und nur, wenn überhaupt etwas genutzt wurde – ein frisches Konto
+  sieht dort nichts. Die volle Übersicht mit allen drei Fenstern steht unter „Einstellungen“.
+
 - **T-03: der Hausaufgaben-Tutor.** Foto der Aufgaben → Aufgabenliste → Hinweisleiter → Lösung
   nach zwei Versuchen (§4a), als dritter Einstieg neben „Freie Frage“ und „Verstehen“. Ein Foto
   legt eine oder mehrere Aufgaben an (Vision liest, löst aber nichts). Jede Aufgabe hat zwei
