@@ -71,10 +71,10 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | „Gemischt“ mischt die Richtungen wirklich; EXIF-Drehung beim Foto                  | ✅    | V-07    |
 |                          | Lernstand über den ganzen Wortschatz; Antwortart wählbar (Auswahl/Tippen)          | ✅    | V-08    |
 |                          | Prüfungsmodus, Schwachstellen, Mix                                                 | 🌑    | V-04    |
-| **Heute**                |                                                                                    | 🌒    |         |
-|                          | Attrappe mit Platzhalter-Zahlen (F-07)                                             | 🌒    | F-07    |
-|                          | Echte Zahlen: fällige Karten je Fach, nächster Termin                              | 🌑    | H-01    |
-|                          | Countdown, Kamera-Knopf, Lernplan-Vorschlag                                        | 🌑    | H-01    |
+| **Heute**                |                                                                                    | 🌓    |         |
+|                          | Echte Zahlen: fällige Vokabeln je Fach, nächster Termin mit Countdown              | ✅    | H-01    |
+|                          | Kamera-Knopf für die Hausaufgabe (führt in den Hausaufgaben-Tutor)                 | ✅    | H-01    |
+|                          | Lernplan-Slot des Tages, Fördern-/Fordern-Karte                                    | 🌑    | M7/M1   |
 | **Prüfungskalender**     |                                                                                    | 🌓    |         |
 |                          | Termin von Hand anlegen, Liste (4 Wochen / später / Historie), bearbeiten, absagen | ✅    | K-01    |
 |                          | Themen an einen Termin hängen, Countdown, Prüfungsseite                            | 🌑    | P-01    |
@@ -133,7 +133,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 7. ~~**T-08 + T-09**~~ — erledigt (Markdown-Rendering; Ansprache nach `student.grade_level`)
 8. ~~**T-01c**~~ — erledigt (ADR 0012 Elternsicht, akzeptiert); **F-17** räumt die Alt-Policies auf
 9. ~~**T-03 schmal**~~ — erledigt (Hausaufgabe mit Hinweisleiter, in zwei PRs: Fundament, dann Backend + Oberfläche)
-10. **H-01 schmal** — Heute mit echten Daten
+10. ~~**H-01 schmal**~~ — erledigt (Heute mit echten Zahlen: Fälliges je Fach, nächster Termin, Kamera-Knopf)
 11. **V-04** — Set-Modus
 
 `S-03a` (CSP) hängt an nichts und kann jederzeit dazwischen.

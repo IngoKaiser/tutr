@@ -16,9 +16,18 @@ export const metadata = { title: "Tutor · tutr" };
  * Weg zurück aus einem Gespräch. Jetzt: hier die Übersicht, unter
  * `/tutor/neu` und `/tutor/[sessionId]` das Gespräch.
  *
+ * `?einstieg=` wählt den Einstieg vor – der Kamera-Knopf auf „Heute" (H-01,
+ * §5) landet damit direkt auf „Hausaufgabe" und nicht auf „Freie Frage".
+ * Ein unbekannter Wert fällt still auf „Freie Frage" zurück: Die URL ist
+ * Nutzereingabe, kein Vertrag.
+ *
  * Für Eltern gibt es hier nichts (ADR 0010 D2).
  */
-export default async function TutorPage() {
+export default async function TutorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ einstieg?: string }>;
+}) {
   const { actor } = await loginStatus();
   if (!actor) redirect("/anmelden");
 
@@ -36,5 +45,11 @@ export default async function TutorPage() {
     );
   }
 
-  return <TutorOverviewView overview={await loadTutorOverview()} />;
+  const { einstieg } = await searchParams;
+  return (
+    <TutorOverviewView
+      overview={await loadTutorOverview()}
+      einstieg={einstieg === "hausaufgabe" || einstieg === "verstehen" ? einstieg : "freie_frage"}
+    />
+  );
 }

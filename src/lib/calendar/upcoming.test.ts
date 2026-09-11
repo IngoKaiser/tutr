@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { countdownLabel, daysUntil, splitByHorizon, type CalendarEvent } from "./upcoming";
+import {
+  countdownLabel,
+  daysUntil,
+  istBald,
+  langesDatum,
+  splitByHorizon,
+  type CalendarEvent,
+} from "./upcoming";
 
 const HEUTE = new Date("2026-09-10T09:00:00Z");
 
@@ -70,5 +77,35 @@ describe("splitByHorizon", () => {
     const { kommend, spaeter } = splitByHorizon([ev("x", "2026-09-24")], HEUTE, 1);
     expect(kommend).toHaveLength(0);
     expect(spaeter.map((e) => e.id)).toEqual(["x"]);
+  });
+});
+
+describe("istBald – die Hervorhebung auf „Heute“ (H-01)", () => {
+  it("heute bis eine Woche zählt als bald", () => {
+    expect(istBald(0)).toBe(true);
+    expect(istBald(1)).toBe(true);
+    expect(istBald(7)).toBe(true);
+  });
+
+  it("weiter weg als eine Woche nicht – sonst hebt der Countdown wochenlang alles hervor", () => {
+    expect(istBald(8)).toBe(false);
+    expect(istBald(34)).toBe(false);
+  });
+
+  it("ein vergangener Termin ist nie bald", () => {
+    expect(istBald(-1)).toBe(false);
+  });
+});
+
+describe("langesDatum", () => {
+  it("schreibt Wochentag und Datum aus", () => {
+    expect(langesDatum("2026-09-11")).toBe("Freitag, 11. September");
+  });
+
+  it("liest denselben Tag wie daysUntil – kein Zeitzonen-Versatz", () => {
+    // Derselbe String, zwei Wege: Die Kopfzeile darf nicht einen Tag vor
+    // oder hinter dem Countdown liegen.
+    expect(langesDatum("2026-01-01")).toBe("Donnerstag, 1. Januar");
+    expect(daysUntil("2026-01-01", new Date("2026-01-01T23:30:00Z"))).toBe(0);
   });
 });
