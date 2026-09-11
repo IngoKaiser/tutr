@@ -244,27 +244,33 @@ export async function ladeGesamtauslastung(tx: Transaction): Promise<Auslastung>
   return kombiniereAuslastung(auslastungAusKosten(tutor), auslastungAusKosten(vision));
 }
 
-export type Fenster = "stunde" | "tag" | "woche";
+/**
+ * Die Fenster, die der Oberfläche etwas sagen (S-03e).
+ *
+ * **Die Stunde ist bewusst nicht dabei**, obwohl `pruefeLimit()` sie
+ * weiterhin prüft: Sie ist ein technischer Schutz gegen eine festhängende
+ * Schleife, kein Zeitraum, in dem jemand plant. Handlungsleitend sind
+ * **heute** („reicht es noch für die Hausaufgaben?") und **diese Woche**
+ * (Montag bis Freitag, der Horizont, in dem eine Schulwoche gedacht wird).
+ * Greift der Stundendeckel doch einmal, sagt die Meldung von
+ * `pruefeLimit()` ohnehin, dass es in der nächsten Stunde weitergeht – eine
+ * Dauer-Anzeige dafür bräuchte es selbst dann nicht.
+ */
+export type Fenster = "tag" | "woche";
 
-/** Deutsches Label je Fenster – eine Stelle, damit Tutor-Hinweis und Einstellungen dasselbe Wort benutzen. */
+/** Deutsches Label je Fenster – eine Stelle, damit Composer und Einstellungen dasselbe Wort benutzen. */
 export const FENSTER_LABEL: Record<Fenster, string> = {
-  stunde: "Diese Stunde",
   tag: "Heute",
   woche: "Diese Woche",
 };
 
 /**
- * Das Fenster mit der höchsten Auslastung – für den dezenten Hinweis im
- * Tutor, der nur eine Zahl zeigt, statt aller drei. Bei einem Gleichstand
- * gewinnt das kleinste Fenster: Es ändert sich am schnellsten wieder, ist
- * also die aktuellste Auskunft.
+ * Das straffere der beiden sichtbaren Fenster – für den Pegel im Composer,
+ * der nur eine Zahl zeigt statt beider. Bei Gleichstand gewinnt der Tag: Er
+ * füllt sich schneller wieder auf und ist damit die aktuellere Auskunft.
  */
-export function groesstesFenster(auslastung: Auslastung): { fenster: Fenster; anteil: number } {
-  if (auslastung.stunde >= auslastung.tag && auslastung.stunde >= auslastung.woche) {
-    return { fenster: "stunde", anteil: auslastung.stunde };
-  }
-  if (auslastung.tag >= auslastung.woche) {
-    return { fenster: "tag", anteil: auslastung.tag };
-  }
-  return { fenster: "woche", anteil: auslastung.woche };
+export function anzeigeFenster(auslastung: Auslastung): { fenster: Fenster; anteil: number } {
+  return auslastung.tag >= auslastung.woche
+    ? { fenster: "tag", anteil: auslastung.tag }
+    : { fenster: "woche", anteil: auslastung.woche };
 }

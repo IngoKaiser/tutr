@@ -256,8 +256,10 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("textbox")).toHaveValue(/wie kürzt man Brüche/);
     // Der Stub beendet sich selbst → „hört zu“ ist wieder weg.
     await expect(page.getByText(/tutr hört zu/)).toHaveCount(0);
-    // Erst jetzt ist Absenden möglich.
-    await expect(page.getByRole("button", { name: "Frage senden" })).toBeEnabled();
+    // Erst jetzt ist Absenden möglich. Der Knopf heißt seit T-12 „Senden“,
+    // nicht mehr „Frage senden“: Derselbe Composer trägt jetzt auch den
+    // Hausaufgaben-Dialog, und dort schickt man einen Versuch, keine Frage.
+    await expect(page.getByRole("button", { name: "Senden" })).toBeEnabled();
   });
 
   test("das Eingabefeld wächst mit dem Text und deckelt sich dann (V-13)", async ({
@@ -288,15 +290,64 @@ test.describe("Tutor als Kind", () => {
     const leer = await huelle();
     expect(leer?.scrollt).toBe(false);
 
+    // **Drei Zeilen müssen ganz hineinpassen** (T-12): Der Deckel liegt
+    // genau dort, und ein Pixel zu wenig erzeugte eine Bildlaufleiste für
+    // nichts – beim Bauen einmal passiert, deshalb hier festgehalten.
     await feld.fill("Zeile 1\nZeile 2\nZeile 3");
     await expect
       .poll(async () => (await huelle())?.hoehe ?? 0)
       .toBeGreaterThan((leer?.hoehe ?? 0) + 20);
+    await expect.poll(async () => (await huelle())?.scrollt ?? false).toBe(false);
 
-    // Weit über die Deckelhöhe hinaus: Die Hülle hört auf zu wachsen (max-h-40
-    // = 160px) und scrollt stattdessen – nichts wird mehr wortlos abgeschnitten.
+    // Ab der vierten Zeile wächst nichts mehr, es scrollt – nichts wird
+    // wortlos abgeschnitten.
     await feld.fill(Array.from({ length: 20 }, (_, i) => `Zeile ${i + 1}`).join("\n"));
-    await expect.poll(async () => (await huelle())?.hoehe ?? 0).toBeLessThanOrEqual(162);
+    await expect.poll(async () => (await huelle())?.hoehe ?? 0).toBeLessThanOrEqual(90);
     await expect.poll(async () => (await huelle())?.scrollt ?? false).toBe(true);
+  });
+
+  test("das Plus-Menü bietet Kamera und Mediathek, der Pegel steht im Feld (T-12)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+
+    await alsMia(page);
+    await page.goto("/tutor");
+    await page.getByRole("link", { name: "Gespräch beginnen" }).click();
+    await expect(page).toHaveURL(/\/tutor\/neu/);
+
+    // Zu ist zu: Das Menü darf die Tastenreihe nicht dauerhaft verdecken.
+    await expect(page.getByRole("button", { name: "Foto aufnehmen" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Anhang hinzufügen" }).click();
+    await expect(page.getByRole("button", { name: "Foto aufnehmen" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Foto auswählen" })).toBeVisible();
+
+    // Zwei Eingabefelder mit demselben `accept`, eines mit `capture` – am
+    // Handy öffnet das eine die Kamera, das andere die Mediathek (ADR 0007 D1).
+    const felder = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLInputElement>('input[type="file"]')].map((i) => ({
+        accept: i.accept,
+        capture: i.getAttribute("capture"),
+      })),
+    );
+    expect(felder).toEqual([
+      { accept: "image/*", capture: "environment" },
+      { accept: "image/*", capture: null },
+    ]);
+
+    // Ein Klick daneben schließt das Menü wieder.
+    await page.getByRole("textbox").click();
+    await expect(page.getByRole("button", { name: "Foto aufnehmen" })).toHaveCount(0);
+
+    // Der Pegel sitzt im Feld und nennt sein Fenster – „Diese Stunde" gibt
+    // es nicht mehr (S-03e), und auf der Übersicht steht er auch nicht mehr.
+    const pegel = page.getByRole("img", { name: /genutzt/ });
+    await expect(pegel).toBeVisible();
+    await expect(pegel).toHaveAttribute("aria-label", /^(Heute|Diese Woche): \d+ % genutzt$/);
+
+    await page.goto("/tutor");
+    await expect(page.getByRole("img", { name: /genutzt/ })).toHaveCount(0);
   });
 });

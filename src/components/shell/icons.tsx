@@ -184,3 +184,33 @@ export function HakenIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Anhang hinzufügen – öffnet das Plus-Menü im Composer (T-12). */
+export function PlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}
+
+/** Kamera – „Foto aufnehmen" im Plus-Menü (T-12). */
+export function KameraIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.75 8.5a1.75 1.75 0 0 1 1.75-1.75h1.4a1 1 0 0 0 .86-.49l.68-1.14a1 1 0 0 1 .86-.49h4.4a1 1 0 0 1 .86.49l.68 1.14a1 1 0 0 0 .86.49h1.4a1.75 1.75 0 0 1 1.75 1.75v8.25a1.75 1.75 0 0 1-1.75 1.75H5.5a1.75 1.75 0 0 1-1.75-1.75Z" />
+      <circle cx="12" cy="12.5" r="3.25" />
+    </Icon>
+  );
+}
+
+/** Bild aus der Mediathek – „Foto auswählen" im Plus-Menü (T-12). */
+export function BildIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.75" y="4.75" width="16.5" height="14.5" rx="1.75" />
+      <circle cx="8.75" cy="9.75" r="1.5" />
+      <path d="M4.5 17.5l4.4-4.4a1.5 1.5 0 0 1 2.12 0l3.3 3.3a1.5 1.5 0 0 0 2.12 0l1.7-1.7a1.5 1.5 0 0 1 2.12 0l1.24 1.24" />
+    </Icon>
+  );
+}

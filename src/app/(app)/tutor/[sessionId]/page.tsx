@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { loginStatus } from "@/lib/auth/actor";
 import { anthropicConfigured } from "@/lib/env";
 
-import { loadSession, loadTutorOverview } from "../actions";
+import { ladeAuslastung, loadSession, loadTutorOverview } from "../actions";
 import { Conversation } from "../chat";
 
 export const metadata = { title: "Tutor · tutr" };
@@ -51,6 +51,7 @@ export default async function GespraechPage({
         content: m.content,
       }))}
       available={anthropicConfigured()}
+      auslastung={await ladeAuslastung()}
     />
   );
 }

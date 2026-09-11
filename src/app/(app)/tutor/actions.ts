@@ -39,8 +39,6 @@ export type SessionSummary = {
 export type TutorOverview = {
   subjects: SubjectChoice[];
   sessions: SessionSummary[];
-  /** Wie ausgelastet der Kostendeckel gerade ist (S-03d) – für den dezenten Hinweis in der Übersicht. */
-  auslastung: Auslastung;
 };
 
 /** Fächer des aktiven Schuljahres und die bisherigen Gespräche. `null` ohne Kind-Anmeldung/DB. */
@@ -68,8 +66,6 @@ export async function loadTutorOverview(): Promise<TutorOverview | null> {
       order by ts.updated_at desc
       limit 20`);
 
-    const auslastung = await ladeGesamtauslastung(tx);
-
     return {
       subjects: subjects.map((r) => ({ id: r.id, name: r.name, language: r.language })),
       sessions: sessions.map((r) => ({
@@ -79,7 +75,6 @@ export async function loadTutorOverview(): Promise<TutorOverview | null> {
         updatedAt: r.updated_at,
         hausaufgabe: r.entry_point === "hausaufgabe",
       })),
-      auslastung,
     };
   });
 }
@@ -158,4 +153,19 @@ export async function deleteTutorSession(sessionId: string): Promise<void> {
     tx.execute(sql`delete from tutor_session where id = ${sessionId}`),
   );
   revalidatePath("/tutor");
+}
+
+/**
+ * Der Auslastungs-Stand für den Pegel im Composer (S-03e).
+ *
+ * Eigene, schmale Action statt eines Feldes in `loadTutorOverview()`: Der
+ * Composer frischt sie **nach jeder Antwort** auf, nicht nur beim Laden der
+ * Seite. Sonst zeigte der Pegel bis zum nächsten Seitenaufruf den Stand von
+ * vorhin – ausgerechnet nach einer langen Antwort, die ihn am stärksten
+ * bewegt hat.
+ */
+export async function ladeAuslastung(): Promise<Auslastung | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+  return withActor(actor, (tx) => ladeGesamtauslastung(tx));
 }

@@ -26,6 +26,21 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **T-12: ein Eingabefeld für alle Tutor-Dialoge.** Aus dem Testen am Gerät: Beim Diktieren wuchs
+  das Feld über den halben Bildschirm, weil die Knöpfe **neben** dem Text saßen und ihn auf halbe
+  Breite drängten. Jetzt liegt der Text oben über die volle Breite und die Knöpfe stehen darunter;
+  das Feld startet einzeilig, wächst bis genau drei Zeilen und scrollt danach. Neu ist ein
+  **Plus-Menü** links für Fotos (Kamera und Mediathek getrennt) – damit kann auch der freie Chat
+  Bilder, nicht nur der Hausaufgaben-Dialog. Und statt zweier Eingabefelder, die auseinanderliefen
+  (Foto nur hier, Diktat nur dort), gibt es jetzt eines, das beide Dialoge trägt.
+
+- **S-03e: die Kostenanzeige sagt „Heute" und „Diese Woche" statt „Diese Stunde".** Der Stundenwert
+  war weder handlungsleitend noch am richtigen Ort – die Stunde ist ein technischer Schutz gegen
+  eine festhängende Schleife, kein Zeitraum, in dem jemand plant. Sie schützt weiter, verschwindet
+  aber aus der Anzeige und meldet sich von selbst, wenn sie greift. Der Pegel sitzt jetzt im
+  Eingabefeld statt auf der Tutor-Übersicht: dort, wo die Kosten entstehen, und ohne Prozentzahl,
+  die neben dem Schreiben um Aufmerksamkeit bäte.
+
 - **H-01: „Heute" zeigt echte Zahlen statt der Attrappe.** Der Startbildschirm stand seit F-07
   mit erfundenen Beispieldaten da. Jetzt: die fälligen Vokabeln je Fach (dieselbe Zahl wie unter
   „Üben", aus derselben Abfrage), der nächste Termin mit Countdown – hervorgehoben nur, wenn er

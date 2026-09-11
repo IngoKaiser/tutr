@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AI_LIMITS,
   auslastungAusKosten,
-  groesstesFenster,
+  anzeigeFenster,
   kombiniereAuslastung,
   kostenUsd,
   pruefeLimit,
@@ -141,23 +141,28 @@ describe("kombiniereAuslastung", () => {
   });
 });
 
-describe("groesstesFenster", () => {
-  it("findet das Fenster mit der höchsten Auslastung", () => {
-    expect(groesstesFenster({ stunde: 0.1, tag: 0.8, woche: 0.3 })).toEqual({
+describe("anzeigeFenster – nur Heute und Diese Woche (S-03e)", () => {
+  it("findet das straffere der beiden sichtbaren Fenster", () => {
+    expect(anzeigeFenster({ stunde: 0.1, tag: 0.8, woche: 0.3 })).toEqual({
       fenster: "tag",
       anteil: 0.8,
     });
-  });
-
-  it("bei Gleichstand gewinnt das kleinste, aktuellste Fenster", () => {
-    expect(groesstesFenster({ stunde: 0.5, tag: 0.5, woche: 0.5 }).fenster).toBe("stunde");
-    expect(groesstesFenster({ stunde: 0.2, tag: 0.5, woche: 0.5 }).fenster).toBe("tag");
-  });
-
-  it("bei nichts Genutztem bleibt es bei der Stunde – ohne Auslastung ist der genaue Wert egal", () => {
-    expect(groesstesFenster({ stunde: 0, tag: 0, woche: 0 })).toEqual({
-      fenster: "stunde",
-      anteil: 0,
+    expect(anzeigeFenster({ stunde: 0.1, tag: 0.2, woche: 0.6 })).toEqual({
+      fenster: "woche",
+      anteil: 0.6,
     });
+  });
+
+  it("die Stunde bleibt außen vor, auch wenn sie am vollsten ist", () => {
+    // Der Stundendeckel schützt weiter (`pruefeLimit`), aber er ist kein
+    // Zeitraum, in dem jemand plant – die Anzeige kennt ihn nicht.
+    const gewaehlt = anzeigeFenster({ stunde: 0.99, tag: 0.2, woche: 0.1 });
+    expect(gewaehlt.fenster).toBe("tag");
+    expect(gewaehlt.anteil).toBe(0.2);
+  });
+
+  it("bei Gleichstand gewinnt der Tag – er füllt sich schneller wieder auf", () => {
+    expect(anzeigeFenster({ stunde: 0, tag: 0.5, woche: 0.5 }).fenster).toBe("tag");
+    expect(anzeigeFenster({ stunde: 0, tag: 0, woche: 0 })).toEqual({ fenster: "tag", anteil: 0 });
   });
 });

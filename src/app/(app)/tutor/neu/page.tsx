@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { loginStatus } from "@/lib/auth/actor";
 import { anthropicConfigured } from "@/lib/env";
 
-import { loadTutorOverview } from "../actions";
+import { ladeAuslastung, loadTutorOverview } from "../actions";
 import { Conversation } from "../chat";
 
 export const metadata = { title: "Neues Gespräch · tutr" };
@@ -43,6 +43,7 @@ export default async function NeuesGespraechPage({
       entryPoint={einstieg === "verstehen" ? "verstehen" : "freie_frage"}
       initialMessages={[]}
       available={anthropicConfigured()}
+      auslastung={await ladeAuslastung()}
     />
   );
 }
