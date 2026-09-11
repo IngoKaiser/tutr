@@ -53,9 +53,12 @@ test.describe("Übungssession", () => {
     // V-08: Lernstand über den ganzen Wortschatz, nicht nur die Fälligen –
     // die drei Kacheln heißen jetzt „Neu / Am Üben / Sitzt". Exakte Zahlen
     // wandern, sobald ein anderer Test eine Karte beantwortet hat; hier zählt
-    // nur, dass der Fortschritt überhaupt sichtbar ist.
+    // nur, dass der Fortschritt überhaupt sichtbar ist. Über den Tag-Namen
+    // gesucht (nicht `getByText`): Seit V-13 nennt die aufklappbare
+    // Lernrhythmus-Erklärung darunter dieselben drei Wörter noch einmal
+    // (als `<b>`), `getByText` fände also zwei Treffer.
     for (const label of ["Neu", "Am Üben", "Sitzt"]) {
-      await expect(page.getByText(label, { exact: true })).toBeVisible();
+      await expect(page.locator("span", { hasText: label })).toBeVisible();
     }
   });
 

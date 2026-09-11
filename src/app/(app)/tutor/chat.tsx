@@ -411,41 +411,6 @@ function Composer({
         <span className="text-koenigsblau text-[0.6875rem] font-medium">tutr hört zu …</span>
       ) : null}
 
-      {/* Stimmenauswahl (T-07b), seit V-12 **immer** sichtbar, sobald
-          Vorlesen an ist. Vorher hing sie an `stimmen.length > 1` – wer nur
-          eine deutsche Stimme installiert hat, sah gar nichts und konnte
-          nicht wissen, dass es überhaupt etwas umzustellen gibt. Genau das
-          war der Fall („warum höre ich immer Anna?“): Die Web Speech API
-          zeigt nur Stimmen, die auf dem Gerät geladen sind – Siri-Stimmen
-          gibt iOS Webseiten grundsätzlich nicht. Die Auswahl liegt im
-          Browser (localStorage), nicht auf dem Server. */}
-      {vorlesen.verfuegbar && vorlesen.immerAn ? (
-        vorlesen.stimmen.length > 1 ? (
-          <label className="text-tinte-leise flex items-center gap-1.5 text-[0.6875rem]">
-            Stimme
-            <select
-              value={vorlesen.stimmeUri}
-              onChange={(e) => vorlesen.stimmeWaehlen(e.target.value)}
-              className="border-linie-stark bg-flaeche text-tinte min-w-0 flex-1 rounded-md border px-1.5 py-1 text-[0.6875rem]"
-            >
-              <option value="">Automatisch (beste)</option>
-              {vorlesen.stimmen.map((v) => (
-                <option key={v.voiceURI} value={v.voiceURI}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <span className="text-tinte-leise text-[0.6875rem]">
-            Nur eine deutsche Stimme auf dem Gerät
-            {vorlesen.stimmen[0] ? ` (${vorlesen.stimmen[0].name})` : ""}. Weitere gibt es unter
-            Einstellungen › Bedienungshilfen › Gesprochene Inhalte › Stimmen › Deutsch – danach
-            steht hier eine Auswahl.
-          </span>
-        )
-      ) : null}
-
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -453,24 +418,48 @@ function Composer({
         }}
         className={`${FIELD_RAHMEN} flex items-end gap-1 py-1.5 pr-1.5 pl-3`}
       >
-        <textarea
-          value={value}
-          onChange={(e) => {
-            vorlesen.stop();
-            onChange(e.target.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              onSend();
+        {/*
+         * Wächst mit dem Text, bis zu einer Deckelhöhe – danach scrollt es
+         * (V-13). Vorher stand hier `rows={1}` ohne jede Anpassung: Alles ab
+         * der zweiten Zeile war einfach weg, ohne Bildlaufleiste oder
+         * anderen Hinweis, dass mehr dasteht, als sichtbar ist.
+         *
+         * Reines CSS, kein `useEffect`, kein `scrollHeight`-Messen: Ein
+         * unsichtbarer Zwilling mit demselben Text, derselben Schrift und
+         * demselben Innenabstand bekommt über CSS Grid dieselbe Zelle wie
+         * das Feld (`col-start-1 row-start-1`) – der Zwilling hat eine
+         * natürliche Höhe (er ist nur Text), das Feld übernimmt sie über
+         * die Zellhöhe. `value` ist ohnehin schon React-Zustand, der
+         * Zwilling bekommt ihn einfach mit, kein Zusatzcode nötig. Die
+         * Deckelhöhe (`max-h-40`) sitzt auf der gemeinsamen Hülle, die dann
+         * selbst scrollt – eine einzige Bildlaufleiste für beide Ebenen.
+         */}
+        <div className="grid max-h-40 min-h-9 min-w-0 flex-1 overflow-y-auto text-sm">
+          <div
+            aria-hidden="true"
+            className="invisible col-start-1 row-start-1 py-1.5 [overflow-wrap:anywhere] whitespace-pre-wrap"
+          >
+            {value ? `${value} ` : " "}
+          </div>
+          <textarea
+            value={value}
+            onChange={(e) => {
+              vorlesen.stop();
+              onChange(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onSend();
+              }
+            }}
+            rows={1}
+            placeholder={
+              zielsprache ? "Frag etwas — auf Deutsch." : "Frag etwas oder sag, wo es hakt."
             }
-          }}
-          rows={1}
-          placeholder={
-            zielsprache ? "Frag etwas — auf Deutsch." : "Frag etwas oder sag, wo es hakt."
-          }
-          className="text-tinte placeholder:text-tinte-leise max-h-40 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-sm outline-none"
-        />
+            className="text-tinte placeholder:text-tinte-leise col-start-1 row-start-1 w-full resize-none overflow-hidden bg-transparent py-1.5 outline-none"
+          />
+        </div>
 
         {vorlesen.verfuegbar ? (
           <button

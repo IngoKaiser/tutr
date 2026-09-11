@@ -259,4 +259,44 @@ test.describe("Tutor als Kind", () => {
     // Erst jetzt ist Absenden möglich.
     await expect(page.getByRole("button", { name: "Frage senden" })).toBeEnabled();
   });
+
+  test("das Eingabefeld wächst mit dem Text und deckelt sich dann (V-13)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+
+    await alsMia(page);
+    await page.goto("/tutor");
+    await page.getByRole("link", { name: "Gespräch beginnen" }).click();
+    await expect(page).toHaveURL(/\/tutor\/neu/);
+
+    const feld = page.getByRole("textbox");
+    await expect(feld).toBeVisible();
+
+    // Gemessen wird die Hülle (der Grid-Container), nicht das Feld selbst:
+    // Das Feld streckt sich in seiner Gitterzelle auf deren – ggf. über die
+    // Deckelhöhe hinausgehende – Größe; sichtbar gedeckelt und scrollbar ist
+    // die Hülle (`max-h-40 overflow-y-auto`).
+    const huelle = () =>
+      page.evaluate(() => {
+        const feld = document.querySelector("textarea");
+        const h = feld?.parentElement;
+        return h ? { hoehe: h.clientHeight, scrollt: h.scrollHeight > h.clientHeight + 1 } : null;
+      });
+
+    const leer = await huelle();
+    expect(leer?.scrollt).toBe(false);
+
+    await feld.fill("Zeile 1\nZeile 2\nZeile 3");
+    await expect
+      .poll(async () => (await huelle())?.hoehe ?? 0)
+      .toBeGreaterThan((leer?.hoehe ?? 0) + 20);
+
+    // Weit über die Deckelhöhe hinaus: Die Hülle hört auf zu wachsen (max-h-40
+    // = 160px) und scrollt stattdessen – nichts wird mehr wortlos abgeschnitten.
+    await feld.fill(Array.from({ length: 20 }, (_, i) => `Zeile ${i + 1}`).join("\n"));
+    await expect.poll(async () => (await huelle())?.hoehe ?? 0).toBeLessThanOrEqual(162);
+    await expect.poll(async () => (await huelle())?.scrollt ?? false).toBe(true);
+  });
 });
