@@ -6,6 +6,17 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **T-19: Die Gesprächsliste bleibt brauchbar, auch nach hundert Gesprächen.** Nach zwei Tagen
+  standen neun Einträge da – davon zwei Mal dieselbe Frage im Abstand von zwei Minuten, ein
+  „Hallo" und ein abgeschnittener Diktat-Rohtext. Drei Änderungen, alle an der Ursache: Die
+  **Titel kommen jetzt vom Modell** („Lineare Gleichungen" statt „Erkläre mir einmal was
+  lineare AG Preis ich versteh …") – ohne zusätzlichen Aufruf, sie reisen bei der
+  Fach-Erkennung mit. Eine **Frage kurz nach der anderen landet im selben Gespräch**, wenn im
+  selben Fach vor weniger als 30 Minuten schon eins lief, statt ein zweites anzulegen. Und die
+  Tutor-Seite zeigt nur noch **„Zuletzt"** – sechs Gespräche, nach Zeit sortiert; alles andere
+  steht unter „Alle Gespräche", nach Fach gruppiert und durchsuchbar (auch „franzosisch"
+  findet „Französisch"). Automatisch gelöscht wird nichts: Die Gespräche gehören dem Kind.
+
 - **T-18: Überschriften und Rückwege sind überall gleich aufgebaut.** „Wie komme ich zurück
   eine Ebene höher?" hatte je nach Seite eine andere Antwort – und die Einstellungen hatten
   gar keine: Sie sind kein Reiter in der Fußleiste, wer dort landete, kam nur über Umwege

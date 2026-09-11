@@ -41,3 +41,55 @@ export function loeseFachZuordnungAuf(
 ): FachOption | null {
   return faecher.find((f) => f.name === antwort) ?? null;
 }
+
+/**
+ * Der Notnagel-Titel: die erste Frage, auf 60 Zeichen gekürzt.
+ *
+ * Bis T-19a war das **der** Titel (ADR 0010, „Konsequenzen"). Seit ADR 0014 D2
+ * vergibt das Modell ihn – und das hier greift nur noch, wenn dabei nichts
+ * herauskam.
+ */
+export function kuerzeTitel(text: string): string {
+  const eine = text.replace(/\s+/g, " ").trim();
+  return eine.length <= 60 ? eine : `${eine.slice(0, 57)}…`;
+}
+
+/**
+ * Macht aus dem rohen Modell-Titel (ADR 0014 D2) den Titel, der in der
+ * Historie steht – oder fällt auf die gekürzte Frage zurück.
+ *
+ * **Was hier zurückgewiesen wird, ist kein Fehler des Modells, sondern die
+ * Grenze der Aufgabe.** Ein Gruß hat kein Thema; der Prompt verlangt dafür
+ * ausdrücklich einen leeren Titel. Diese Funktion macht daraus keinen Streit,
+ * sondern nimmt den Notnagel – dieselbe Haltung wie bei
+ * `loeseFachZuordnungAuf()`: lieber der ehrliche Rückfall als ein geratener
+ * Treffer.
+ *
+ * Abgeräumt wird nur, was ein Modell typischerweise mitliefert und was in
+ * einer Liste stört: umschließende Anführungszeichen (deutsche wie gerade),
+ * ein Schlusspunkt, mehrfache Leerzeichen, Zeilenumbrüche. **Kein**
+ * Groß-/Kleinschreibungs-Zurechtrücken: Wenn das Modell „reflexive Verben"
+ * schreibt, ist das der Titel, nicht etwas zu Korrigierendes.
+ */
+export function bereinigeTitel(roh: string, frage: string): string {
+  const titel = roh
+    .replace(/\s+/g, " ")
+    .trim()
+    // Anführungszeichen nur, wenn sie den ganzen Titel umschließen – ein
+    // Zitat *im* Titel („Der Zauberlehrling“-Analyse) bleibt stehen.
+    .replace(/^["'„“”»«](.*)["'„“”»«]$/u, "$1")
+    .trim()
+    // Ein Schlusspunkt macht aus dem Namen einen Satz; Frage- und
+    // Ausrufezeichen dürfen bleiben, die tragen Bedeutung.
+    .replace(/\.$/u, "")
+    .trim();
+
+  if (titel.length > 0) return titel;
+
+  // Zwei Notnägel, weil die Frage selbst leer sein kann: `liesEingang()`
+  // lässt eine Nachricht ohne Text durch, solange ein Foto daranhängt
+  // („schau dir das mal an"). Bis T-19a stand in genau diesem Fall eine leere
+  // Zeile in der Historie – ein Gespräch ohne Namen, das man nur am Datum
+  // wiedererkennt.
+  return kuerzeTitel(frage) || "Foto";
+}

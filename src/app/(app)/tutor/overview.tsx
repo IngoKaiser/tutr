@@ -3,22 +3,23 @@
 import Link from "next/link";
 
 import { Block, Notice, PageHeader } from "@/components/shell/primitives";
-import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
+import { UndoLoeschen } from "@/components/shell/swipe-row";
 import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 import type { Auslastung } from "@/lib/ai/rate-limit";
 
 import { deleteTutorSession, type SessionSummary, type TutorOverview } from "./actions";
 import { Conversation } from "./chat";
+import { NachZeit } from "./gespraechs-liste";
 
 /**
- * `/tutor` (T-07, umgebaut in T-13): Historie plus der Beginn eines neuen
- * Gesprächs, in einer Komponente.
+ * `/tutor` (T-07, umgebaut in T-13 und T-19c): die zuletzt geführten
+ * Gespräche plus der Beginn eines neuen, in einer Komponente.
  *
- * **Kein eigenes Formular mehr** (ADR 0013 D1): Diese Seite rendert einfach
+ * **Kein eigenes Formular** (ADR 0013 D1): Diese Seite rendert einfach
  * `Conversation` mit `sessionId={null}`, `subjectId={null}` – genau dieselbe
  * Komponente wie ein bestehendes Gespräch auf `/tutor/<id>`. Solange nichts
- * geschickt wurde, füllt `leerInhalt` (die Historie hier unten) den Platz,
- * an dem sonst Nachrichten stünden; sobald die erste Frage raus ist, blendet
+ * geschickt wurde, füllt `leerInhalt` (die Liste hier unten) den Platz, an
+ * dem sonst Nachrichten stünden; sobald die erste Frage raus ist, blendet
  * `Conversation` sie automatisch aus (`leer` wird `false`) und zeigt
  * stattdessen die Antwort. Kopfzeile (Rückweg + Fach-Chip) erscheint erst,
  * sobald ein Gespräch existiert – auf dieser Seite gibt es vorher nichts,
@@ -28,10 +29,16 @@ import { Conversation } from "./chat";
  * entsteht erst mit der ersten Frage, drüben im Sendeweg. So sammeln sich
  * keine leeren Gespräche an, nur weil jemand einmal geschaut hat.
  *
+ * **„Zuletzt" statt der ganzen Historie** (T-19c, ADR 0014 D3): Hier stehen
+ * sechs Gespräche, nach Zeit sortiert; die volle, nach Fach gruppierte Liste
+ * steht unter `/tutor/gespraeche`. Die Gruppierung nach Fach ist eine
+ * Archiv-Eigenschaft – sie hilft beim Wiederfinden. Auf der Startfläche
+ * zählt „woran war ich dran", und das ist eine Frage der Zeit.
+ *
  * **Wischen zum Löschen** (T-15): dieselben Bausteine wie bei den
  * Vokabelsets (V-11) – `SwipeRow` für die Geste, `useDeferredDelete` fürs
- * Rückgängig-Fenster. Der Hook lebt hier statt in `Historie`, weil sowohl
- * die Liste (`istEntfernt` zum Ausblenden) als auch die Rückgängig-Leiste
+ * Rückgängig-Fenster. Der Hook lebt hier statt in der Liste, weil sowohl die
+ * Liste (`istEntfernt` zum Ausblenden) als auch die Rückgängig-Leiste
  * (`pending`) davon wissen müssen, und beide über `leerInhalt` in
  * `Conversation` hineingereicht werden. Gilt für Hausaufgaben-Sessions
  * genauso wie für freie Gespräche – `deleteTutorSession()` kennt den
@@ -77,8 +84,12 @@ export function TutorOverviewView({
       alleFaecher={overview.subjects}
       leerInhalt={
         <>
-          <Historie sessions={sichtbar} onLoeschen={(s) => geloescht.entfernen(s)} />
-          {/* Sitzt in derselben scrollenden Fläche wie die Historie
+          <Zuletzt
+            sessions={sichtbar}
+            gesamt={overview.gesamt}
+            onLoeschen={(s) => geloescht.entfernen(s)}
+          />
+          {/* Sitzt in derselben scrollenden Fläche wie die Liste
               (`verlaufRef` in `chat.tsx`), nicht außerhalb: `sticky` braucht
               als Bezug genau diesen Scrollbereich (V-12), und der ist seit
               T-12a nicht mehr `main`. */}
@@ -95,11 +106,14 @@ export function TutorOverviewView({
   );
 }
 
-function Historie({
+function Zuletzt({
   sessions,
+  gesamt,
   onLoeschen,
 }: {
-  sessions: TutorOverview["sessions"];
+  sessions: SessionSummary[];
+  /** Wie viele es insgesamt gibt – entscheidet, ob der Weg ins Archiv überhaupt etwas verspricht. */
+  gesamt: number;
   onLoeschen: (session: SessionSummary) => void;
 }) {
   if (sessions.length === 0) {
@@ -108,82 +122,24 @@ function Historie({
     );
   }
 
-  // Nach Fach gruppieren (§15: „Chatverlauf mit Titeln pro Fach"). Ein
-  // Gespräch ohne Fach (ADR 0013 D3, „noch nicht einsortiert") bekommt eine
-  // eigene Gruppe am Ende, statt sich unter ein beliebiges Fach zu mischen.
-  const nachFach = new Map<string, TutorOverview["sessions"]>();
-  const ohneFach: TutorOverview["sessions"] = [];
-  for (const s of sessions) {
-    if (s.subjectName === null) {
-      ohneFach.push(s);
-      continue;
-    }
-    const liste = nachFach.get(s.subjectName) ?? [];
-    liste.push(s);
-    nachFach.set(s.subjectName, liste);
-  }
-  const faecher = [...nachFach.keys()].sort((a, b) => a.localeCompare(b, "de"));
-
   return (
     <div className="flex flex-col gap-3">
-      <Ueberschrift>Frühere Gespräche</Ueberschrift>
-      {faecher.map((fach) => (
-        <FachGruppe
-          key={fach}
-          titel={fach}
-          sessions={nachFach.get(fach) ?? []}
-          onLoeschen={onLoeschen}
-        />
-      ))}
-      {ohneFach.length > 0 ? (
-        <FachGruppe titel="Noch nicht einsortiert" sessions={ohneFach} onLoeschen={onLoeschen} />
+      <span className="text-tinte-leise text-[0.6875rem] font-semibold tracking-wider uppercase">
+        Zuletzt
+      </span>
+      <NachZeit sessions={sessions} onLoeschen={onLoeschen} />
+      {/* Nur, wenn im Archiv mehr steht als hier: Ein Link auf „alle" neben
+          einer Liste, die schon alle ist, wäre ein Versprechen auf nichts.
+          Gegen `sessions.length` verglichen, nicht gegen die Sechs – gerade
+          gelöschte Zeilen sind hier schon weg, in `gesamt` noch drin. */}
+      {gesamt > sessions.length ? (
+        <Link
+          href="/tutor/gespraeche"
+          className="text-tinte-leise hover:text-koenigsblau self-start text-[0.8125rem] font-medium"
+        >
+          Alle Gespräche ({gesamt}) ›
+        </Link>
       ) : null}
     </div>
   );
-}
-
-function FachGruppe({
-  titel,
-  sessions,
-  onLoeschen,
-}: {
-  titel: string;
-  sessions: TutorOverview["sessions"];
-  onLoeschen: (session: SessionSummary) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-tinte-weich text-[0.75rem] font-medium">{titel}</span>
-      <ul className="flex flex-col gap-1.5">
-        {sessions.map((s) => (
-          <SwipeRow key={s.id} onDelete={() => onLoeschen(s)}>
-            <Link
-              href={s.hausaufgabe ? `/tutor/hausaufgabe/${s.id}` : `/tutor/${s.id}`}
-              className="border-linie bg-papier hover:bg-papier-tief flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2.5"
-            >
-              <span className="text-tinte min-w-0 flex-1 truncate text-[0.8125rem]">{s.title}</span>
-              <span className="text-tinte-leise shrink-0 text-[0.75rem] tabular-nums">
-                {kurzDatum(s.updatedAt)}
-              </span>
-            </Link>
-          </SwipeRow>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Ueberschrift({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-tinte-leise text-[0.6875rem] font-semibold tracking-wider uppercase">
-      {children}
-    </span>
-  );
-}
-
-/** `2026-09-10T…` → `10.09.` – im Gespräch zählt der Titel, das Datum ordnet nur ein. */
-function kurzDatum(wert: string): string {
-  const d = new Date(wert);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`;
 }

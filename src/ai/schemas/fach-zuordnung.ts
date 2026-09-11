@@ -1,7 +1,14 @@
 import { z } from "zod";
 
 /**
- * Das Ergebnis der Fach-Zuordnung (T-13, ADR 0013 D2).
+ * Das Ergebnis der Fach-Zuordnung (T-13, ADR 0013 D2) – seit T-19a (ADR 0014
+ * D2) zusammen mit dem Gesprächstitel.
+ *
+ * **Zwei Dinge in einem Aufruf.** Der Titel hätte ein eigener Aufruf sein
+ * können; er wäre derselbe Text an dasselbe Modell gewesen. Beides hängt an
+ * der ersten Nachricht, beides ist Klassifikationsarbeit – und der Aufruf
+ * läuft ohnehin, bevor die erste Antwort gestreamt wird (das Fach entscheidet
+ * über die Sprache im Systemprompt).
  *
  * Anders als die übrigen Schemas hier steht die Auswahl nicht zur Schreibzeit
  * fest, sondern hängt vom Kind ab (ADR 0009: frei angelegte Fächer). Das
@@ -23,6 +30,19 @@ export function fachZuordnungSchema(fachNamen: readonly string[]) {
   const werte: string[] = [...fachNamen, "unklar"];
   return z.object({
     fach: z.enum(werte as [string, ...string[]]),
+    /**
+     * Zwei bis vier Wörter, die das Gespräch benennen (ADR 0014 D2).
+     *
+     * Nur `.max()`, kein `.min(1)`: Ein leerer Titel ist ein brauchbares
+     * Ergebnis – er heißt „mir fällt nichts ein", und `bereinigeTitel()`
+     * (`lib/tutor/fach-zuordnung.ts`) fällt dann auf die gekürzte Frage
+     * zurück. Ein Schema-Fehler dafür risse den ganzen Aufruf mit, und damit
+     * auch die Fach-Zuordnung, die daneben steht.
+     *
+     * Die Obergrenze ist eine Reißleine gegen einen Titel, der zum Satz
+     * wird; die eigentliche Länge regelt der Prompt.
+     */
+    titel: z.string().max(80),
   });
 }
 

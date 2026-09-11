@@ -55,6 +55,8 @@ test("Alle fünf Bereiche stehen jederzeit zur Wahl", async ({ page }) => {
  */
 const UNTERSEITEN = [
   { path: "/faecher/vokabeln", titel: "Vokabeln", zurueck: "Fächer" },
+  // Das Archiv (T-19c): `/tutor` zeigt nur die letzten sechs Gespräche.
+  { path: "/tutor/gespraeche", titel: "Alle Gespräche", zurueck: "Tutor" },
   // Kein Fußleisten-Bereich, hängt im Kopfbereich – und stand deshalb lange
   // ganz ohne Ausgang da (T-18).
   { path: "/einstellungen", titel: "Einstellungen", zurueck: "Heute" },
