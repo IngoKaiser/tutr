@@ -1,0 +1,2 @@
+ALTER TABLE "tutor_message" ADD COLUMN "task_id" uuid;--> statement-breakpoint
+ALTER TABLE "tutor_message" ADD CONSTRAINT "tutor_message_task_fk" FOREIGN KEY ("task_id","student_id") REFERENCES "public"."homework_task"("id","student_id") ON DELETE cascade ON UPDATE no action;

@@ -1,5 +1,6 @@
 /**
- * Ein Foto fürs Hochladen vorbereiten (V-03b).
+ * Ein Foto fürs Hochladen vorbereiten (V-03b, ab T-03 auch für Hausaufgaben
+ * genutzt – deshalb `lib/`, nicht mehr `lib/vocab/`).
  *
  * Läuft im Browser, **bevor** das Bild an die Server Action geht. Drei
  * Gründe, alle drei praktisch:

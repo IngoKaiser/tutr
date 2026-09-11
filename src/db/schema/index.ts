@@ -5,7 +5,6 @@ export * from "./auth";
 export * from "./curriculum";
 export * from "./calendar";
 export * from "./tutor";
-export * from "./homework";
 export * from "./textbook";
 export * from "./school-profile";
 export * from "./vocab";

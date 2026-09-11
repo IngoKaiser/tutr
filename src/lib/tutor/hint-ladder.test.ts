@@ -7,6 +7,7 @@ import {
   naechsteHinweisstufe,
   naechsterZug,
   zaehltAlsVersuch,
+  zustandNachVersuchUrteil,
   type AufgabenZustand,
   type Eingabe,
 } from "./hint-ladder";
@@ -184,6 +185,43 @@ describe("folgeZustand", () => {
     const jetzt = naechsterZug(z, eingabe({ text: "zeig mir die Lösung", loesungVerlangt: true }));
     expect(jetzt).toEqual({ art: "loesung_zeigen" });
     expect(folgeZustand(z, jetzt).status).toBe("loesung_gezeigt");
+  });
+});
+
+describe("zustandNachVersuchUrteil – das einzige Urteil, das §4a dem Modell überlässt", () => {
+  const zugErsterVersuch = {
+    art: "versuch_pruefen",
+    versuchNr: 1,
+    darfLoesungWennFalsch: false,
+  } as const;
+  const zugZweiterVersuch = {
+    art: "versuch_pruefen",
+    versuchNr: 2,
+    darfLoesungWennFalsch: true,
+  } as const;
+
+  it("„richtig“ schließt die Aufgabe als gelöst ab", () => {
+    const danach = zustandNachVersuchUrteil(frisch, zugErsterVersuch, "richtig");
+    expect(danach.status).toBe("geloest");
+    expect(danach.attempts).toBe(1);
+  });
+
+  it("„falsch“ bleibt in Arbeit, deckt sich mit folgeZustand()", () => {
+    const ueberUrteil = zustandNachVersuchUrteil(frisch, zugErsterVersuch, "falsch");
+    const ueberFolgeZustand = folgeZustand(frisch, zugErsterVersuch);
+    expect(ueberUrteil).toEqual(ueberFolgeZustand);
+  });
+
+  it("„falsch_loesung_gezeigt“ markiert Lösung gezeigt, nicht gelöst (§4a Schritt 4) – aber die Versuche zählen", () => {
+    const zustandNachErstemVersuch = { ...frisch, status: "in_arbeit" as const, attempts: 1 };
+    const danach = zustandNachVersuchUrteil(
+      zustandNachErstemVersuch,
+      zugZweiterVersuch,
+      "falsch_loesung_gezeigt",
+    );
+    expect(danach.status).toBe("loesung_gezeigt");
+    expect(danach.status).not.toBe("geloest");
+    expect(danach.attempts).toBe(2);
   });
 });
 

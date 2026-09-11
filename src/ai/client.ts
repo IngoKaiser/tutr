@@ -9,11 +9,17 @@ import {
   type HomeworkExtractionContext,
 } from "./prompts/homework-extraction";
 import {
+  versuchUrteilSystemPrompt,
+  versuchUrteilUserPrompt,
+  type VersuchUrteilContext,
+} from "./prompts/versuch-urteil";
+import {
   vocabExtractionSystemPrompt,
   vocabExtractionUserPrompt,
   type VocabExtractionContext,
 } from "./prompts/vocab-extraction";
 import { homeworkExtractionSchema, type HomeworkExtraction } from "./schemas/homework-extraction";
+import { versuchUrteilSchema, type VersuchUrteil } from "./schemas/versuch-urteil";
 import { vocabExtractionSchema, type VocabExtraction } from "./schemas/vocab-extraction";
 
 /**
@@ -40,6 +46,13 @@ const VISION_MODEL = "claude-sonnet-5";
 
 /** CLAUDE.md: „Sonnet für Tutor". Eine Konstante, damit ein Wechsel eine Zeile ist. */
 const TUTOR_MODEL = "claude-sonnet-5";
+
+/**
+ * CLAUDE.md: „Haiku für Klassifikation" (T-03 PR 2). Nur für
+ * `klassifiziereVersuch()` – die liest die schon fertige Tutor-Antwort und
+ * destilliert ein `enum` daraus, keine eigene fachliche Bewertung.
+ */
+const KLASSIFIKATION_MODEL = "claude-haiku-4-5-20251001";
 
 /** Ein Bild, wie es aus dem Browser kommt – Base64 ohne `data:`-Präfix. */
 export type InlineImage = {
@@ -98,6 +111,13 @@ export async function extractVocabularyFromImage(
   return message.parsed_output;
 }
 
+/** Erkannte Aufgaben plus die verbrauchten Token – T-03 PR 2 bucht sie gegen den Kostendeckel (S-03c). */
+export type HomeworkExtractionResult = {
+  extraction: HomeworkExtraction;
+  inputTokens: number;
+  outputTokens: number;
+};
+
 /**
  * Ein Foto einer Hausaufgabe → Aufgabenliste (T-03, §4a Schritt 1).
  *
@@ -106,11 +126,15 @@ export async function extractVocabularyFromImage(
  * gespeichert. Der Systemprompt verbietet ausdrücklich, die Aufgaben zu
  * lösen – sonst stünde die Lösung schon in der Liste, bevor §4a überhaupt
  * greift.
+ *
+ * Gibt die Token-Zahlen mit zurück (anders als `extractVocabularyFromImage()`,
+ * die vor S-03c entstand): Der Aufrufer bucht sie gegen `ai_usage`, damit ein
+ * Hausaufgaben-Foto genauso zum Kostendeckel zählt wie ein Tutor-Zug.
  */
 export async function extractHomeworkFromImage(
   image: InlineImage,
   context: HomeworkExtractionContext,
-): Promise<HomeworkExtraction> {
+): Promise<HomeworkExtractionResult> {
   const message = await anthropic().messages.parse({
     model: VISION_MODEL,
     max_tokens: 4000,
@@ -133,11 +157,26 @@ export async function extractHomeworkFromImage(
   if (!message.parsed_output) {
     throw new Error("Die Bilderkennung hat keine verwertbare Antwort geliefert.");
   }
-  return message.parsed_output;
+  return {
+    extraction: message.parsed_output,
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  };
 }
 
-/** Ein Gesprächsbeitrag, wie ihn das Modell erwartet. */
-export type TutorTurn = { role: "user" | "assistant"; content: string };
+/**
+ * Ein Gesprächsbeitrag, wie ihn das Modell erwartet.
+ *
+ * `image` nur bei `role: "user"` und nur im **aktuellen** Zug (T-03 PR 2):
+ * Ein Foto vom Lösungsweg zählt als Versuch (§4a Schritt 2), aber die
+ * Historie früherer Züge wird nie erneut mit Bild verschickt – das wäre bei
+ * jedem weiteren Zug dieselben Bild-Tokens noch einmal bezahlt, ohne dass
+ * das Modell sie noch bräuchte (es hat die frühere Antwort ja schon
+ * gegeben). Der Text der Nutzernachricht bleibt in der Historie stehen,
+ * nur das Bild fällt nach diesem einen Zug wieder heraus.
+ */
+export type TutorTurn =
+  { role: "user"; content: string; image?: InlineImage } | { role: "assistant"; content: string };
 
 /**
  * Startet die Tutor-Antwort als Stream (T-02, ADR 0010 D1).
@@ -157,6 +196,65 @@ export function streamTutorReply(system: string, verlauf: TutorTurn[]) {
     model: TUTOR_MODEL,
     max_tokens: 1200,
     system,
-    messages: verlauf.map((turn) => ({ role: turn.role, content: turn.content })),
+    messages: verlauf.map((turn) => ({
+      role: turn.role,
+      content:
+        turn.role === "user" && turn.image
+          ? [
+              {
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: turn.image.mediaType,
+                  data: turn.image.base64,
+                },
+              },
+              { type: "text" as const, text: turn.content },
+            ]
+          : turn.content,
+    })),
   });
+}
+
+export type VersuchUrteilResult = {
+  urteil: VersuchUrteil;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+/**
+ * Urteil über einen geprüften Hausaufgaben-Versuch (T-03 PR 2, §4a).
+ *
+ * Liest **nur** die schon fertige Tutor-Antwort, kein neuer Blick auf
+ * Aufgabe oder Versuch (`ai/prompts/versuch-urteil.ts`). Haiku statt Sonnet
+ * (CLAUDE.md: „Haiku für Klassifikation") – die fachliche Bewertung ist mit
+ * dem Tutor-Zug schon gelaufen, hier wird nur destilliert.
+ *
+ * Gibt die Token-Zahlen mit zurück, damit der Aufrufer sie zum selben
+ * `ai_usage`-Eintrag des Tutor-Zugs dazuzählt (ein Zug, eine Zeile,
+ * S-03c) statt eine eigene Zeile für die Klassifizierung anzulegen.
+ *
+ * Wirft, wenn das Modell nichts Verwertbares liefert; der Aufrufer entscheidet
+ * dann konservativ (siehe Route Handler – ein unklares Urteil zählt nie als
+ * „richtig").
+ */
+export async function klassifiziereVersuch(
+  context: VersuchUrteilContext,
+): Promise<VersuchUrteilResult> {
+  const message = await anthropic().messages.parse({
+    model: KLASSIFIKATION_MODEL,
+    max_tokens: 20,
+    system: versuchUrteilSystemPrompt(),
+    output_config: { format: zodOutputFormat(versuchUrteilSchema) },
+    messages: [{ role: "user", content: versuchUrteilUserPrompt(context) }],
+  });
+
+  if (!message.parsed_output) {
+    throw new Error("Die Urteils-Klassifizierung hat keine verwertbare Antwort geliefert.");
+  }
+  return {
+    urteil: message.parsed_output.urteil,
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  };
 }

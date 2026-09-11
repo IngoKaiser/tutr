@@ -1,12 +1,27 @@
 import { sql } from "drizzle-orm";
 
-import { streamTutorReply, type TutorTurn } from "@/ai/client";
+import {
+  klassifiziereVersuch,
+  streamTutorReply,
+  type InlineImage,
+  type TutorTurn,
+} from "@/ai/client";
+import { hausaufgabeSystemPrompt } from "@/ai/prompts/hausaufgabe";
 import { tutorSystemPrompt } from "@/ai/prompts/tutor";
 import { withActor, type Actor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
 import { istDeutsch } from "@/lib/tutor/language-guard";
+import {
+  folgeZustand,
+  istAbgeschlossen,
+  naechsterZug,
+  zustandNachVersuchUrteil,
+  type AufgabenZustand,
+  type Bahn,
+  type Zug,
+} from "@/lib/tutor/hint-ladder";
 
 /**
  * Der einzige streamende Endpunkt im Projekt (T-02, ADR 0010 D1).
@@ -31,24 +46,55 @@ import { istDeutsch } from "@/lib/tutor/language-guard";
  */
 
 const EINSTIEGE = new Set(["freie_frage", "verstehen"]);
+const BILDTYPEN = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 type Eingang = {
   sessionId: string | null;
   subjectId: string | null;
   entryPoint: string;
   message: string;
+  /** Gesetzt heißt: dieser Zug gehört zu einer Hausaufgabe (T-03 PR 2). */
+  taskId: string | null;
+  /** Nur bei `taskId` von Bedeutung – welche der zwei Bahnen aus §4a. */
+  bahn: Bahn;
+  /** „Zeig mir die Lösung" ausdrücklich verlangt (nur mit `taskId`). */
+  loesungVerlangt: boolean;
+  /** Foto des Lösungswegs – zählt immer als Versuch (§4a Schritt 2). */
+  image: InlineImage | null;
 };
 
 function liesEingang(body: unknown): Eingang | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
   const message = typeof b.message === "string" ? b.message.trim() : "";
-  if (message.length === 0 || message.length > 4000) return null;
+
+  const bildRoh = b.image;
+  let image: InlineImage | null = null;
+  if (typeof bildRoh === "object" && bildRoh !== null) {
+    const r = bildRoh as Record<string, unknown>;
+    if (
+      typeof r.base64 === "string" &&
+      r.base64.length > 0 &&
+      typeof r.mediaType === "string" &&
+      BILDTYPEN.has(r.mediaType)
+    ) {
+      image = { base64: r.base64, mediaType: r.mediaType as InlineImage["mediaType"] };
+    }
+  }
+
+  // Ein Foto allein ist eine gültige Eingabe (§4a: „Foto ihres Lösungswegs
+  // oder tippt das Ergebnis") – nur „gar nichts" wird abgelehnt.
+  if ((message.length === 0 && !image) || message.length > 4000) return null;
+
   return {
     sessionId: typeof b.sessionId === "string" && b.sessionId.length > 0 ? b.sessionId : null,
     subjectId: typeof b.subjectId === "string" && b.subjectId.length > 0 ? b.subjectId : null,
     entryPoint: typeof b.entryPoint === "string" ? b.entryPoint : "freie_frage",
     message,
+    taskId: typeof b.taskId === "string" && b.taskId.length > 0 ? b.taskId : null,
+    bahn: b.bahn === "verstehen" ? "verstehen" : "versuch",
+    loesungVerlangt: b.loesungVerlangt === true,
+    image,
   };
 }
 
@@ -73,6 +119,14 @@ type Vorarbeit =
       system: string;
       verlauf: TutorTurn[];
       usageId: string;
+      /** Nur bei einem Hausaufgaben-Zug gesetzt (T-03 PR 2) – steuert das Schreiben nach dem Stream. */
+      hausaufgabe: {
+        taskId: string;
+        sessionId: string;
+        aufgabe: string;
+        zug: Zug;
+        zustandVorher: AufgabenZustand;
+      } | null;
     };
 
 export async function POST(request: Request): Promise<Response> {
@@ -99,7 +153,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const stream = streamTutorReply(vor.system, [
     ...vor.verlauf,
-    { role: "user", content: eingang.message },
+    { role: "user", content: eingang.message, image: eingang.image ?? undefined },
   ]);
 
   const encoder = new TextEncoder();
@@ -121,20 +175,31 @@ export async function POST(request: Request): Promise<Response> {
           // getrennt, weil Ausgabe-Tokens fünfmal so teuer sind.
           const tokens = final.usage.input_tokens + final.usage.output_tokens;
           const deutsch = istDeutsch(volltext);
-          await withActor(actor, async (tx) => {
-            await tx.execute(sql`
-              insert into tutor_message (student_id, session_id, role, content, token_count, language_ok)
-              values (app.student_id(), ${vor.sessionId}, 'tutor', ${volltext}, ${tokens}, ${deutsch})`);
-            await ergaenzeTokenzahl(
-              tx,
+
+          if (vor.hausaufgabe) {
+            await schreibeHausaufgabenZug(
+              actor,
+              vor.hausaufgabe,
               vor.usageId,
-              final.usage.input_tokens,
-              final.usage.output_tokens,
+              volltext,
+              final.usage,
             );
-            await tx.execute(
-              sql`update tutor_session set updated_at = now() where id = ${vor.sessionId}`,
-            );
-          });
+          } else {
+            await withActor(actor, async (tx) => {
+              await tx.execute(sql`
+                insert into tutor_message (student_id, session_id, role, content, token_count, language_ok)
+                values (app.student_id(), ${vor.sessionId}, 'tutor', ${volltext}, ${tokens}, ${deutsch})`);
+              await ergaenzeTokenzahl(
+                tx,
+                vor.usageId,
+                final.usage.input_tokens,
+                final.usage.output_tokens,
+              );
+              await tx.execute(
+                sql`update tutor_session set updated_at = now() where id = ${vor.sessionId}`,
+              );
+            });
+          }
           controller.close();
         })
         .catch((fehler: unknown) => {
@@ -161,8 +226,17 @@ export async function POST(request: Request): Promise<Response> {
  * Schritte 1 und 2 in einer Transaktion: Limit prüfen, Session auflösen
  * oder anlegen, bisherige Nachrichten laden, Nutzernachricht schreiben,
  * Nutzung buchen. Gibt alles zurück, was das Streamen danach braucht.
+ *
+ * Zweigt bei `eingang.taskId` in den Hausaufgaben-Weg ab (T-03 PR 2) –
+ * eigener Systemprompt aus dem `Zug`, Verlauf nur der einen Aufgabe, kein
+ * `subjectId`/`entryPoint` aus der Anfrage (die Aufgabe kennt ihr Fach
+ * schon über ihre Session).
  */
 async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
+  if (eingang.taskId) {
+    return bereiteHausaufgabeVor(actor, eingang.taskId, eingang);
+  }
+
   return withActor(actor, async (tx): Promise<Vorarbeit> => {
     const limit = await pruefeUndZaehle(tx, "tutor");
     if (!limit.erlaubt) {
@@ -256,6 +330,162 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
         role: r.role === "tutor" ? "assistant" : "user",
         content: r.content,
       })),
+      hausaufgabe: null,
     };
+  });
+}
+
+/**
+ * Der Hausaufgaben-Zweig von `bereiteVor()` (T-03 PR 2, §4a).
+ *
+ * `naechsterZug()` (`lib/tutor/hint-ladder.ts`) entscheidet **vor** dem
+ * Modellaufruf, was in diesem Zug überhaupt erlaubt ist – der Systemprompt
+ * bekommt genau das vorgegeben (ADR 0011 D3: der Zustand liegt in der App).
+ *
+ * Der Verlauf ist auf **diese eine Aufgabe** begrenzt (`task_id`), nicht auf
+ * die ganze Session: Mehrere Aufgaben teilen sich eine `tutor_session` (ein
+ * Foto, eine Liste, §4a Schritt 1), und der Tutor soll beim Prüfen von
+ * Aufgabe 3 nicht den Verlauf von Aufgabe 1 sehen.
+ */
+async function bereiteHausaufgabeVor(
+  actor: Actor,
+  taskId: string,
+  eingang: Eingang,
+): Promise<Vorarbeit> {
+  return withActor(actor, async (tx): Promise<Vorarbeit> => {
+    const limit = await pruefeUndZaehle(tx, "tutor");
+    if (!limit.erlaubt) {
+      return { ok: false, status: 429, nachricht: limit.nachricht };
+    }
+
+    const [row] = await tx.execute<{
+      session_id: string;
+      prompt: string;
+      status: "offen" | "in_arbeit" | "geloest" | "loesung_gezeigt" | "uebersprungen";
+      attempts: number;
+      hint_level: number;
+      subject_name: string;
+      grade_level: number;
+    }>(sql`
+      select ht.session_id, ht.prompt, ht.status, ht.attempts, ht.hint_level,
+             s.name as subject_name, st.grade_level
+      from homework_task ht
+      join tutor_session ts on ts.id = ht.session_id
+      join subject s on s.id = ts.subject_id
+      join student st on st.id = ht.student_id
+      where ht.id = ${taskId}`);
+    if (!row) return { ok: false, status: 404, nachricht: "Diese Aufgabe gibt es nicht." };
+
+    const zustand: AufgabenZustand = {
+      status: row.status,
+      attempts: row.attempts,
+      hintLevel: row.hint_level,
+    };
+    const zug = naechsterZug(zustand, {
+      bahn: eingang.bahn,
+      text: eingang.message,
+      hatFoto: eingang.image !== null,
+      loesungVerlangt: eingang.loesungVerlangt,
+    });
+
+    const verlaufRows = await tx.execute<{ role: "nutzer" | "tutor"; content: string }>(sql`
+      select role, content from tutor_message
+      where task_id = ${taskId}
+      order by created_at asc, id asc`);
+
+    await tx.execute(sql`
+      insert into tutor_message (student_id, session_id, task_id, role, content)
+      values (app.student_id(), ${row.session_id}, ${taskId}, 'nutzer', ${eingang.message})`);
+
+    // Erster Zug an dieser Aufgabe: Sie geht von „offen" auf „in Arbeit" –
+    // und der Zeitbedarf aus §4a („nach 20 Minuten …") bekommt seinen
+    // Startpunkt. `coalesce` lässt einen schon gesetzten Wert unangetastet.
+    await tx.execute(
+      sql`update homework_task set started_at = coalesce(started_at, now()),
+            status = case when status = 'offen' then 'in_arbeit' else status end
+          where id = ${taskId}`,
+    );
+
+    const usageId = await bucheNutzung(tx, "tutor");
+
+    return {
+      ok: true,
+      sessionId: row.session_id,
+      usageId,
+      system: hausaufgabeSystemPrompt({
+        subjectName: row.subject_name,
+        gradeLevel: row.grade_level,
+        aufgabe: row.prompt,
+        zug,
+      }),
+      verlauf: verlaufRows.map((r) => ({
+        role: r.role === "tutor" ? "assistant" : "user",
+        content: r.content,
+      })),
+      hausaufgabe: {
+        taskId,
+        sessionId: row.session_id,
+        aufgabe: row.prompt,
+        zug,
+        zustandVorher: zustand,
+      },
+    };
+  });
+}
+
+/**
+ * Schreibt einen abgeschlossenen Hausaufgaben-Zug (T-03 PR 2): die
+ * Tutor-Nachricht, den neuen Aufgabenzustand, die Kostenbuchung.
+ *
+ * Nur bei `art: "versuch_pruefen"` läuft die Urteils-Klassifizierung
+ * (`klassifiziereVersuch()`) – die anderen drei Zugarten sind vollständig
+ * app-bestimmt (`folgeZustand()`), ohne dass das Modell etwas beurteilen
+ * müsste (§4a: nur „ist dieser Versuch richtig?" ist seine Entscheidung).
+ */
+async function schreibeHausaufgabenZug(
+  actor: Actor,
+  hausaufgabe: NonNullable<Extract<Vorarbeit, { ok: true }>["hausaufgabe"]>,
+  usageId: string,
+  volltext: string,
+  usage: { input_tokens: number; output_tokens: number },
+): Promise<void> {
+  const { taskId, sessionId, aufgabe, zug, zustandVorher } = hausaufgabe;
+  const deutsch = istDeutsch(volltext);
+  const tokens = usage.input_tokens + usage.output_tokens;
+
+  let eingabeGesamt = usage.input_tokens;
+  let ausgabeGesamt = usage.output_tokens;
+  let neuerZustand: AufgabenZustand;
+
+  if (zug.art === "versuch_pruefen") {
+    try {
+      const urteil = await klassifiziereVersuch({ aufgabe, tutorAntwort: volltext });
+      eingabeGesamt += urteil.inputTokens;
+      ausgabeGesamt += urteil.outputTokens;
+      neuerZustand = zustandNachVersuchUrteil(zustandVorher, zug, urteil.urteil);
+    } catch {
+      // Die Klassifizierung selbst ist ausgefallen (Netzwerk, Timeout) –
+      // der Versuch bleibt dokumentiert (Zeile und Zähler), aber ohne
+      // Urteil zählt er konservativ als „falsch": Niemand bekommt eine
+      // Aufgabe fälschlich als „gelöst" markiert, weil eine Nebenanfrage
+      // scheiterte. Die Tutor-Antwort selbst steht trotzdem im Verlauf.
+      neuerZustand = folgeZustand(zustandVorher, zug);
+    }
+  } else {
+    neuerZustand = folgeZustand(zustandVorher, zug);
+  }
+
+  await withActor(actor, async (tx) => {
+    await tx.execute(sql`
+      insert into tutor_message (student_id, session_id, task_id, role, content, token_count, language_ok)
+      values (app.student_id(), ${sessionId}, ${taskId}, 'tutor', ${volltext}, ${tokens}, ${deutsch})`);
+    await ergaenzeTokenzahl(tx, usageId, eingabeGesamt, ausgabeGesamt);
+    await tx.execute(sql`
+      update homework_task
+      set status = ${neuerZustand.status}, attempts = ${neuerZustand.attempts},
+          hint_level = ${neuerZustand.hintLevel},
+          finished_at = case when ${istAbgeschlossen(neuerZustand)} then now() else finished_at end
+      where id = ${taskId}`);
+    await tx.execute(sql`update tutor_session set updated_at = now() where id = ${sessionId}`);
   });
 }
