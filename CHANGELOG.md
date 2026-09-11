@@ -115,6 +115,27 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Fixed
 
+- **T-16: Die Bildlaufleiste lag über dem Text.** Im Tutor – in der Historie wie im Gespräch –
+  zeichnete iOS seine überlagernde Leiste mitten über die Karten und Sprechblasen, weil der
+  Scrollbereich kurz vor dem Bildschirmrand endete. Er reicht jetzt bis an den Rand, das Polster
+  liegt innen, und die Leiste steht da, wo sie hingehört: daneben.
+
+- **T-16: Im Tutor fehlte zeitweise der Weg zurück zu den Gesprächen.** Die Kopfzeile erschien
+  erst, wenn die erste Antwort vollständig da war – bei einer langen Antwort also zehn, zwanzig
+  Sekunden lang gar nicht, und wenn die Verbindung abbrach, blieb sie ganz weg. Jetzt ist sie da,
+  sobald die erste Frage abgeschickt ist. Nebenbei: Der Tutor war der einzige der fünf Bereiche
+  ohne Überschrift – solange kein Gespräch läuft, steht dort jetzt „Tutor".
+
+- **T-16: Aus dem Tutor ließ sich keine Hausaufgabe mehr starten.** Mit dem Formular (T-13) war
+  auch die „Hausaufgabe"-Kachel verschwunden, und ein Foto im Eingabefeld hängt nur ein Bild an
+  die Nachricht – es startet nicht den Hausaufgaben-Ablauf mit Aufgabenliste und Hinweisleiter.
+  Der Weg dorthin steht jetzt im Plus-Menü, abgesetzt von den beiden Foto-Einträgen.
+
+- **T-16: Das Eingabefeld lief beim Schreiben und Diktieren nach unten aus dem Bild.** Ab der
+  vierten Zeile wuchs der Text unsichtbar weiter, mit dem Finger ließ sich nichts schieben, und
+  unten stand eine halbe, angeschnittene Zeile. Jetzt scrollt das Feld selbst mit – es zeigt
+  immer, was gerade entsteht, lässt sich durchblättern, und drei Zeilen passen exakt hinein.
+
 - **Beim Scrollen im Chat wanderte das Eingabefeld mit nach oben.** Auf dem iPhone zog ein Wisch
   über die Nachrichten das Textfeld mit und ließ eine leere Fläche darunter stehen. Gescrollt wurde
   bis hierher der ganze Inhaltsbereich; Kopfzeile und Eingabefeld klebten nur per `position: sticky`
