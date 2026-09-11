@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { Block, Notice, PageHeader } from "@/components/shell/primitives";
+import { Auslastungsbalken, Block, Notice, PageHeader } from "@/components/shell/primitives";
+import { FENSTER_LABEL } from "@/lib/ai/rate-limit";
 import { loginStatus } from "@/lib/auth/actor";
 
 import {
@@ -8,6 +9,7 @@ import {
   deleteMyAccount,
   deleteMyParentAccount,
   loadActiveSchoolYearLabel,
+  loadAuslastung,
   loadDevices,
   loadOwnFirstName,
 } from "./actions";
@@ -148,11 +150,16 @@ export default async function SettingsPage() {
   );
 }
 
-/** Nur-Lese-Zeile plus die einzige Aktion, die ein Kind hier sonst braucht (F-06e, F-16a). */
+/**
+ * Nur-Lese-Zeilen plus die einzige Aktion, die ein Kind hier sonst braucht
+ * (F-06e, F-16a) – und, seit S-03c, die volle Fortschrittsanzeige: nur das
+ * Kind sieht `ai_usage`, dieselbe Richtung wie beim Tutor selbst.
+ */
 async function StudentSettings() {
-  const [firstName, schoolYearLabel] = await Promise.all([
+  const [firstName, schoolYearLabel, auslastung] = await Promise.all([
     loadOwnFirstName(),
     loadActiveSchoolYearLabel(),
+    loadAuslastung(),
   ]);
 
   return (
@@ -161,6 +168,20 @@ async function StudentSettings() {
       {schoolYearLabel ? (
         <Block title="Schuljahr" trailing={schoolYearLabel}>
           <Notice>Deine Fächer legst du unter „Fächer&quot; an.</Notice>
+        </Block>
+      ) : null}
+      {auslastung ? (
+        <Block title="Tutor-Nutzung">
+          <Notice>
+            Wie viel du den Tutor gerade nutzt – Fragen und Fotos zusammen. Ist eine Leiste voll,
+            macht der Tutor kurz Pause; deine Vokabeln, Karten und der Prüfungskalender laufen immer
+            weiter.
+          </Notice>
+          <div className="flex flex-col gap-3">
+            <Auslastungsbalken anteil={auslastung.stunde} label={FENSTER_LABEL.stunde} />
+            <Auslastungsbalken anteil={auslastung.tag} label={FENSTER_LABEL.tag} />
+            <Auslastungsbalken anteil={auslastung.woche} label={FENSTER_LABEL.woche} />
+          </div>
         </Block>
       ) : null}
       <Block title="Konto löschen">

@@ -86,6 +86,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Sprachwächter (Tutor antwortet auf Deutsch, Fach-Ausnahme)                         | ✅    | T-02a   |
 |                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | ✅    | S-03b   |
 |                          | Kostendeckel in echtem Geld statt Anfragenzahl, plus Wochenfenster                 | ✅    | S-03c   |
+|                          | Fortschrittsanzeige: dezent im Tutor, volle Übersicht in Einstellungen             | ✅    | S-03d   |
 |                          | Chat-Shell: Übersicht + Gespräch, klebendes Eingabefeld, ↓-Knopf                   | ✅    | T-07    |
 |                          | Antworten als Markdown lesbar (Fettung, Listen)                                    | ✅    | T-08    |
 |                          | Altersgerechte Ansprache nach Jahrgang                                             | ✅    | T-09    |

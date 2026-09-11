@@ -8,6 +8,7 @@ import { headers } from "next/headers";
 
 import { logout } from "@/app/anmelden/actions";
 import { withActor } from "@/db/actor";
+import { ladeGesamtauslastung, type Auslastung } from "@/lib/ai/rate-limit";
 import { loginStatus } from "@/lib/auth/actor";
 import { deleteChildAsParent, deleteParentAccount, deleteSelfAsStudent } from "@/lib/auth/deletion";
 import { databaseConfigured } from "@/lib/env";
@@ -96,6 +97,19 @@ export async function loadActiveSchoolYearLabel(): Promise<string | null> {
     ),
   );
   return rows[0]?.label ?? null;
+}
+
+/**
+ * Die volle Fortschrittsanzeige (S-03c): alle drei Fenster, nur fürs Kind
+ * selbst – dieselbe Richtung wie beim Tutor (kein Elternzugriff auf
+ * `ai_usage`, ADR 0012 D3 sinngemäß: Kosten hängen direkt an der eigenen
+ * Nutzung). Der dezente Hinweis in der Tutor-Übersicht zeigt nur das
+ * straffste Fenster, hier stehen alle drei nebeneinander.
+ */
+export async function loadAuslastung(): Promise<Auslastung | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+  return withActor(actor, (tx) => ladeGesamtauslastung(tx));
 }
 
 export async function loadDevices(): Promise<DeviceList | null> {

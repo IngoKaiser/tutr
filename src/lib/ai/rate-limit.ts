@@ -109,24 +109,28 @@ export function pruefeLimit(kosten: {
   return { erlaubt: true };
 }
 
+export type Fensterkosten = { stundeUsd: number; tagUsd: number; wocheUsd: number };
+
 /**
- * Zählt die Kosten des Kindes im Actor-Kontext von `tx` und entscheidet.
- * Räumt dabei alte Zeilen weg. Muss **vor** dem Modellaufruf laufen.
+ * Liest die Kosten des Kindes im Actor-Kontext von `tx` für einen Endpunkt,
+ * über alle drei Fenster. Reiner Lesezugriff – räumt nichts auf, entscheidet
+ * nichts; das macht `pruefeUndZaehle()` bzw. `pruefeLimit()` daraus.
  *
  * Eine Zeile ohne `input_tokens`/`output_tokens` (Aufruf vor der Antwort
  * abgebrochen) zählt mit `sum(...)` automatisch als 0 $ – eine bekannte,
  * kleine Lücke: Ein abgebrochener Stream hat schon etwas gekostet, nur weiß
  * diese Zeile nicht, wie viel. Für einen Sicherheitsdeckel unkritisch,
  * solange Abbrüche die Ausnahme bleiben.
+ *
+ * Das Wochenfenster trägt hier (anders als in der ursprünglichen Fassung)
+ * einen eigenen Zeitfilter, statt sich auf das Aufräumen in
+ * `pruefeUndZaehle()` zu verlassen: `ladeGesamtauslastung()` liest, ohne
+ * vorher aufzuräumen (ein Modellaufruf gehört nicht in eine reine
+ * Anzeige-Abfrage) – ohne eigenen Filter zählte eine Zeile, die die
+ * siebentägige Aufbewahrung längst überschritten hat, aber noch nicht
+ * gelöscht wurde, fälschlich zur Woche mit.
  */
-export async function pruefeUndZaehle(
-  tx: Transaction,
-  endpoint: "tutor" | "vision",
-): Promise<LimitEntscheidung> {
-  await tx.execute(
-    sql`delete from ai_usage where created_at < now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})`,
-  );
-
+async function leseKosten(tx: Transaction, endpoint: "tutor" | "vision"): Promise<Fensterkosten> {
   const [row] = await tx.execute<{
     eingabe_stunde: string;
     ausgabe_stunde: string;
@@ -140,18 +144,30 @@ export async function pruefeUndZaehle(
       coalesce(sum(output_tokens) filter (where created_at > now() - interval '1 hour'), 0)::text as ausgabe_stunde,
       coalesce(sum(input_tokens)  filter (where created_at > now() - interval '1 day'), 0)::text  as eingabe_tag,
       coalesce(sum(output_tokens) filter (where created_at > now() - interval '1 day'), 0)::text  as ausgabe_tag,
-      -- Kein Filter nötig: Alles, was noch da ist, ist per Definition aus
-      -- den letzten sieben Tagen (AUFBEWAHRUNG_TAGE) – siehe Kommentar oben.
-      coalesce(sum(input_tokens), 0)::text  as eingabe_woche,
-      coalesce(sum(output_tokens), 0)::text as ausgabe_woche
+      coalesce(sum(input_tokens)  filter (where created_at > now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})), 0)::text as eingabe_woche,
+      coalesce(sum(output_tokens) filter (where created_at > now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})), 0)::text as ausgabe_woche
     from ai_usage
     where student_id = app.student_id() and endpoint = ${endpoint}`);
 
-  return pruefeLimit({
+  return {
     stundeUsd: kostenUsd(Number(row?.eingabe_stunde ?? 0), Number(row?.ausgabe_stunde ?? 0)),
     tagUsd: kostenUsd(Number(row?.eingabe_tag ?? 0), Number(row?.ausgabe_tag ?? 0)),
     wocheUsd: kostenUsd(Number(row?.eingabe_woche ?? 0), Number(row?.ausgabe_woche ?? 0)),
-  });
+  };
+}
+
+/**
+ * Zählt die Kosten des Kindes im Actor-Kontext von `tx` und entscheidet.
+ * Räumt dabei alte Zeilen weg. Muss **vor** dem Modellaufruf laufen.
+ */
+export async function pruefeUndZaehle(
+  tx: Transaction,
+  endpoint: "tutor" | "vision",
+): Promise<LimitEntscheidung> {
+  await tx.execute(
+    sql`delete from ai_usage where created_at < now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})`,
+  );
+  return pruefeLimit(await leseKosten(tx, endpoint));
 }
 
 /** Bucht einen Aufruf. Nach dem Streamende `ergaenzeTokenzahl()` aufrufen, um Ein-/Ausgabe nachzutragen. */
@@ -174,4 +190,81 @@ export async function ergaenzeTokenzahl(
     sql`update ai_usage set input_tokens = ${inputTokens}, output_tokens = ${outputTokens}
         where id = ${usageId}`,
   );
+}
+
+// --- Fortschrittsanzeige ---------------------------------------------------
+// Freigegeben fürs Kind, keine Elternsicht (dieselbe Richtung wie
+// `tutor_session`/`homework_task`): Kosten hängen direkt an der eigenen
+// Nutzungsintensität. Bewusst **ohne** US-$-Beträge in der Oberfläche – nur
+// die Auslastung je Fenster, als Anteil 0–1. Das ist der Punkt, an dem sich
+// diese Anzeige von einem Kontostand unterscheidet: Es geht darum, ob gleich
+// eine Pause ansteht, nicht darum, wie viel „übrig" ist.
+
+/** Auslastung je Fenster, als Anteil 0–1 (gedeckelt – mehr als „voll" gibt es nicht). */
+export type Auslastung = { stunde: number; tag: number; woche: number };
+
+/** Reine Umrechnung Kosten → Anteil am jeweiligen Deckel (`AI_LIMITS`). */
+export function auslastungAusKosten(kosten: Fensterkosten): Auslastung {
+  return {
+    stunde: Math.min(1, kosten.stundeUsd / AI_LIMITS.stundeUsd),
+    tag: Math.min(1, kosten.tagUsd / AI_LIMITS.tagUsd),
+    woche: Math.min(1, kosten.wocheUsd / AI_LIMITS.wocheUsd),
+  };
+}
+
+/**
+ * Der ungünstigere der beiden Werte je Fenster.
+ *
+ * `tutor` und `vision` haben **eigene**, unabhängige Deckel (`pruefeUndZaehle()`
+ * prüft je Endpunkt) – wer diese Stunde schon viele Fotos eingelesen hat,
+ * kann trotzdem noch mit dem Tutor schreiben, und umgekehrt. Eine einzelne
+ * Zahl für „die Auslastung" gibt es deshalb streng genommen nicht; das
+ * Maximum ist trotzdem die ehrliche Vereinfachung dafür, weil genau der
+ * Kanal, der zuerst voll ist, auch zuerst pausiert.
+ */
+export function kombiniereAuslastung(a: Auslastung, b: Auslastung): Auslastung {
+  return {
+    stunde: Math.max(a.stunde, b.stunde),
+    tag: Math.max(a.tag, b.tag),
+    woche: Math.max(a.woche, b.woche),
+  };
+}
+
+/**
+ * Die Auslastung über beide Endpunkte für die Anzeige (Tutor-Übersicht,
+ * Einstellungen). Reiner Lesezugriff, kein Aufräumen, kein Entscheid – das
+ * Blockieren selbst bleibt `pruefeUndZaehle()` vorbehalten, das **vor** dem
+ * Modellaufruf läuft. Zwei Abfragen statt einer größeren mit Spalten je
+ * Endpunkt: leichter zu lesen, und diese Funktion läuft nur beim Aufrufen
+ * einer Seite, nicht im heißen Pfad eines Modellaufrufs.
+ */
+export async function ladeGesamtauslastung(tx: Transaction): Promise<Auslastung> {
+  const tutor = await leseKosten(tx, "tutor");
+  const vision = await leseKosten(tx, "vision");
+  return kombiniereAuslastung(auslastungAusKosten(tutor), auslastungAusKosten(vision));
+}
+
+export type Fenster = "stunde" | "tag" | "woche";
+
+/** Deutsches Label je Fenster – eine Stelle, damit Tutor-Hinweis und Einstellungen dasselbe Wort benutzen. */
+export const FENSTER_LABEL: Record<Fenster, string> = {
+  stunde: "Diese Stunde",
+  tag: "Heute",
+  woche: "Diese Woche",
+};
+
+/**
+ * Das Fenster mit der höchsten Auslastung – für den dezenten Hinweis im
+ * Tutor, der nur eine Zahl zeigt, statt aller drei. Bei einem Gleichstand
+ * gewinnt das kleinste Fenster: Es ändert sich am schnellsten wieder, ist
+ * also die aktuellste Auskunft.
+ */
+export function groesstesFenster(auslastung: Auslastung): { fenster: Fenster; anteil: number } {
+  if (auslastung.stunde >= auslastung.tag && auslastung.stunde >= auslastung.woche) {
+    return { fenster: "stunde", anteil: auslastung.stunde };
+  }
+  if (auslastung.tag >= auslastung.woche) {
+    return { fenster: "tag", anteil: auslastung.tag };
+  }
+  return { fenster: "woche", anteil: auslastung.woche };
 }
