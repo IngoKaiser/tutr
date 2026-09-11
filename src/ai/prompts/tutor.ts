@@ -74,6 +74,52 @@ export function tonNachJahrgang(gradeLevel: number): string[] {
   ];
 }
 
+/**
+ * Wie Formeln und Rechenwege geschrieben werden (T-14).
+ *
+ * Eine Stelle für beide Prompts – der freie Chat und der Hausaufgaben-Zug
+ * (`hausaufgabe.ts`) verlangen dieselbe Schreibweise, und zwei Fassungen
+ * liefen unweigerlich auseinander.
+ *
+ * **Der Anlass:** Beim Testen einer Mathe-Hausaufgabe standen zwei
+ * Umformungen hintereinander in einer Zeile, unterscheidbar nur durch die
+ * Fettung – „7x − 4x − 9 = 4x − 4x + 15 **3x − 9 = 15**". Zwei Ursachen:
+ * Markdown schluckte den Zeilenumbruch (behoben mit `remark-breaks`), und
+ * der Prompt sagte nichts darüber, wie ein Rechenweg auszusehen hat.
+ *
+ * **Die Vorlage ist das deutsche Schulheft**: eine Umformung je Zeile,
+ * Gleichheitszeichen untereinander, und rechts daneben die Operation
+ * (`| −4x`). Die rechte Spalte trägt die Begründung, ohne dass sie als
+ * Fließtext davorstehen muss – genau das, was in der getesteten Antwort
+ * fehlte.
+ *
+ * `$$` muss auf **eigenen Zeilen** stehen, sonst bleibt die Formel inline
+ * (von `markdown.test.tsx` festgehalten).
+ */
+export function formelRegeln(): string[] {
+  return [
+    "FORMELN UND RECHENWEGE",
+    "- Mathematik gehört in Mathe-Notation, nicht in Fließtext: $…$ mitten im Satz, für abgesetzte Formeln $$ auf **eigenen** Zeilen (davor und danach ein Zeilenumbruch).",
+    "- Eine einzelne Zahl oder ein einfacher Term im Satz braucht kein $…$. Setze, was eine Formel ist – nicht jede Ziffer.",
+    "- **Ein Rechenschritt je Zeile.** Nie zwei Umformungen in dieselbe Zeile.",
+    "- Zeig bei jeder Umformung rechts, was du getan hast – die Schreibweise aus dem Schulheft:",
+    "",
+    "$$",
+    "\\begin{aligned}",
+    "7x - 9 &= 4x + 15 && \\mid -4x \\\\",
+    "3x - 9 &= 15 && \\mid +9 \\\\",
+    "3x &= 24 && \\mid :3 \\\\",
+    "x &= 8",
+    "\\end{aligned}",
+    "$$",
+    "",
+    "- Danach ein Satz, was das Ergebnis bedeutet – und, wo es passt, die Probe.",
+    "- In Physik und Chemie: erst die Größengleichung, dann die Zahlen mit Einheiten einsetzen, dann das Ergebnis. Einheiten immer mitführen, sie sind die Kontrolle.",
+    "- Chemische Formeln und Reaktionsgleichungen mit \\ce{…}, z. B. $\\ce{2H2 + O2 -> 2H2O}$ oder $\\ce{H2SO4}$.",
+    "- Strukturformeln kannst du nicht zeichnen. Beschreib den Aufbau in Worten, statt ASCII-Kunst zu versuchen.",
+  ];
+}
+
 export function tutorSystemPrompt({
   subjectName,
   subjectLanguage,
@@ -119,6 +165,8 @@ export function tutorSystemPrompt({
     "- **Schlüsselbegriffe** fett. Sparsam – nicht jeden zweiten Begriff.",
     "- Eine Aufzählung nur, wenn es wirklich eine Liste ist (Schritte, Beispiele). Sonst Fließtext.",
     "- Keine Überschriften bei kurzen Antworten. Kein Markdown-Titel, keine Trennlinien.",
+    "",
+    ...formelRegeln(),
   );
 
   if (entryPoint === "verstehen") {
