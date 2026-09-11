@@ -94,12 +94,20 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Fixed
 
-- **Der Tutor verweigerte die Loesung, obwohl die App sie schon verbucht hatte.** Die Fachtabelle aus
-  Paragraf 4a (bei Mathematik das Ergebnis nicht vor zwei Versuchen nennen) stand auch dann im
-  Systemprompt, wenn die Hinweisleiter laengst entschieden hatte, dass die Loesung jetzt gezeigt wird.
-  Das Modell loeste den Widerspruch zugunsten der Zurueckhaltung auf und fragte zurueck - waehrend die
-  Aufgabe bereits als "Loesung gezeigt" markiert wurde. Das Kind verlor die Aufgabe, ohne etwas
-  bekommen zu haben. Der einschraenkende Satz steht jetzt nur noch dort, wo er gilt.
+- **Beim Scrollen im Chat wanderte das Eingabefeld mit nach oben.** Auf dem iPhone zog ein Wisch
+  über die Nachrichten das Textfeld mit und ließ eine leere Fläche darunter stehen. Gescrollt wurde
+  bis hierher der ganze Inhaltsbereich; Kopfzeile und Eingabefeld klebten nur per `position: sticky`
+  darin, und das hält beim Schwung-Scrollen auf iOS nicht verlässlich. Jetzt scrollt **nur noch der
+  Verlauf** – Kopfzeile und Eingabefeld stehen daneben fest, statt mitzufahren und sich wieder
+  zurückzuhängen. Gilt für den freien Chat und den Hausaufgaben-Dialog gleichermaßen; alle anderen
+  Seiten scrollen unverändert.
+
+- **Der Tutor verweigerte die Lösung, obwohl die App sie schon verbucht hatte.** Die Fachtabelle aus
+  §4a (bei Mathematik das Ergebnis nicht vor zwei Versuchen nennen) stand auch dann im Systemprompt,
+  wenn die Hinweisleiter längst entschieden hatte, dass die Lösung jetzt gezeigt wird. Das Modell
+  löste den Widerspruch zugunsten der Zurückhaltung auf und fragte zurück – während die Aufgabe
+  bereits als „Lösung gezeigt“ markiert wurde. Das Kind verlor die Aufgabe, ohne etwas bekommen zu
+  haben. Der einschränkende Satz steht jetzt nur noch dort, wo er gilt.
 
 - **Log-Injection in zwei Fehlerprotokollen (CodeQL `js/log-injection`).** `console.error()`
   beim Foto-Import (Vokabeln, Hausaufgaben) schrieb eine ID aus der Anfrage und eine

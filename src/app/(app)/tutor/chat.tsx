@@ -70,7 +70,7 @@ export function Conversation({
   // Geglätteter Textfluss: `zielText` ist, was angekommen ist, `streamText`,
   // was steht. Siehe `lib/tutor/stream-text.ts`.
   const streamText = useSanfterText(zielText, !pending);
-  const { amEnde, sentinelRef, nachUnten } = useAmEnde([messages, streamText]);
+  const { amEnde, sentinelRef, verlaufRef, nachUnten } = useAmEnde([messages, streamText]);
   useAutoVorlesen(messages, vorlesen);
 
   async function senden() {
@@ -119,13 +119,25 @@ export function Conversation({
   const leer = messages.length === 0 && !streamText;
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Angeheftete Kopfzeile (T-07b): Weg zurück und Fach-Kontext bleiben
-          beim Scrollen sichtbar. Keine „Tutor“-Überschrift – der aktive
-          Fußleisten-Reiter sagt das schon, und die h1 fraß nur Höhe.
-          `-mx-4 px-4` + Hintergrund, damit durchgescrollte Bubbles nicht
-          dahinter durchscheinen; `-mt-5` frisst das `py-5` der Hülle. */}
-      <div className="bg-papier border-linie sticky top-0 z-10 -mx-4 -mt-5 flex items-center gap-3 border-b px-4 py-2">
+    // Drei Zonen statt eines Scrollbereichs (T-12a): Kopfzeile fest,
+    // **nur die Nachrichten scrollen**, Eingabefeld fest. Vorher hingen
+    // Kopfzeile und Composer als `sticky` im scrollenden `main` – auf dem
+    // Desktop tadellos, auf dem iPhone aber rutschte das Eingabefeld beim
+    // Scrollen mit nach oben und ließ eine leere Fläche darunter stehen
+    // (iOS rendert `position: sticky` im Momentum-Scrolling nicht
+    // zuverlässig nach). Was nicht im Scrollbereich liegt, kann auch nicht
+    // mitrutschen.
+    //
+    // Pinnen geht nur mit einer **definierten** Höhe. `100cqh` ist die von
+    // `main` (Größen-Container, siehe `(app)/layout.tsx`), minus 2,5 rem für
+    // das `py-5` der Hülle darin – Kopfzeile und Composer holen sich diesen
+    // Rand über `-mt-5`/`-mb-5` ohnehin zurück.
+    <div className="flex h-[calc(100cqh-2.5rem)] min-h-0 flex-col">
+      {/* Kopfzeile: Weg zurück und Fach-Kontext (T-07b). Keine
+          „Tutor“-Überschrift – der aktive Fußleisten-Reiter sagt das schon.
+          `-mx-4 px-4` lässt den Hintergrund bis an den Rand laufen, `-mt-5`
+          frisst das `py-5` der Hülle. */}
+      <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
         <Link
           href="/tutor"
           className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
@@ -136,31 +148,35 @@ export function Conversation({
         <ContextChip subject={subjectName} topic={topicTitle} />
       </div>
 
-      {leer ? (
-        <Notice>
-          {entryPoint === "verstehen"
-            ? "Erzähl, was ihr gemacht habt und wo du aussteigst."
-            : "Stell deine Frage — der Tutor kennt dein Fach, aber noch nicht dein Material."}
-        </Notice>
-      ) : (
-        <ol className="flex flex-col gap-2.5">
-          {messages.map((m) => (
-            <MessageBubble key={m.id} message={m} vorlesen={vorlesen} />
-          ))}
-          {streamText ? (
-            <MessageBubble
-              message={{ id: "live", role: "tutor", content: streamText }}
-              vorlesen={vorlesen}
-              live
-            />
-          ) : null}
-        </ol>
-      )}
+      {/* Die einzige scrollende Fläche. `min-h-0`, sonst weigert sich das
+          Flex-Kind zu schrumpfen und schiebt den Composer aus dem Bild. */}
+      <div ref={verlaufRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
+        {leer ? (
+          <Notice>
+            {entryPoint === "verstehen"
+              ? "Erzähl, was ihr gemacht habt und wo du aussteigst."
+              : "Stell deine Frage — der Tutor kennt dein Fach, aber noch nicht dein Material."}
+          </Notice>
+        ) : (
+          <ol className="flex flex-col gap-2.5">
+            {messages.map((m) => (
+              <MessageBubble key={m.id} message={m} vorlesen={vorlesen} />
+            ))}
+            {streamText ? (
+              <MessageBubble
+                message={{ id: "live", role: "tutor", content: streamText }}
+                vorlesen={vorlesen}
+                live
+              />
+            ) : null}
+          </ol>
+        )}
 
-      {fehler ? <Notice>{fehler}</Notice> : null}
+        {fehler ? <Notice>{fehler}</Notice> : null}
 
-      {/* Der Anker, an dem „bin ich unten?“ gemessen wird. */}
-      <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+        {/* Der Anker, an dem „bin ich unten?“ gemessen wird. */}
+        <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+      </div>
 
       {available ? (
         <Composer
@@ -351,9 +367,14 @@ const ENDE_TOLERANZ = 64;
  */
 function useAmEnde(abhaengigkeiten: readonly unknown[]) {
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const verlaufRef = useRef<HTMLDivElement>(null);
   const [amEnde, setAmEnde] = useState(true);
 
-  const behaelter = useCallback(() => sentinelRef.current?.closest("main") ?? null, []);
+  // Seit T-12a scrollt nicht mehr `main`, sondern der Verlauf selbst – der
+  // Ref zeigt direkt darauf. Das `closest("main")` von vorher fände jetzt
+  // einen Container, der gar nicht mehr scrollt, und der ↓-Knopf käme nie
+  // wieder zum Vorschein.
+  const behaelter = useCallback(() => verlaufRef.current, []);
 
   const springAnsEnde = useCallback(
     (sanft: boolean) => {
@@ -398,7 +419,7 @@ function useAmEnde(abhaengigkeiten: readonly unknown[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bewusst an den übergebenen Werten statt an einer festen Liste
   }, [amEnde, springAnsEnde, ...abhaengigkeiten]);
 
-  return { amEnde, sentinelRef, nachUnten };
+  return { amEnde, sentinelRef, verlaufRef, nachUnten };
 }
 
 /** Liest eine neu hinzugekommene Tutor-Antwort vor, wenn „immer vorlesen“ an ist (ADR 0011 D2). */
