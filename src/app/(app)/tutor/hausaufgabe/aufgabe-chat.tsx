@@ -156,7 +156,10 @@ export function AufgabeChat({
       </div>
 
       {/* Die einzige scrollende Fläche – Aufgabenstellung, Verlauf, Fehler. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
+      {/* `-mx-4 px-4` wie im freien Chat (T-16): Der Scrollbereich reicht bis
+          an den Bildschirmrand, sonst zeichnet iOS seine überlagernde
+          Bildlaufleiste über die Karten statt daneben. */}
+      <div className="-mx-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
         <Block>
           <div className="flex items-baseline gap-2">
             {aufgabe.label ? (

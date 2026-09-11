@@ -170,40 +170,72 @@ export function Conversation({
     // das `py-5` der Hülle darin – Kopfzeile und Composer holen sich diesen
     // Rand über `-mt-5`/`-mb-5` ohnehin zurück.
     <div className="flex h-[calc(100cqh-2.5rem)] min-h-0 flex-col">
-      {/* Kopfzeile: Weg zurück und Fach-Kontext (T-07b), nur wenn es schon
-          ein Gespräch gibt. Auf `/tutor` selbst (ADR 0013 D1) ist
-          `sessionId` anfangs `null` – ein Rückweg „zu den Gesprächen" wäre
-          dort sinnlos, man ist ja schon da, und einen Fach-Chip gibt es
-          nicht, solange keine Zuordnung gelaufen ist. Keine
-          „Tutor“-Überschrift – der aktive Fußleisten-Reiter sagt das schon.
+      {/* **Die Kopfzeile ist immer da** (T-16). Sie hing bis dahin an
+          `sessionId` – lokalem State, der erst gesetzt wird, wenn die erste
+          Antwort **fertig** gestreamt ist. Dadurch gab es auf `/tutor` vom
+          Absenden bis zum Ende der Antwort keinen Rückweg, und wenn der
+          Stream abbrach (Netz, Rate Limit), blieb er ganz weg: Der
+          `catch`-Zweig setzt nur die Fehlermeldung, `setSessionId` wird nie
+          erreicht. Beim Testen am Gerät genau so aufgefallen – „zurück ging
+          nicht, danach ließ es sich nicht reproduzieren" (nach einem Reload
+          ist man wieder auf der Übersicht).
+
+          Zwei Gestalten, eine Zeile: Ohne Gespräch der Seitentitel wie auf
+          jeder anderen Wurzel (Heute, Fächer, Üben, Prüfungen – der Tutor
+          war die einzige ohne), im Gespräch Rückweg und Fach-Chip.
+
+          Der Umschaltpunkt ist `leer`, **nicht** `sessionId`: Sobald die
+          erste Frage abgeschickt ist, ist man sichtbar im Gespräch (Historie
+          weg, Sprechblasen da) – und genau dann soll der Rückweg da sein,
+          nicht erst wenn die Antwort steht. Er führt auf `/tutor` und damit
+          zur Historie, in der das Gespräch schon auftaucht: Die Frage wird
+          vor dem Modellaufruf geschrieben (ADR 0010 D1). Der Fach-Chip
+          hängt weiter an `sessionId` – ohne Session gibt es nichts
+          zuzuordnen.
+
           `-mx-4 px-4` lässt den Hintergrund bis an den Rand laufen, `-mt-5`
           frisst das `py-5` der Hülle. */}
-      {sessionId ? (
-        <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
-          <Link
-            href="/tutor"
-            className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
-          >
-            <span aria-hidden="true">‹</span>
-            Gespräche
-          </Link>
-          <FachChip
-            sessionId={sessionId}
-            subjectName={subjectName}
-            topicTitle={topicTitle}
-            alleFaecher={alleFaecher}
-            onGewaehlt={(fach) => {
-              setSubjectId(fach.id);
-              setSubjectName(fach.name);
-              setSubjectLanguage(fach.language);
-            }}
-          />
-        </div>
-      ) : null}
+      <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
+        {leer && !sessionId ? (
+          <h1 className="text-lg font-semibold tracking-tight">Tutor</h1>
+        ) : (
+          <>
+            <Link
+              href="/tutor"
+              className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
+            >
+              <span aria-hidden="true">‹</span>
+              Gespräche
+            </Link>
+            {sessionId ? (
+              <FachChip
+                sessionId={sessionId}
+                subjectName={subjectName}
+                topicTitle={topicTitle}
+                alleFaecher={alleFaecher}
+                onGewaehlt={(fach) => {
+                  setSubjectId(fach.id);
+                  setSubjectName(fach.name);
+                  setSubjectLanguage(fach.language);
+                }}
+              />
+            ) : null}
+          </>
+        )}
+      </div>
 
       {/* Die einzige scrollende Fläche. `min-h-0`, sonst weigert sich das
-          Flex-Kind zu schrumpfen und schiebt den Composer aus dem Bild. */}
-      <div ref={verlaufRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
+          Flex-Kind zu schrumpfen und schiebt den Composer aus dem Bild.
+
+          `-mx-4 px-4` (T-16): Der Scrollbereich reicht bis an den
+          Bildschirmrand, das Polster liegt **innen**. Vorher endete er am
+          `px-4` der Hülle – iOS zeichnet seine überlagernde Bildlaufleiste
+          am rechten Rand des Scrollcontainers, also mitten über den Karten
+          und Sprechblasen statt daneben. */}
+      <div
+        ref={verlaufRef}
+        className="-mx-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3"
+      >
         {leer ? (
           (leerInhalt ?? (
             <Notice>
@@ -248,6 +280,7 @@ export function Conversation({
           nachUnten={nachUnten}
           anhang={anhang}
           onAnhang={setAnhang}
+          hausaufgabeHref="/tutor/hausaufgabe/neu"
         />
       ) : (
         <Block>

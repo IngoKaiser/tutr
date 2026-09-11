@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  AufgabenblattIcon,
   BildIcon,
   KameraIcon,
   LautsprecherAusIcon,
@@ -71,6 +73,7 @@ export function Composer({
   nachUnten,
   anhang,
   onAnhang,
+  hausaufgabeHref,
   kinder,
 }: {
   wert: string;
@@ -89,6 +92,11 @@ export function Composer({
   nachUnten?: () => void;
   anhang: ComposerAnhang | null;
   onAnhang: (a: ComposerAnhang | null) => void;
+  /**
+   * Wohin „Hausaufgabe fotografieren" im Plus-Menü führt (T-16). Ungesetzt
+   * im Hausaufgaben-Dialog selbst – dort ist man schon drin.
+   */
+  hausaufgabeHref?: string;
   /** Zusätzliche Bedienelemente über der Tastenreihe – z. B. der Bahn-Umschalter der Hausaufgabe. */
   kinder?: React.ReactNode;
 }) {
@@ -97,8 +105,25 @@ export function Composer({
   const [fehler, setFehler] = useState<string | null>(null);
   const kameraRef = useRef<HTMLInputElement>(null);
   const galerieRef = useRef<HTMLInputElement>(null);
+  const feldRef = useRef<HTMLTextAreaElement>(null);
   const menueRef = useRef<HTMLDivElement>(null);
   const diktat = useDiktat({ sprache, onText: onChange });
+
+  /**
+   * Mitlaufen lassen, was gerade entsteht (T-16).
+   *
+   * Beim Tippen hält der Browser den Cursor von selbst im Bild – aber nur,
+   * solange er am Ende steht. Beim **Diktieren** kommt der Text von außen
+   * (`useDiktat` ruft `onChange`), da rührt sich der Cursor nicht, und das
+   * Feld blieb oben stehen, während unten weitergeschrieben wurde. Deshalb
+   * hier von Hand ans Ende – aber nur, wenn der Cursor auch am Ende ist:
+   * Wer mitten im Text etwas korrigiert, soll nicht weggescrollt werden.
+   */
+  useEffect(() => {
+    const feld = feldRef.current;
+    if (!feld) return;
+    if (feld.selectionStart === feld.value.length) feld.scrollTop = feld.scrollHeight;
+  }, [wert]);
 
   // Klick daneben schließt das Menü – sonst bliebe es offen, während man
   // schon wieder tippt, und verdeckte die Tastenreihe.
@@ -258,21 +283,31 @@ export function Composer({
          * Grid-Zelle (V-13): Er trägt denselben Text mit derselben Schrift
          * und hat eine natürliche Höhe, das Feld übernimmt sie.
          *
-         * Der Deckel sind **genau drei Zeilen**: 3 × 1,625 rem Zeilenhöhe
-         * (`leading-relaxed` auf `text-sm`) plus 0,75 rem Polster = 5,1 rem,
-         * aufgerundet auf 5,25 rem. Nachgemessen, nicht geschätzt – mit
-         * `max-h-20` (5 rem) blieb die dritte Zeile um einen Pixel hängen
-         * und erzeugte eine Bildlaufleiste für nichts. Ab der vierten Zeile
-         * scrollt die gemeinsame Hülle.
+         * **Gescrollt wird im Feld selbst, nicht in der Hülle** (T-16).
+         * Vorher war es umgekehrt: Das Feld stand `overflow-hidden` in
+         * voller Texthöhe, die Hülle darum scrollte. Das brach an drei
+         * Stellen, alle beim Diktieren am Gerät aufgefallen – ein Feld ohne
+         * eigenen Scrollbereich hält beim Tippen den Cursor nicht im Bild
+         * (der Browser tut das nur für scrollende Elemente), der Finger fand
+         * im Text nichts zum Schieben, und die Hülle blieb zwischen zwei
+         * Zeilen stehen. Jetzt deckelt der **Zwilling** die Grid-Zeile auf
+         * drei Zeilen, das Feld erbt diese Höhe und scrollt darin selbst.
+         *
+         * `leading-6` statt `leading-relaxed`: 24 px sind ein glatter
+         * Zeilenschritt, 3 × 24 + 12 px Polster = genau die 5,25 rem des
+         * Deckels. `leading-relaxed` ergab 22,75 px – nie ein ganzes
+         * Vielfaches, weshalb beim Scrollen unten immer eine halbe Zeile
+         * stehenblieb (im Screenshot vom Gerät gut zu sehen).
          */}
-        <div className="grid max-h-[5.25rem] min-h-9 w-full overflow-y-auto px-1.5 text-sm">
+        <div className="grid min-h-9 w-full px-1.5 text-sm">
           <div
             aria-hidden="true"
-            className="invisible col-start-1 row-start-1 py-1.5 leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap"
+            className="invisible col-start-1 row-start-1 max-h-[5.25rem] overflow-hidden py-1.5 leading-6 [overflow-wrap:anywhere] whitespace-pre-wrap"
           >
             {wert ? `${wert} ` : " "}
           </div>
           <textarea
+            ref={feldRef}
             value={wert}
             onChange={(e) => {
               vorlesen?.stop();
@@ -286,7 +321,7 @@ export function Composer({
             }}
             rows={1}
             placeholder={platzhalter}
-            className="text-tinte placeholder:text-tinte-leise col-start-1 row-start-1 w-full resize-none overflow-hidden bg-transparent py-1.5 leading-relaxed outline-none"
+            className="text-tinte placeholder:text-tinte-leise col-start-1 row-start-1 w-full resize-none overflow-y-auto bg-transparent py-1.5 leading-6 outline-none"
           />
         </div>
 
@@ -306,7 +341,23 @@ export function Composer({
               <PlusIcon />
             </button>
             {menueOffen ? (
-              <div className="border-linie-stark bg-flaeche absolute bottom-11 left-0 z-20 flex w-48 flex-col overflow-hidden rounded-[10px] border shadow-lg">
+              <div className="border-linie-stark bg-flaeche absolute bottom-11 left-0 z-20 flex w-56 flex-col overflow-hidden rounded-[10px] border shadow-lg">
+                {/* Der Hausaufgaben-Weg steht **oben** (§5: „‚Hausaufgabe' ist
+                    der prominenteste Chip") und ist von den zwei Foto-Wegen
+                    darunter abgesetzt: Er hängt kein Bild an diese Nachricht,
+                    er startet den Ablauf aus §4a mit eigener Aufgabenliste.
+                    Im Hausaufgaben-Dialog selbst fehlt er – dort ist man
+                    schon drin (`hausaufgabeHref` bleibt dort ungesetzt). */}
+                {hausaufgabeHref ? (
+                  <Link
+                    href={hausaufgabeHref}
+                    onClick={() => setMenueOffen(false)}
+                    className="text-tinte hover:bg-papier-tief border-linie flex items-center gap-2.5 border-b px-3 py-2.5 text-left text-[0.8125rem] font-medium"
+                  >
+                    <AufgabenblattIcon size={17} />
+                    Hausaufgabe fotografieren
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {

@@ -214,3 +214,21 @@ export function BildIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/**
+ * Aufgabenblatt – „Hausaufgabe fotografieren" im Plus-Menü (T-16).
+ *
+ * Bewusst **kein** zweites Kamera-Icon, obwohl auch dieser Weg mit einem
+ * Foto beginnt: Im selben Menü stünden sonst zwei Kameras nebeneinander, die
+ * Verschiedenes tun – ein Foto an die Nachricht hängen gegenüber dem
+ * Hausaufgaben-Ablauf aus §4a. Das Blatt zeigt, worum es geht, nicht womit
+ * es anfängt.
+ */
+export function AufgabenblattIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.5 3.75h7.4L18.25 8v12.5a1.75 1.75 0 0 1-1.75 1.75h-10a1.75 1.75 0 0 1-1.75-1.75V5.5a1.75 1.75 0 0 1 1.75-1.75Z" />
+      <path d="M13.75 3.9V8.25h4.35M8.5 12.5h7M8.5 16h4.5" />
+    </Icon>
+  );
+}

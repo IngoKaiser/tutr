@@ -104,6 +104,42 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("link", { name: new RegExp(PREFIX) })).toBeVisible();
   });
 
+  test("Kopfzeile, Scrollbereich und Hausaufgaben-Weg auf der Übersicht (T-16)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+
+    await alsMia(page);
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.goto("/tutor");
+
+    // Der Tutor war die einzige Fußleisten-Wurzel ohne Titel – jetzt steht
+    // er da, solange kein Gespräch läuft.
+    await expect(page.getByRole("heading", { name: "Tutor", level: 1 })).toBeVisible();
+
+    // Der Scrollbereich reicht bis an den Rand von `main`: Sonst zeichnet
+    // iOS seine überlagernde Bildlaufleiste über die Karten statt daneben.
+    const raender = await page.evaluate(() => {
+      const verlauf = document.querySelector("main div.overflow-y-auto");
+      const main = document.querySelector("main");
+      if (!verlauf || !main) return null;
+      const v = verlauf.getBoundingClientRect();
+      const m = main.getBoundingClientRect();
+      return { links: Math.abs(v.left - m.left), rechts: Math.abs(v.right - m.right) };
+    });
+    expect(raender).toEqual({ links: 0, rechts: 0 });
+
+    // Der Weg in die Hausaufgabe führt seit T-13 nicht mehr über eine Kachel
+    // auf dieser Seite – ohne ihn im Plus-Menü gäbe es aus dem Tutor heraus
+    // gar keinen mehr (nur noch über „Heute").
+    await page.getByRole("button", { name: "Anhang hinzufügen" }).click();
+    await expect(page.getByRole("link", { name: "Hausaufgabe fotografieren" })).toHaveAttribute(
+      "href",
+      "/tutor/hausaufgabe/neu",
+    );
+  });
+
   test("frühere Gespräche lassen sich löschen, mit Rückgängig-Fenster (T-15)", async ({
     page,
     browserName,
@@ -380,18 +416,22 @@ test.describe("Tutor als Kind", () => {
     const feld = page.getByRole("textbox");
     await expect(feld).toBeVisible();
 
-    // Gemessen wird die Hülle (der Grid-Container), nicht das Feld selbst:
-    // Das Feld streckt sich in seiner Gitterzelle auf deren – ggf. über die
-    // Deckelhöhe hinausgehende – Größe; sichtbar gedeckelt und scrollbar ist
-    // die Hülle (`max-h-40 overflow-y-auto`).
-    const huelle = () =>
+    // Gemessen wird seit T-16 das **Feld selbst**: Es ist jetzt der
+    // Scrollcontainer (vorher die Hülle darum – ein Feld ohne eigenen
+    // Scrollbereich hält beim Tippen den Cursor nicht im Bild und lässt sich
+    // mit dem Finger nicht schieben).
+    const feldMasse = () =>
       page.evaluate(() => {
-        const feld = document.querySelector("textarea");
-        const h = feld?.parentElement;
-        return h ? { hoehe: h.clientHeight, scrollt: h.scrollHeight > h.clientHeight + 1 } : null;
+        const f = document.querySelector("textarea");
+        if (!f) return null;
+        return {
+          hoehe: f.clientHeight,
+          scrollt: f.scrollHeight > f.clientHeight + 1,
+          amEnde: f.scrollHeight - f.scrollTop - f.clientHeight <= 1,
+        };
       });
 
-    const leer = await huelle();
+    const leer = await feldMasse();
     expect(leer?.scrollt).toBe(false);
 
     // **Drei Zeilen müssen ganz hineinpassen** (T-12): Der Deckel liegt
@@ -399,15 +439,25 @@ test.describe("Tutor als Kind", () => {
     // nichts – beim Bauen einmal passiert, deshalb hier festgehalten.
     await feld.fill("Zeile 1\nZeile 2\nZeile 3");
     await expect
-      .poll(async () => (await huelle())?.hoehe ?? 0)
+      .poll(async () => (await feldMasse())?.hoehe ?? 0)
       .toBeGreaterThan((leer?.hoehe ?? 0) + 20);
-    await expect.poll(async () => (await huelle())?.scrollt ?? false).toBe(false);
+    await expect.poll(async () => (await feldMasse())?.scrollt ?? false).toBe(false);
+
+    // Genau drei Zeilen, kein angeschnittener Rest (T-16): 3 × 24 px
+    // Zeilenhöhe + 12 px Polster. Mit `leading-relaxed` (22,75 px) ging die
+    // Rechnung nie auf, und unten stand beim Scrollen eine halbe Zeile.
+    expect((await feldMasse())?.hoehe).toBe(84);
 
     // Ab der vierten Zeile wächst nichts mehr, es scrollt – nichts wird
     // wortlos abgeschnitten.
     await feld.fill(Array.from({ length: 20 }, (_, i) => `Zeile ${i + 1}`).join("\n"));
-    await expect.poll(async () => (await huelle())?.hoehe ?? 0).toBeLessThanOrEqual(90);
-    await expect.poll(async () => (await huelle())?.scrollt ?? false).toBe(true);
+    await expect.poll(async () => (await feldMasse())?.hoehe ?? 0).toBeLessThanOrEqual(90);
+    await expect.poll(async () => (await feldMasse())?.scrollt ?? false).toBe(true);
+
+    // … und das Feld steht am Ende, zeigt also die zuletzt geschriebene
+    // Zeile (T-16): Beim Diktieren wuchs der Text sonst unsichtbar nach
+    // unten weiter, während oben die erste Zeile stehenblieb.
+    await expect.poll(async () => (await feldMasse())?.amEnde ?? false).toBe(true);
   });
 
   test("das Plus-Menü bietet Kamera und Mediathek, der Pegel steht im Feld (T-12)", async ({
