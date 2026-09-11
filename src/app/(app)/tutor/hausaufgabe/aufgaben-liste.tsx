@@ -2,18 +2,30 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
 import { Block, ContextChip, Notice, PageHeader } from "@/components/shell/primitives";
+import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
+import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 
 import { ueberspringeAufgabe, type AufgabeSummary, type HausaufgabenListe } from "./actions";
 
+/**
+ * **„gehört nicht dazu" statt „übersprungen"** (T-17). §4a nennt den Ausgang
+ * „übersprungen", und so heißt der Enum-Wert in der Datenbank weiterhin – die
+ * Beschriftung ist trotzdem eine andere, weil sie etwas anderes verspricht.
+ *
+ * Der einzige gute Grund, eine Aufgabe beiseitezulegen, ist eine, die gar
+ * keine ist: ein Merkkasten, den Vision als Aufgabe gelesen hat, eine
+ * gestrichene Nummer, eine Überschrift. „Überspringen" lud dagegen zum
+ * Ausweichen ein, sobald es schwierig wurde – das Gegenteil dessen, wofür
+ * die Hinweisleiter da ist.
+ */
 const STATUS_LABEL: Record<AufgabeSummary["status"], string> = {
   offen: "offen",
   in_arbeit: "in Arbeit",
   geloest: "gelöst",
   loesung_gezeigt: "Lösung gezeigt",
-  uebersprungen: "übersprungen",
+  uebersprungen: "gehört nicht dazu",
 };
 
 const STATUS_TON: Record<AufgabeSummary["status"], string> = {
@@ -38,26 +50,28 @@ const ABGESCHLOSSEN = new Set<AufgabeSummary["status"]>([
  */
 export function AufgabenListe({ liste }: { liste: HausaufgabenListe }) {
   const router = useRouter();
-  const [aufgaben, setAufgaben] = useState(liste.aufgaben);
-  const [pending, startTransition] = useTransition();
-  const [ueberspringtId, setUeberspringtId] = useState<string | null>(null);
 
-  function ueberspringen(taskId: string) {
-    setUeberspringtId(taskId);
-    setAufgaben((prev) =>
-      prev.map((a) => (a.id === taskId ? { ...a, status: "uebersprungen" } : a)),
-    );
-    startTransition(async () => {
-      await ueberspringeAufgabe(liste.sessionId, taskId);
-      setUeberspringtId(null);
-      // Ein Überspringen kann die letzte offene Aufgabe gewesen sein – dann
-      // hat der Server gerade den Zweizeiler geschrieben
-      // (`pruefeUndErzeugeAbschluss()`). `liste` steckt als Prop fest, ein
-      // Neuladen holt ihn.
-      router.refresh();
-    });
-  }
+  /**
+   * Aussortieren mit Rückgängig-Fenster (T-17) – dieselben Bausteine wie
+   * beim Löschen (V-11), nur endet der Wisch hier nicht im Löschen, sondern
+   * im Status `uebersprungen`. Der Serveraufruf startet erst nach fünf
+   * Sekunden; bis dahin holt „Rückgängig" die Aufgabe zurück, ohne dass in
+   * der Datenbank je etwas stand.
+   *
+   * `istEntfernt()` blendet die Zeile deshalb **nicht** aus – anders als in
+   * einer Löschliste bleibt sie stehen und zeigt nur schon den neuen Status.
+   */
+  const aussortiert = useDeferredDelete<AufgabeSummary>(async (taskId) => {
+    await ueberspringeAufgabe(liste.sessionId, taskId);
+    // Das kann die letzte offene Aufgabe gewesen sein – dann hat der Server
+    // gerade den Zweizeiler geschrieben (`pruefeUndErzeugeAbschluss()`).
+    // `liste` steckt als Prop fest, ein Neuladen holt ihn.
+    router.refresh();
+  });
 
+  const aufgaben = liste.aufgaben.map((a) =>
+    aussortiert.istEntfernt(a.id) ? { ...a, status: "uebersprungen" as const } : a,
+  );
   const offeneAnzahl = aufgaben.filter((a) => !ABGESCHLOSSEN.has(a.status)).length;
 
   return (
@@ -82,7 +96,14 @@ export function AufgabenListe({ liste }: { liste: HausaufgabenListe }) {
         <Block>
           <ul className="flex flex-col gap-2">
             {aufgaben.map((aufgabe) => (
-              <li key={aufgabe.id}>
+              // Der Wisch liegt nur auf offenen Aufgaben: Was schon gelöst,
+              // gezeigt oder aussortiert ist, hat seinen Ausgang.
+              <SwipeRow
+                key={aufgabe.id}
+                loeschLabel="Gehört nicht dazu"
+                disabled={ABGESCHLOSSEN.has(aufgabe.status)}
+                onDelete={() => aussortiert.entfernen(aufgabe)}
+              >
                 <div className="border-linie bg-papier flex items-center gap-2 rounded-[9px] border p-2.5">
                   <Link
                     href={`/tutor/hausaufgabe/${liste.sessionId}/${aufgabe.id}`}
@@ -102,22 +123,23 @@ export function AufgabenListe({ liste }: { liste: HausaufgabenListe }) {
                       {STATUS_LABEL[aufgabe.status]}
                     </span>
                   </Link>
-                  {!ABGESCHLOSSEN.has(aufgabe.status) ? (
-                    <button
-                      type="button"
-                      onClick={() => ueberspringen(aufgabe.id)}
-                      disabled={pending && ueberspringtId === aufgabe.id}
-                      className="text-tinte-leise hover:text-koenigsblau shrink-0 px-2 py-1 text-[0.75rem] font-medium disabled:opacity-50"
-                    >
-                      Überspringen
-                    </button>
-                  ) : null}
                 </div>
-              </li>
+              </SwipeRow>
             ))}
           </ul>
         </Block>
       )}
+
+      {/* Außerhalb des Blocks: `sticky` braucht als Bezug den scrollenden
+          Bereich, nicht die Karte drumherum (V-12). */}
+      <UndoLoeschen
+        verb="aussortiert"
+        eintraege={aussortiert.pending.map((a) => ({
+          id: a.id,
+          label: a.label?.trim() || a.prompt.slice(0, 30),
+        }))}
+        onZurueck={(id) => aussortiert.zuruecknehmen(id)}
+      />
     </div>
   );
 }

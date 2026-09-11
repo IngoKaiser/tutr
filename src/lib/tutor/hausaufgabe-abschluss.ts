@@ -51,6 +51,11 @@ export async function pruefeUndErzeugeAbschluss(actor: Actor, sessionId: string)
     const offen = rows.some((r) => r.status === "offen" || r.status === "in_arbeit");
     if (offen) return null;
 
+    // Alles aussortiert („gehört nicht dazu", T-17)? Dann stand auf dem Foto
+    // keine Aufgabe, über die sich bilanzieren ließe – „0 Aufgaben – …" wäre
+    // ein Satz über nichts.
+    if (rows.every((r) => r.status === "uebersprungen")) return null;
+
     const [vorhanden] = await tx.execute<{ id: string }>(
       sql`select id from tutor_session_summary where session_id = ${sessionId}`,
     );

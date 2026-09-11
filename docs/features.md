@@ -97,6 +97,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | „Erklär es anders“, Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
 |                          | Elternsicht entschieden (ADR 0012: was, nicht wie gut)                             | ✅    | T-01c   |
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter → Lösung, Zweizeiler zum Schluss | ✅    | T-03    |
+|                          | Aufgabe aussortieren („Gehört nicht dazu“) per Wisch, mit Rückgängig               | ✅    | T-17    |
 |                          | Einstieg Vorschau (Selbsteinschätzung → Hook)                                      | 🌑    | T-04    |
 | **Sprache im Tutor**     |                                                                                    | 🌓    |         |
 |                          | Weg entschieden (ADR 0011: Diktat + Vorlesen, Echtzeit vertagt)                    | ✅    | T-01b   |

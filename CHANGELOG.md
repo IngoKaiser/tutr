@@ -6,6 +6,16 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **T-17: Aus „Überspringen" wird „Gehört nicht dazu" – und lässt sich zurücknehmen.** Der
+  Knopf stand neben jeder Hausaufgabe und ließ sich versehentlich treffen, ohne Weg zurück.
+  Dahinter steckte aber eine größere Frage: Wofür ist Überspringen da? Für genau einen Fall –
+  eine Zeile, die gar keine Aufgabe ist: ein Merkkasten, eine gestrichene Nummer, eine
+  Überschrift, die beim Abfotografieren mitgelesen wurde. Als Knopf lud das Wort zum
+  Ausweichen ein, sobald es schwierig wurde. Jetzt liegt der Ausgang hinter demselben Wisch
+  wie das Löschen bei den Vokabeln, heißt beim Namen, was er tut, und fünf Sekunden lang holt
+  „Rückgängig" die Aufgabe zurück. Aussortierte Zeilen zählen außerdem nicht mehr in der
+  Schlussbilanz mit – aus „5 Aufgaben, 4 selbst gelöst" wurde damit sonst eine stille Lücke.
+
 - **T-13: der Tutor beginnt mit dem Dialog, nicht mit einem Formular.** Bisher standen eine
   Fachwahl, drei Einstiegs-Kacheln und ein „Gespräch beginnen"-Knopf vor der ersten Frage. Jetzt
   zeigt `/tutor` direkt die Historie und das Eingabefeld darunter – wer tippt und abschickt, ist

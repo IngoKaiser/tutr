@@ -39,10 +39,22 @@ describe("zweizeiler", () => {
   });
 
   it("die Einzahl bei genau einer Aufgabe", () => {
-    const bilanz = bilanziere([{ status: "uebersprungen" }]);
+    const bilanz = bilanziere([{ status: "geloest" }, { status: "uebersprungen" }]);
     expect(zweizeiler(bilanz, "Nächstes Mal in Ruhe angehen")).toBe(
-      "1 Aufgabe – Nächstes Mal in Ruhe angehen.",
+      "1 Aufgabe, 1 selbst gelöst – Nächstes Mal in Ruhe angehen.",
     );
+  });
+
+  it("aussortierte Zeilen zählen nicht als Aufgabe (T-17)", () => {
+    // „Gehört nicht dazu" heißt: war nie eine Aufgabe – ein Merkkasten, eine
+    // gestrichene Nummer. Vorher zählten solche Zeilen zu „gesamt" und
+    // rissen eine stille Lücke in die Bilanz („5 Aufgaben, 4 selbst gelöst").
+    const bilanz = bilanziere([
+      { status: "geloest" },
+      { status: "geloest" },
+      { status: "uebersprungen" },
+    ]);
+    expect(zweizeiler(bilanz, "Weiter so")).toBe("2 Aufgaben, 2 selbst gelöst – Weiter so.");
   });
 
   it("ein Punkt oder Leerzeichen am Ende des Hinweises wird nicht verdoppelt", () => {
