@@ -3,6 +3,21 @@ import { MagicLinkForm } from "./magic-link-form";
 import { PasskeyLogin } from "./passkey-login";
 
 export const metadata = { title: "Anmelden · tutr" };
+/**
+ * Dynamisch rendern, damit die Seite ein `nonce` bekommt (S-03a).
+ *
+ * Die Content-Security-Policy bindet Skripte an ein `nonce`, das der Proxy
+ * je Anfrage würfelt (`lib/security/csp.ts`). Next hängt es beim Rendern an
+ * seine Skript-Tags – **beim Rendern**, und das heißt: Eine zur Buildzeit
+ * vorgerenderte Seite hat keins, ihre Skripte tragen kein `nonce`, und der
+ * Browser führt keins davon aus. Ohne diese Zeile stünde ausgerechnet die
+ * Anmeldung ohne JavaScript da.
+ *
+ * Der Rest der App braucht das nicht: Jede Seite dort liest die Sitzung und
+ * ist damit ohnehin dynamisch. Nur die Seiten vor der Anmeldung kommen ohne
+ * aus – und wurden deshalb statisch vorgerendert.
+ */
+export const dynamic = "force-dynamic";
 
 /**
  * Zwei Wege hinein, in der Reihenfolge, in der sie gebraucht werden (ADR 0005):
