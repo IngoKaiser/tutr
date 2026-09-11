@@ -32,16 +32,18 @@ import { bilanziere, zweizeiler } from "./hausaufgabe-zusammenfassung";
  */
 export async function pruefeUndErzeugeAbschluss(actor: Actor, sessionId: string): Promise<void> {
   const arbeit = await withActor(actor, async (tx) => {
+    // `left join`, nicht `join`: eine Hausaufgabe ohne Fach (ADR 0013 D7 –
+    // die Zuordnung aus dem Foto ergab „unklar") hat kein `subject_id`.
     const rows = await tx.execute<{
       label: string | null;
       prompt: string;
       status: "offen" | "in_arbeit" | "geloest" | "loesung_gezeigt" | "uebersprungen";
-      subject_name: string;
+      subject_name: string | null;
     }>(sql`
       select ht.label, ht.prompt, ht.status, s.name as subject_name
       from homework_task ht
       join tutor_session ts on ts.id = ht.session_id
-      join subject s on s.id = ts.subject_id
+      left join subject s on s.id = ts.subject_id
       where ht.session_id = ${sessionId}
       order by ht.position`);
     if (rows.length === 0) return null;

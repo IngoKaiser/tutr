@@ -13,7 +13,8 @@ export type HausaufgabeZusammenfassungAufgabe = {
 };
 
 export type HausaufgabeZusammenfassungContext = {
-  subjectName: string;
+  /** `null`, wenn die Hausaufgabe keinem Fach zugeordnet ist (ADR 0013 D7). */
+  subjectName: string | null;
   aufgaben: HausaufgabeZusammenfassungAufgabe[];
 };
 
@@ -45,5 +46,5 @@ export function hausaufgabeZusammenfassungUserPrompt({
           : "übersprungen";
     return `${nummer}: ${a.prompt} (${ausgang})`;
   });
-  return [`Fach: ${subjectName}`, "", ...zeilen].join("\n");
+  return [`Fach: ${subjectName ?? "noch nicht zugeordnet"}`, "", ...zeilen].join("\n");
 }

@@ -9,11 +9,15 @@ import {
 } from "@/ai/client";
 import { hausaufgabeSystemPrompt } from "@/ai/prompts/hausaufgabe";
 import { tutorSystemPrompt } from "@/ai/prompts/tutor";
-import { withActor, type Actor, type Transaction } from "@/db/actor";
+import { withActor, type Actor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
-import { loeseFachZuordnungAuf, type FachOption } from "@/lib/tutor/fach-zuordnung";
+import {
+  ladeFaecherFuerZuordnung,
+  loeseFachZuordnungAuf,
+  type FachOption,
+} from "@/lib/tutor/fach-zuordnung";
 import { pruefeUndErzeugeAbschluss } from "@/lib/tutor/hausaufgabe-abschluss";
 import { istDeutsch } from "@/lib/tutor/language-guard";
 import {
@@ -254,14 +258,6 @@ export async function POST(request: Request): Promise<Response> {
   });
 }
 
-/** Die Fächer des Kindes im aktuellen Schuljahr – die Auswahl für die Fach-Zuordnung (ADR 0013 D2). */
-async function ladeFaecherFuerZuordnung(tx: Transaction): Promise<FachOption[]> {
-  return tx.execute<FachOption>(sql`
-    select s.id, s.name, s.language from subject s
-    join school_year_subject sys on sys.subject_id = s.id
-    join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'`);
-}
-
 /**
  * Schritte 1 und 2 in einer Transaktion: Limit prüfen, Session auflösen
  * oder anlegen, bisherige Nachrichten laden, Nutzernachricht schreiben,
@@ -469,21 +465,24 @@ async function bereiteHausaufgabeVor(
       return { ok: false, status: 429, nachricht: limit.nachricht };
     }
 
+    // `left join subject`, nicht `join`: Eine Hausaufgabe, deren erstes Foto
+    // noch keine Zuordnung ergab („unklar", ADR 0013 D7), hat kein
+    // `subject_id` – ein `join` fände dann keine Zeile.
     const [row] = await tx.execute<{
       session_id: string;
       prompt: string;
       status: "offen" | "in_arbeit" | "geloest" | "loesung_gezeigt" | "uebersprungen";
       attempts: number;
       hint_level: number;
-      subject_id: string;
-      subject_name: string;
+      subject_id: string | null;
+      subject_name: string | null;
       grade_level: number;
     }>(sql`
       select ht.session_id, ht.prompt, ht.status, ht.attempts, ht.hint_level,
              s.id as subject_id, s.name as subject_name, st.grade_level
       from homework_task ht
       join tutor_session ts on ts.id = ht.session_id
-      join subject s on s.id = ts.subject_id
+      left join subject s on s.id = ts.subject_id
       join student st on st.id = ht.student_id
       where ht.id = ${taskId}`);
     if (!row) return { ok: false, status: 404, nachricht: "Diese Aufgabe gibt es nicht." };

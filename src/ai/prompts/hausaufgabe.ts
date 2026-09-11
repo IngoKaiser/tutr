@@ -19,7 +19,13 @@ import { formelRegeln, tonNachJahrgang } from "./tutor";
  */
 
 export type HausaufgabePromptContext = {
-  subjectName: string;
+  /**
+   * `null`, solange die Hausaufgabe noch keinem Fach zugeordnet ist (ADR 0013
+   * D7) – die Zuordnung aus dem ersten Foto ergab „unklar", oder es gibt gar
+   * keine Fächer. Fällt dann auf die allgemeine Fassung von
+   * `hausaufgabeFachHinweis()` zurück.
+   */
+  subjectName: string | null;
   gradeLevel: number;
   /** Der Aufgabentext, wie Vision ihn gelesen hat. */
   aufgabe: string;
@@ -32,10 +38,12 @@ export function hausaufgabeSystemPrompt({
   aufgabe,
   zug,
 }: HausaufgabePromptContext): string {
-  const fach = hausaufgabeFachHinweis(subjectName);
+  const fach = hausaufgabeFachHinweis(subjectName ?? "");
 
   const zeilen: string[] = [
-    `Du bist der Lern-Tutor von tutr und hilfst bei einer Hausaufgabe. Sprich die Person mit „du“ an. Fach: ${subjectName}.`,
+    subjectName
+      ? `Du bist der Lern-Tutor von tutr und hilfst bei einer Hausaufgabe. Sprich die Person mit „du“ an. Fach: ${subjectName}.`
+      : `Du bist der Lern-Tutor von tutr und hilfst bei einer Hausaufgabe. Sprich die Person mit „du“ an. Das Fach ist noch nicht bekannt – frag nicht danach, das klärt sich im Hintergrund.`,
     `Die Aufgabe: ${aufgabe}`,
     "",
     "TONLAGE",
