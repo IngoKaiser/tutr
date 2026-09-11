@@ -60,6 +60,15 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Fixed
 
+- **Log-Injection in zwei Fehlerprotokollen (CodeQL `js/log-injection`).** `console.error()`
+  beim Foto-Import (Vokabeln, Hausaufgaben) schrieb eine ID aus der Anfrage und eine
+  Fehlerursache ungeprüft ins Serverlog – ein Zeilenumbruch darin hätte eine gefälschte
+  Logzeile einschleusen können. Jetzt geht die ganze zusammengesetzte Zeile durch
+  `JSON.stringify()`, bevor sie geloggt wird – das escaped Zeilenumbrüche, Anführungszeichen
+  und andere Steuerzeichen in einem Rutsch. (Ein erster Versuch mit einer eigenen
+  `.replace()`-Sanitisierung sah lokal korrekt aus, erfüllte aber nicht das enge Muster, das
+  CodeQLs `js/log-injection`-Regel als Schranke erkennt – deshalb der Umweg über eine
+  Funktion, die die Regel eindeutig kennt.)
 - **V-13: „Passt so“ war dasselbe wie „Speichern“ – raus.** Aus dem Testen: Ein eigener
   zweiter Knopf zum Akzeptieren einer geprüften Zeile war überflüssig, weil „Speichern“
   (mit den vorausgefüllten Feldern) `confirmed_at` schon immer mitsetzt, auch ganz ohne
