@@ -132,3 +132,46 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Kopf- und Fußleiste bleiben stehen (F-18).
+ *
+ * Der App-Rahmen ist `h-dvh` mit scrollendem `main` – trotzdem durfte der
+ * **Body** mitscrollen. Auf iOS reichte der Gummiband-Effekt, um die ganze
+ * Anwendung samt Kopfzeile aus dem Bild zu schieben; im Screenshot blieb
+ * oben ein schwarzer Streifen stehen.
+ *
+ * Der Riegel gilt nur dort, wo der Rahmen wirklich steht (`:has`): Die
+ * Anmelde- und Wiederherstellungsseiten hängen direkt am Wurzel-Layout,
+ * haben keinen eigenen Scrollbereich und müssen weiter normal scrollen.
+ */
+html:has(.app-rahmen),
+body:has(.app-rahmen) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/*
+ * Kein automatisches Hineinzoomen beim Antippen eines Feldes (F-18).
+ *
+ * iOS Safari zoomt, sobald ein fokussiertes Eingabefeld kleiner als 16 px
+ * setzt – unsere Felder standen auf 14 px (`text-sm`). Auf Tippgeräten
+ * bekommen sie deshalb schlicht die Größe, ab der nicht gezoomt wird.
+ *
+ * Bewusst **nicht** `user-scalable=no`: Das ignoriert iOS Safari seit iOS 10
+ * ohnehin (es wirkt nur in der installierten PWA) und es verstößt gegen
+ * WCAG 1.4.4 – Aufziehen mit zwei Fingern muss möglich bleiben. Das
+ * eigentliche Ärgernis ist der *automatische* Zoom, und genau der ist hier weg.
+ *
+ * Die Regel steht bewusst **außerhalb jeder `@layer`**: Tailwind legt seine
+ * Utilities in `@layer utilities`, und ungeschichtete Regeln gewinnen in der
+ * Kaskade gegen geschichtete – ohne `!important` und ohne Spezifitätstricks.
+ */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

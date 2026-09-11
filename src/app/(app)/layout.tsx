@@ -48,7 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // Tutor-Composer per `sticky bottom-0` genau über der Fußleiste klebt,
     // ohne deren Höhe kennen zu müssen. Vorher wanderte er beim Lesen einer
     // langen Antwort aus dem Bild.
-    <div className="flex h-dvh flex-col">
+    <div className="app-rahmen flex h-dvh flex-col">
       <header className="border-linie bg-flaeche shrink-0 border-b">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-3">
           <span className="text-koenigsblau text-lg font-bold tracking-tight">tutr</span>
@@ -104,7 +104,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* `min-h-0` ist hier nicht kosmetisch: Ohne das weigert sich ein
           Flex-Kind zu schrumpfen, `overflow-y-auto` liefe ins Leere und die
           Seite scrollte wieder als Ganzes. */}
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto w-full max-w-2xl px-4 py-5">{children}</div>
       </main>
 

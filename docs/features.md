@@ -30,6 +30,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | `withActor()`, `app.*`-Helper, RLS-Metatest                                        | ✅    | F-04a   |
 |                          | Schema Identität, Kurrikulum, Lehrwerk-Registry                                    | ✅    | F-04b–d |
 |                          | App-Shell: fünf Bereiche, Mobile-First                                             | ✅    | F-07    |
+|                          | Rahmen steht fest: kein Body-Scroll, kein Zoom beim Feld-Fokus                     | ✅    | F-18    |
 |                          | Modell-Neuschnitt: Kind ist Mandant (ADR 0006)                                     | ✅    | F-11    |
 |                          | Seed-Skript                                                                        | ✅    | F-04e   |
 | **Anmeldung**            |                                                                                    | ✅    |         |

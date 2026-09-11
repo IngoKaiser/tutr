@@ -20,6 +20,17 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
   dort wo man weiterliest, und der Pfeil nach unten erscheint verlässlich, sobald du
   hochscrollst.
 
+- **F-18: Kopf- und Fußleiste bleiben stehen, und Felder zoomen nicht mehr hinein.** Zwei
+  Ärgernisse im täglichen Gebrauch, zwei getrennte Ursachen. Der App-Rahmen war zwar schon
+  bildschirmhoch mit eigenem Scrollbereich, aber die **Seite selbst** durfte trotzdem
+  scrollen – auf iOS reichte ein Gummiband-Zug, um die ganze Anwendung samt Kopfzeile aus
+  dem Bild zu schieben. Die ist jetzt festgesetzt, und zwar nur dort, wo der Rahmen steht:
+  Anmeldung und Wiederherstellung scrollen weiter normal. Und beim Antippen eines
+  Eingabefelds zoomte iOS hinein, weil die Felder auf 14 px standen – auf Tippgeräten sind
+  es jetzt 16 px, die Schwelle, ab der iOS in Ruhe lässt. Das **Aufziehen mit zwei Fingern
+  bleibt absichtlich möglich**: Es zu sperren ignoriert iOS Safari ohnehin und nähme
+  Menschen, die vergrößern müssen, die Möglichkeit dazu.
+
 - **V-12: drei Nachschärfungen aus dem Gerätetest.** Der farbige Grund beim Wischen lag nur
   unter dem „Löschen“-Knopf – wer weiter wischte, sah den Seitenhintergrund durchscheinen;
   jetzt liegt er über die ganze Zeile. Die „Rückgängig“-Leiste stand am **Ende der Liste**
