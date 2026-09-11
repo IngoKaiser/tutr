@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { HakenIcon, KopierenIcon, PauseIcon, PlayIcon } from "@/components/shell/icons";
@@ -89,6 +90,7 @@ export function Conversation({
   const [anhang, setAnhang] = useState<ComposerAnhang | null>(null);
   const [auslastung, setAuslastung] = useState(anfangsAuslastung);
   const vorlesen = useVorlesen();
+  const router = useRouter();
 
   // Geglätteter Textfluss: `zielText` ist, was angekommen ist, `streamText`,
   // was steht. Siehe `lib/tutor/stream-text.ts`.
@@ -124,13 +126,22 @@ export function Conversation({
         : subjectId
           ? { subjectId, entryPoint, message: frage, image: bild }
           : { message: frage, image: bild };
-      const { text, neueSessionId, fach } = await streameAntwort(payload, setZielText);
+      const { text, neueSessionId, fach, fortgesetzt } = await streameAntwort(payload, setZielText);
       setMessages((prev) => [...prev, { id: `tutor-${Date.now()}`, role: "tutor", content: text }]);
       if (!sessionId && neueSessionId) {
         setSessionId(neueSessionId);
-        // URL nachziehen, ohne zu navigieren – ein Reload landet danach im
-        // richtigen Gespräch, der Stream bleibt aber unangetastet.
-        window.history.replaceState(null, "", `/tutor/${neueSessionId}`);
+        if (fortgesetzt) {
+          // Die Frage ist in ein bestehendes Gespräch gewandert (ADR 0014 D1).
+          // Hier reicht die Adresszeile **nicht**: Vor uns steht nur dieser
+          // eine Austausch, das Modell kennt aber den ganzen Verlauf – eine
+          // Antwort, die auf etwas von vorhin verweist, zeigte auf nichts.
+          // `router.push` lädt das Gespräch wirklich, mit allem darin.
+          router.push(`/tutor/${neueSessionId}`);
+        } else {
+          // URL nachziehen, ohne zu navigieren – ein Reload landet danach im
+          // richtigen Gespräch, der Stream bleibt aber unangetastet.
+          window.history.replaceState(null, "", `/tutor/${neueSessionId}`);
+        }
       }
       // Das Fach steht erst jetzt fest (ADR 0013 D2) – der Server trägt es
       // in den Antwort-Headern nach, sonst zeigte der Chip weiter „Fach
@@ -633,6 +644,8 @@ async function streameAntwort(
   text: string;
   neueSessionId: string | null;
   fach: { id: string; name: string; language: string | null } | null;
+  /** Die Frage ist in ein bestehendes Gespräch gewandert (ADR 0014 D1). */
+  fortgesetzt: boolean;
 }> {
   const res = await fetch("/api/tutor", {
     method: "POST",
@@ -646,6 +659,7 @@ async function streameAntwort(
   }
 
   const neueSessionId = res.headers.get("x-tutor-session");
+  const fortgesetzt = res.headers.get("x-tutor-fortgesetzt") === "1";
   const fachId = res.headers.get("x-tutor-subject-id");
   const fachNameRoh = res.headers.get("x-tutor-subject-name");
   const fachSprache = res.headers.get("x-tutor-subject-language");
@@ -665,5 +679,5 @@ async function streameAntwort(
     onDelta(voll);
   }
 
-  return { text: voll, neueSessionId, fach };
+  return { text: voll, neueSessionId, fach, fortgesetzt };
 }

@@ -20,6 +20,7 @@ import {
   loeseFachZuordnungAuf,
   type FachOption,
 } from "@/lib/tutor/fach-zuordnung";
+import { istFortsetzbar } from "@/lib/tutor/fortsetzung";
 import { pruefeUndErzeugeAbschluss } from "@/lib/tutor/hausaufgabe-abschluss";
 import { istDeutsch } from "@/lib/tutor/language-guard";
 import {
@@ -128,6 +129,14 @@ type Vorarbeit =
       subjectId: string | null;
       subjectName: string | null;
       subjectLanguage: string | null;
+      /**
+       * Die Frage ist in ein bestehendes Gespräch gewandert, statt eins
+       * anzulegen (T-19b, ADR 0014 D1) – über `x-tutor-fortgesetzt` an den
+       * Client. Der hat dann einen leeren Verlauf vor sich, während das
+       * Modell den alten kennt; er muss deshalb wirklich auf `/tutor/<id>`
+       * wechseln, nicht bloß die Adresszeile nachziehen.
+       */
+      fortgesetzt: boolean;
       system: string;
       verlauf: TutorTurn[];
       usageId: string;
@@ -250,6 +259,11 @@ export async function POST(request: Request): Promise<Response> {
       "x-tutor-subject-id": vor.subjectId ?? "",
       "x-tutor-subject-name": vor.subjectName ? encodeURIComponent(vor.subjectName) : "",
       "x-tutor-subject-language": vor.subjectLanguage ?? "",
+      // ADR 0014 D1: Die Frage ist in ein bestehendes Gespräch gewandert.
+      // Ohne dieses Signal zöge der Client nur die Adresszeile nach und
+      // zeigte einen leeren Verlauf, während das Modell den alten kennt –
+      // eine Antwort mit „wie eben bei den Mitochondrien" zeigte auf nichts.
+      "x-tutor-fortgesetzt": vor.fortgesetzt ? "1" : "",
     },
   });
 }
@@ -330,6 +344,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
     let subjectLanguage: string | null;
     let topicTitle: string | null;
     let entryPoint: "freie_frage" | "verstehen";
+    let fortgesetzt = false;
 
     if (eingang.sessionId) {
       // `left join`, nicht `join`: Ein Gespräch ohne Fach (noch nicht
@@ -397,15 +412,45 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       subjectLanguage = zuordnung?.language ?? null;
       topicTitle = null;
 
-      // `titel` kommt aus der Zuordnung oben (ADR 0014 D2) und ist dort schon
-      // bereinigt – inklusive Rückfall auf die gekürzte Frage. `null` heißt,
-      // dass gar keine Zuordnung lief (keine Fächer, oder sie ist
-      // ausgefallen); dann steht hier, was bis T-19a überall stand.
-      const [neu] = await tx.execute<{ id: string }>(sql`
-        insert into tutor_session (student_id, subject_id, title, entry_point)
-        values (app.student_id(), ${subjectId}, ${titel ?? kuerzeTitel(eingang.message)}, ${entryPoint})
-        returning id`);
-      sessionId = neu!.id;
+      // **Fortsetzen statt neu anlegen** (T-19b, ADR 0014 D1): Steht im
+      // selben Fach ein Gespräch, das gerade eben noch lief, wandert die
+      // Frage dorthin. Ohne Fach greift das nicht – dann ist nicht
+      // feststellbar, ob es dasselbe Thema ist.
+      //
+      // `entry_point = 'freie_frage'` schließt beides aus, was hier nicht
+      // hingehört: Hausaufgaben-Sessions (die gehören zu einem Foto und haben
+      // ihren eigenen Dialog, §4a) und die alten „verstehen"-Gespräche, deren
+      // Systemprompt ein anderer ist (die Kachel dafür ist mit ADR 0013 D1
+      // entfallen, die Zeilen von damals stehen aber noch da). Eine freie
+      // Frage in eins von beiden zu schreiben, hieße den Zug mit dem falschen
+      // Prompt zu fahren.
+      //
+      // Das Zeitfenster steht **nicht** als `interval` in dieser Abfrage,
+      // sondern in `istFortsetzbar()` – eine Setzung, über die wir nachdenken
+      // wollen, gehört nicht unsichtbar in eine `where`-Klausel.
+      const letzte = subjectId
+        ? await tx.execute<{ id: string; updated_at: string }>(sql`
+            select ts.id, ts.updated_at
+            from tutor_session ts
+            where ts.subject_id = ${subjectId} and ts.entry_point = 'freie_frage'
+            order by ts.updated_at desc
+            limit 1`)
+        : [];
+
+      if (letzte[0] && istFortsetzbar(new Date(letzte[0].updated_at), new Date())) {
+        sessionId = letzte[0].id;
+        fortgesetzt = true;
+      } else {
+        // `titel` kommt aus der Zuordnung oben (ADR 0014 D2) und ist dort
+        // schon bereinigt – inklusive Rückfall auf die gekürzte Frage.
+        // `null` heißt, dass gar keine Zuordnung lief (keine Fächer, oder
+        // sie ist ausgefallen); dann steht hier, was bis T-19a überall stand.
+        const [neu] = await tx.execute<{ id: string }>(sql`
+          insert into tutor_session (student_id, subject_id, title, entry_point)
+          values (app.student_id(), ${subjectId}, ${titel ?? kuerzeTitel(eingang.message)}, ${entryPoint})
+          returning id`);
+        sessionId = neu!.id;
+      }
     }
 
     const verlaufRows = await tx.execute<{ role: "nutzer" | "tutor"; content: string }>(sql`
@@ -433,6 +478,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       subjectLanguage,
       usageId,
       zuordnungTokens,
+      fortgesetzt,
       system: tutorSystemPrompt({
         subjectName,
         subjectLanguage,
@@ -534,6 +580,7 @@ async function bereiteHausaufgabeVor(
       subjectLanguage: null,
       usageId,
       zuordnungTokens: null,
+      fortgesetzt: false,
       system: hausaufgabeSystemPrompt({
         subjectName: row.subject_name,
         gradeLevel: row.grade_level,
