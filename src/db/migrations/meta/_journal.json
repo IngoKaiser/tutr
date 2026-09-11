@@ -71,6 +71,20 @@
       "when": 1789080798955,
       "tag": "0009_fluffy_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789112556030,
+      "tag": "0010_soft_ronan",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789112595368,
+      "tag": "0011_stiff_sunspot",
+      "breakpoints": true
     }
   ]
 }

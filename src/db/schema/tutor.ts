@@ -135,9 +135,10 @@ export const tutorMessage = pgTable(
 );
 
 // --- ai_usage -----------------------------------------------------------
-// Das Kostenkonto (S-03b, ADR 0010 D4): eine Zeile je Modellaufruf, RLS wie
-// `tutor_message` (nur Kind). Das Limit ist eine `count(*)`-Abfrage über ein
-// gleitendes Fenster; aufgeräumt wird beim Schreiben, nicht per Cron.
+// Das Kostenkonto (S-03b, ADR 0010 D4; in echtes Geld übersetzt S-03c): eine
+// Zeile je Modellaufruf, RLS wie `tutor_message` (nur Kind). Das Limit ist
+// eine `sum(...)`-Abfrage über ein gleitendes Fenster; aufgeräumt wird beim
+// Schreiben, nicht per Cron.
 
 export const aiUsage = pgTable(
   "ai_usage",
@@ -145,8 +146,17 @@ export const aiUsage = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     studentId: uuid("student_id").notNull(),
     endpoint: aiEndpoint("endpoint").notNull(),
-    /** Ein- + Ausgabe des Aufrufs, wenn bekannt. `null`, wenn der Aufruf vor der Antwort abbrach. */
-    tokenCount: integer("token_count"),
+    /**
+     * Eingabe und Ausgabe **getrennt** (S-03c), nicht mehr als eine Summe:
+     * Sonnet berechnet Ausgabe-Tokens fünfmal so teuer wie Eingabe-Tokens
+     * (`lib/ai/rate-limit.ts`) – eine addierte Zahl ließe sich nicht mehr in
+     * echtes Geld zurückrechnen. Beide `null`, wenn der Aufruf vor der
+     * Antwort abbrach (dann zählt die Zeile 0 zum Kostendeckel, nicht die
+     * tatsächlich schon verbrauchten Tokens – eine bekannte, kleine Lücke,
+     * siehe Kommentar dort).
+     */
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
     ...timestamps,
   },
   (t) => [foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade")],
