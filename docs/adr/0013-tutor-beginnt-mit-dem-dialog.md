@@ -1,6 +1,6 @@
 # ADR 0013: Der Tutor beginnt mit dem Dialog, nicht mit einem Formular
 
-Status: **Entwurf** · Datum: 2026-09-11 · Bezug: docs/konzept.md §4 (Einstieg 7), §5, §15
+Status: **akzeptiert** · Datum: 2026-09-11 · Bezug: docs/konzept.md §4 (Einstieg 7), §5, §15
 Ändert [ADR 0010](0010-tutor-architektur.md) D6 (`tutor_session.subject_id` ist `not null`).
 Setzt [ADR 0011](0011-sprache-im-tutor.md) D3 fort („der Zustand gehört der App, nicht dem
 Modell"). Tickets: T-13.
@@ -125,6 +125,16 @@ Drei Eigenschaften, die nicht verhandelbar sind:
 Kosten: ein Haiku-Aufruf je Gespräch, nur bei der ersten Nachricht, über denselben
 `ai_usage`-Weg gezählt und gedeckelt wie alles andere (S-03c).
 
+**Die Erkennung läuft _vor_ dem Streamen, nicht daneben.** Das kostet Wartezeit vor dem
+ersten Wort und ist trotzdem richtig: Der Systemprompt braucht das Fach, weil `subject.language`
+darüber entscheidet, ob die Zielsprache erlaubt ist. Liefe die Erkennung parallel, wäre
+ausgerechnet die erste Antwort in einem Sprachenfach die schlechteste – „wie bilde ich das
+passé composé" ohne ein einziges französisches Beispiel, weil D5 die Zielsprache noch
+verbietet. Der Aufruf ist klein (ein Enum als Ausgabe) und läuft parallel zur
+Datenbank-Vorarbeit derselben Anfrage; bleibt er trotzdem über der Drei-Sekunden-Marke aus
+CLAUDE.md, gehört dorthin ein benannter Schritt („ordne das Fach zu"), kein Spinner.
+Ab der zweiten Nachricht entfällt er ganz – das Fach steht dann in der Zeile.
+
 ### D3 · `tutor_session.subject_id` wird nullbar – als Übergang, nicht als Dauerzustand
 
 Damit ist ADR 0010 D6 in diesem Punkt geändert. `null` heißt **„noch nicht einsortiert"**,
@@ -161,8 +171,8 @@ Fremdsprachen-Zugeständnis: Die Antwort ist deutsch. Das ist die sichere Richtu
 Fehler „hätte französische Beispiele bringen dürfen" ist harmlos, der Fehler „hat auf
 Englisch geantwortet" ist der aus §15.
 
-Die Fachtabelle aus §4a betrifft den Hausaufgaben-Ablauf, und der kennt sein Fach von
-Anfang an (er beginnt an einer Route, die es mitbringt). Dort ändert sich nichts.
+Für den Hausaufgaben-Ablauf gilt dasselbe, bis das Foto gelesen ist – siehe D7. Danach
+steht das Fach fest, und die Fachtabelle aus §4a greift wie bisher.
 
 ### D6 · Die Historie bleibt nach Fach gruppiert
 
@@ -170,6 +180,23 @@ Genau der Teil, der im Auslöser ausdrücklich behalten werden soll. Sessions oh
 stehen unter einer eigenen Überschrift („Noch nicht einsortiert") am Ende der Liste, statt
 sich unter ein beliebiges Fach zu mischen. Ist die Gruppe leer – der Normalfall –,
 erscheint sie nicht.
+
+### D7 · Bei der Hausaufgabe kommt das Fach aus dem Foto, nicht aus einem zweiten Aufruf
+
+Ohne die Fachwahl auf `/tutor` hätte auch der Hausaufgaben-Weg keine Quelle mehr für sein
+Fach: `/tutor/hausaufgabe/neu` bekommt es heute als `?fach=` aus genau dem Auswahlfeld,
+das D1 abschafft. Diese Lücke schließt nicht D2, sondern das Foto selbst.
+
+Vision liest das Blatt ohnehin (§4a Schritt 1, `homeworkExtractionSchema`). Das Schema
+bekommt ein Feld für das Fach dazu – mit denselben Regeln wie in D2: geschlossene Auswahl
+aus den Fächern des Kindes, `unklar` erlaubt, kein Anlegen. **Kein zusätzlicher Aufruf und
+keine zusätzlichen Kosten**, denn das Bild geht ohnehin durch das Modell; ein Aufgabenblatt
+sagt sein Fach meist schon in der ersten Zeile.
+
+Die Session der Hausaufgabe entsteht damit ebenfalls ohne Fach (D3) und bekommt es beim
+ersten eingelesenen Foto. Für `hausaufgabeFachHinweis()` ändert sich nichts: Die Funktion
+hat seit T-03 einen Fallback für unbekannte Fachnamen – „vorsichtige Vorgabe statt gar
+keiner" –, und genau der greift bei `unklar`.
 
 ## Konsequenzen
 
