@@ -8,6 +8,7 @@ import { withActor, type Actor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
+import { saniereFuerLog } from "@/lib/log";
 import { pruefeUndErzeugeAbschluss } from "@/lib/tutor/hausaufgabe-abschluss";
 import { classifyHomeworkPhotoError } from "@/lib/tutor/hausaufgabe-foto";
 import type { HomeworkStatus } from "@/lib/tutor/hint-ladder";
@@ -109,7 +110,13 @@ export async function fotoZuAufgaben(
     );
   } catch (problem) {
     const { fehler, ursache } = classifyHomeworkPhotoError(problem);
-    console.error(`Hausaufgaben-Foto gescheitert (Session ${sessionId}): ${ursache}`);
+    // `sessionId` kommt roh aus der Anfrage, `ursache` kann bei einem
+    // unerwarteten Fehler `error.message` enthalten – beides ungeprüft in
+    // ein Serverlog zu schreiben, ließe einen Zeilenumbruch darin eine
+    // gefälschte Logzeile einschleusen (CodeQL `js/log-injection`).
+    console.error(
+      `Hausaufgaben-Foto gescheitert (Session ${saniereFuerLog(sessionId)}): ${saniereFuerLog(ursache)}`,
+    );
     return { ok: false, fehler };
   }
 
