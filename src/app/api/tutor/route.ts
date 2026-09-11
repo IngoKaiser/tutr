@@ -12,6 +12,7 @@ import { withActor, type Actor } from "@/db/actor";
 import { loginStatus } from "@/lib/auth/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
+import { pruefeUndErzeugeAbschluss } from "@/lib/tutor/hausaufgabe-abschluss";
 import { istDeutsch } from "@/lib/tutor/language-guard";
 import {
   folgeZustand,
@@ -488,4 +489,11 @@ async function schreibeHausaufgabenZug(
       where id = ${taskId}`);
     await tx.execute(sql`update tutor_session set updated_at = now() where id = ${sessionId}`);
   });
+
+  // Nach der Transaktion, nicht darin: prüft selbst noch einmal (eigene
+  // Transaktion) und ruft bei Bedarf das Modell für den Hinweis-Halbsatz –
+  // das soll die Transaktion oben nicht offenhalten.
+  if (istAbgeschlossen(neuerZustand)) {
+    await pruefeUndErzeugeAbschluss(actor, sessionId);
+  }
 }

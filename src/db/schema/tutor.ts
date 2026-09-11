@@ -174,6 +174,51 @@ export const homeworkTask = pgTable(
   ],
 );
 
+// --- tutor_session_summary -------------------------------------------------
+// Der Zweizeiler nach Abschluss einer Hausaufgaben-Session (T-03, §4a
+// „Ansicht"): „5 Aufgaben, 4 selbst gelöst, 1 mit Lösung – Ungleichungen
+// üben wir morgen."
+//
+// **War laut ADR 0004 D4 für Eltern gedacht, ist es nach ADR 0012 D3
+// nicht mehr.** „Eltern sehen, was gelernt wird – nicht, wie gut es
+// läuft" schließt auch den Zweizeiler ein: Er verrät über die Zahl
+// gezeigter Lösungen genau das Wie-gut, das ADR 0012 den Eltern entzieht.
+// CLAUDE.md führt die Tabelle deshalb ausdrücklich in der Kein-Zugriff-
+// Liste. Die Tabelle bleibt trotzdem – als Abschluss-Rückmeldung fürs
+// Kind selbst (`ladeHausaufgabenListe()` zeigt sie über der Aufgabenliste,
+// sobald jede Aufgabe abgeschlossen ist) und damit ein einmal erzeugter
+// Satz bei jedem erneuten Öffnen derselbe bleibt, statt bei jedem Laden neu
+// erfunden zu werden.
+//
+// Eine Zeile je Session (`unique` auf `session_id`) – `naechsterZug()`/
+// `zustandNachVersuchUrteil()` bestimmen den Zustand je Aufgabe, hier
+// zählt nur die fertige Bilanz (`lib/tutor/hausaufgabe-zusammenfassung.ts`
+// `bilanziere()`), kein Nacherzählen des Dialogs.
+//
+// **RLS: nur das Kind**, dieselbe Richtung wie `homework_task`
+// (`0080-homework.sql`).
+
+export const tutorSessionSummary = pgTable(
+  "tutor_session_summary",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    studentId: uuid("student_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    /** Der fertige Zweizeiler, schon als ein Satz – keine Einzelfelder, die die Oberfläche wieder zusammensetzen müsste. */
+    summary: text("summary").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
+    foreignKey({
+      name: "tutor_session_summary_session_fk",
+      columns: [t.sessionId, t.studentId],
+      foreignColumns: [tutorSession.id, tutorSession.studentId],
+    }).onDelete("cascade"),
+    unique("tutor_session_summary_session_id_key").on(t.sessionId),
+  ],
+);
+
 // --- tutor_message -------------------------------------------------------
 
 export const tutorMessage = pgTable(

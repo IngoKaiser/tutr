@@ -4,6 +4,11 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { aiEnv } from "@/lib/env";
 
 import {
+  hausaufgabeZusammenfassungSystemPrompt,
+  hausaufgabeZusammenfassungUserPrompt,
+  type HausaufgabeZusammenfassungContext,
+} from "./prompts/hausaufgabe-zusammenfassung";
+import {
   homeworkExtractionSystemPrompt,
   homeworkExtractionUserPrompt,
   type HomeworkExtractionContext,
@@ -18,6 +23,10 @@ import {
   vocabExtractionUserPrompt,
   type VocabExtractionContext,
 } from "./prompts/vocab-extraction";
+import {
+  hausaufgabenZusammenfassungSchema,
+  type HausaufgabenZusammenfassung,
+} from "./schemas/hausaufgabe-zusammenfassung";
 import { homeworkExtractionSchema, type HomeworkExtraction } from "./schemas/homework-extraction";
 import { versuchUrteilSchema, type VersuchUrteil } from "./schemas/versuch-urteil";
 import { vocabExtractionSchema, type VocabExtraction } from "./schemas/vocab-extraction";
@@ -254,6 +263,43 @@ export async function klassifiziereVersuch(
   }
   return {
     urteil: message.parsed_output.urteil,
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  };
+}
+
+export type HausaufgabeHinweisResult = HausaufgabenZusammenfassung & {
+  inputTokens: number;
+  outputTokens: number;
+};
+
+/**
+ * Der Hinweis-Halbsatz für den Zweizeiler nach Abschluss einer Hausaufgaben-
+ * Session (T-03 PR 2, §4a „Ansicht"). Sonnet, nicht Haiku (CLAUDE.md:
+ * „Sonnet für … Generierung") – anders als `klassifiziereVersuch()` ist das
+ * hier keine Destillation einer schon fertigen Antwort, sondern eine eigene
+ * kleine Einschätzung aus der Aufgabenliste.
+ *
+ * Wirft, wenn das Modell nichts Verwertbares liefert; der Aufrufer
+ * (`lib/tutor/hausaufgabe-abschluss.ts`) fällt dann auf einen neutralen
+ * Halbsatz zurück statt den ganzen Abschluss scheitern zu lassen.
+ */
+export async function erzeugeHausaufgabenHinweis(
+  context: HausaufgabeZusammenfassungContext,
+): Promise<HausaufgabeHinweisResult> {
+  const message = await anthropic().messages.parse({
+    model: TUTOR_MODEL,
+    max_tokens: 60,
+    system: hausaufgabeZusammenfassungSystemPrompt(),
+    output_config: { format: zodOutputFormat(hausaufgabenZusammenfassungSchema) },
+    messages: [{ role: "user", content: hausaufgabeZusammenfassungUserPrompt(context) }],
+  });
+
+  if (!message.parsed_output) {
+    throw new Error("Die Zusammenfassung hat keine verwertbare Antwort geliefert.");
+  }
+  return {
+    hinweis: message.parsed_output.hinweis,
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
   };

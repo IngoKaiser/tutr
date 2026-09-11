@@ -42,9 +42,11 @@ export function TutorOverviewView({ overview }: { overview: TutorOverview | null
   );
 }
 
+type Einstieg = "freie_frage" | "verstehen" | "hausaufgabe";
+
 function NeuesGespraech({ subjects }: { subjects: TutorOverview["subjects"] }) {
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
-  const [entryPoint, setEntryPoint] = useState<"freie_frage" | "verstehen">("freie_frage");
+  const [entryPoint, setEntryPoint] = useState<Einstieg>("freie_frage");
 
   if (subjects.length === 0) {
     return (
@@ -77,6 +79,7 @@ function NeuesGespraech({ subjects }: { subjects: TutorOverview["subjects"] }) {
             [
               ["freie_frage", "Freie Frage"],
               ["verstehen", "Verstehen"],
+              ["hausaufgabe", "Hausaufgabe"],
             ] as const
           ).map(([wert, label]) => (
             <label
@@ -102,19 +105,30 @@ function NeuesGespraech({ subjects }: { subjects: TutorOverview["subjects"] }) {
         <span className="text-tinte-leise text-[0.6875rem]">
           {entryPoint === "verstehen"
             ? "Du hast etwas im Unterricht nicht verstanden — der Tutor fragt nach, wo es hakt."
-            : "Stell irgendeine Frage zum Fach."}
+            : entryPoint === "hausaufgabe"
+              ? "Foto von den Aufgaben — der Tutor legt daraus eine Liste an, eine nach der anderen."
+              : "Stell irgendeine Frage zum Fach."}
         </span>
       </fieldset>
 
       {/* `URLSearchParams` statt Zusammenkleben: kodiert die Werte, egal was
           im Feld steht. CodeQL hatte die Interpolation zu Recht als
           „DOM text reinterpreted as HTML" markiert – und ein Fach-Name mit
-          `&` hätte die URL ohnehin zerlegt. */}
+          `&` hätte die URL ohnehin zerlegt.
+
+          Hausaufgabe führt auf eine eigene Route (`/tutor/hausaufgabe/neu`),
+          nicht auf `/tutor/neu`: Der erste Schritt ist dort ein Foto, kein
+          Chatfenster – ein eigener Einstieg statt eines dritten `entryPoint`-
+          Zweigs in `chat.tsx`, der dessen Composer hätte verzweigen müssen. */}
       <Link
-        href={`/tutor/neu?${new URLSearchParams({ fach: subjectId, einstieg: entryPoint }).toString()}`}
+        href={
+          entryPoint === "hausaufgabe"
+            ? `/tutor/hausaufgabe/neu?${new URLSearchParams({ fach: subjectId }).toString()}`
+            : `/tutor/neu?${new URLSearchParams({ fach: subjectId, einstieg: entryPoint }).toString()}`
+        }
         className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau w-full rounded-[9px] border border-transparent px-4 py-2.5 text-center text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
       >
-        Gespräch beginnen
+        {entryPoint === "hausaufgabe" ? "Foto aufnehmen" : "Gespräch beginnen"}
       </Link>
     </Block>
   );
@@ -149,7 +163,7 @@ function Historie({ sessions }: { sessions: TutorOverview["sessions"] }) {
             {(nachFach.get(fach) ?? []).map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/tutor/${s.id}`}
+                  href={s.hausaufgabe ? `/tutor/hausaufgabe/${s.id}` : `/tutor/${s.id}`}
                   className="border-linie bg-papier hover:bg-papier-tief flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2.5"
                 >
                   <span className="text-tinte min-w-0 flex-1 truncate text-[0.8125rem]">

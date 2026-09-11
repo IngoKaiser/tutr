@@ -1,6 +1,6 @@
 # Feature-Übersicht
 
-**Stand: 10. September 2026** · Bezug: `docs/PLAN.md` (Backlog mit Begründung je Ticket),
+**Stand: 11. September 2026** · Bezug: `docs/PLAN.md` (Backlog mit Begründung je Ticket),
 `docs/roadmap.md` (Arbeitsreihenfolge), `docs/konzept.md` (Spezifikation).
 
 Diese Tabelle ist der schnelle Blick von oben: wo steht welcher Bereich. Sie wird mit
@@ -92,7 +92,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Kontextpaket, Schichten mit Quellenangabe, Prompt Caching                          | 🌑    | T-01    |
 |                          | „Erklär es anders“, Verständnischeck, Anschlussfragen-Chips                        | 🌑    | T-02c   |
 |                          | Elternsicht entschieden (ADR 0012: was, nicht wie gut)                             | ✅    | T-01c   |
-|                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter                                  | 🌒    | T-03    |
+|                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter → Lösung, Zweizeiler zum Schluss | ✅    | T-03    |
 |                          | Einstieg Vorschau (Selbsteinschätzung → Hook)                                      | 🌑    | T-04    |
 | **Sprache im Tutor**     |                                                                                    | 🌓    |         |
 |                          | Weg entschieden (ADR 0011: Diktat + Vorlesen, Echtzeit vertagt)                    | ✅    | T-01b   |
@@ -131,7 +131,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 6. ~~**T-07**~~ — erledigt (Chat-Shell: Übersicht + Gespräch, klebendes Eingabefeld, ↓-Knopf)
 7. ~~**T-08 + T-09**~~ — erledigt (Markdown-Rendering; Ansprache nach `student.grade_level`)
 8. ~~**T-01c**~~ — erledigt (ADR 0012 Elternsicht, akzeptiert); **F-17** räumt die Alt-Policies auf
-9. **T-03 schmal** — Hausaufgabe mit Hinweisleiter, in zwei PRs
+9. ~~**T-03 schmal**~~ — erledigt (Hausaufgabe mit Hinweisleiter, in zwei PRs: Fundament, dann Backend + Oberfläche)
 10. **H-01 schmal** — Heute mit echten Daten
 11. **V-04** — Set-Modus
 

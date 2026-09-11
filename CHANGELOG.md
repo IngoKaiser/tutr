@@ -26,6 +26,22 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **T-03: der Hausaufgaben-Tutor.** Foto der Aufgaben → Aufgabenliste → Hinweisleiter → Lösung
+  nach zwei Versuchen (§4a), als dritter Einstieg neben „Freie Frage“ und „Verstehen“. Ein Foto
+  legt eine oder mehrere Aufgaben an (Vision liest, löst aber nichts). Jede Aufgabe hat zwei
+  Bahnen – „ich verstehe die Aufgabe nicht“ (erklärt, zählt nicht als Versuch) und „hier ist
+  mein Versuch“ (prüft Weg **und** Ergebnis, per Text, Diktat oder Foto vom Lösungsweg). Die
+  Hinweisleiter steigt nie zwei Stufen auf einmal, die Lösung kommt erst nach zwei
+  dokumentierten Versuchen – oder, als Ventil, nach zwei Hinweisstufen ausdrücklich verlangt
+  (dann als „Lösung gezeigt“ markiert, nie als „gelöst“). Ob ein Versuch richtig war, urteilt
+  ein eigener, kleiner Haiku-Aufruf über die schon fertige Tutor-Antwort – alles andere
+  (Versuchszahl, Hinweisstufe, ob die Lösung erlaubt ist) entscheidet die App, nicht das
+  Modell. Sobald jede Aufgabe einer Sitzung abgeschlossen ist, erscheint ein Zweizeiler:
+  „5 Aufgaben, 4 selbst gelöst, 1 mit Lösung – Ungleichungen üben wir morgen“ – die Zahlen
+  zählt die App, nur der Hinweis danach kommt vom Modell. `homework_task` und die neue Tabelle
+  `tutor_session_summary` bleiben wie `tutor_session`/`tutor_message` **beim Kind** (ADR 0012
+  D3) – keine Elternzeile, anders als ADR 0004 D4 ursprünglich vorsah.
+
 - **V-13: der Lernrhythmus erklärt sich selbst.** Beim Testen aufgefallen: „Neu / Am Üben /
   Sitzt“ und eine täglich wechselnde Fällig-Zahl sind ohne Erklärung nicht nachvollziehbar –
   warum ist nicht jeden Tag alles dran? Ein aufklappbarer Hinweis unter den Fach-Blöcken auf

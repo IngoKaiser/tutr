@@ -29,6 +29,10 @@ export default async function GespraechPage({
   // `null` heißt: gibt es nicht, oder gehört einem anderen Kind – RLS
   // unterscheidet das nicht, und die Oberfläche soll es auch nicht.
   if (!session) notFound();
+  // Eine Hausaufgaben-Session gehört auf ihre eigene Route (T-03 PR 2) – der
+  // freie Chat kennt weder Aufgabenliste noch Bahnen. Ein alter Link oder ein
+  // Eintrag aus der Übersicht landet trotzdem hier, deshalb die Weiche.
+  if (session.entryPoint === "hausaufgabe") redirect(`/tutor/hausaufgabe/${sessionId}`);
 
   const overview = await loadTutorOverview();
   const subject = overview?.subjects.find((s) => s.name === session.subjectName);

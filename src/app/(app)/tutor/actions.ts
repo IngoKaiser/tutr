@@ -31,6 +31,8 @@ export type SessionSummary = {
   title: string;
   subjectName: string;
   updatedAt: string;
+  /** `true` bei `entry_point = 'hausaufgabe'` (T-03 PR 2) – die Übersicht verlinkt dann auf `/tutor/hausaufgabe/<id>` statt auf den freien Chat. */
+  hausaufgabe: boolean;
 };
 
 export type TutorOverview = {
@@ -55,8 +57,9 @@ export async function loadTutorOverview(): Promise<TutorOverview | null> {
       title: string;
       subject_name: string;
       updated_at: string;
+      entry_point: string;
     }>(sql`
-      select ts.id, ts.title, s.name as subject_name, ts.updated_at
+      select ts.id, ts.title, s.name as subject_name, ts.updated_at, ts.entry_point
       from tutor_session ts
       join subject s on s.id = ts.subject_id
       order by ts.updated_at desc
@@ -69,6 +72,7 @@ export async function loadTutorOverview(): Promise<TutorOverview | null> {
         title: r.title,
         subjectName: r.subject_name,
         updatedAt: r.updated_at,
+        hausaufgabe: r.entry_point === "hausaufgabe",
       })),
     };
   });
