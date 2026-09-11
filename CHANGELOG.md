@@ -6,6 +6,20 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Fixed
 
+- **T-10: der Tutor-Chat hört auf dich – und auf die Stimme, die du eingestellt hast.** Vier
+  Dinge aus dem Gebrauch. **Die Stimme:** Die App setzte immer selbst eine Stimme aus der
+  Liste des Browsers und überschrieb damit die, die in den Geräte-Einstellungen gewählt ist
+  – wer dort „Anna (Premium)“ ausgesucht hatte, hörte trotzdem die alte, kompakte Anna. Jetzt
+  bleibt die Systemstimme unangetastet, außer du wählst im Chat ausdrücklich eine andere.
+  **Der hängende „Stopp“:** Ein gespeichertes Gespräch begann beim Öffnen vorzulesen; iOS
+  verwirft das ohne vorherige Berührung stillschweigend, und der Knopf blieb für immer auf
+  „Stopp“ stehen, obwohl nichts lief. Jetzt spricht ein Gespräch beim Öffnen nicht mehr von
+  selbst los. **Die Leiste unter jeder Antwort:** statt der Textschaltfläche jetzt zwei
+  Icons – Kopieren (mit kurzer Bestätigung) und Abspielen, das während des Vorlesens zu
+  Pause wird und die Stelle behält. **Das Scrollen:** Ein Gespräch geht jetzt am Ende auf,
+  dort wo man weiterliest, und der Pfeil nach unten erscheint verlässlich, sobald du
+  hochscrollst.
+
 - **V-12: drei Nachschärfungen aus dem Gerätetest.** Der farbige Grund beim Wischen lag nur
   unter dem „Löschen“-Knopf – wer weiter wischte, sah den Seitenhintergrund durchscheinen;
   jetzt liegt er über die ganze Zeile. Die „Rückgängig“-Leiste stand am **Ende der Liste**

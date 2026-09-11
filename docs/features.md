@@ -104,6 +104,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 | **Kurrikulum**           |                                                                                    | 🌑    |         |
 |                          | Schema Kurrikulum-Pack                                                             | 🌑    | F-04g   |
 |                          | Pack `de-hh-gym-2023` importieren                                                  | 🌑    | T-05    |
+|                          | Chat-Leiste: Kopieren, Play/Pause, öffnet am Ende, Systemstimme                    | ✅    | T-10    |
 | **Betrieb**              |                                                                                    | 🌓    |         |
 |                          | Deploy `mytutr.de`, Domain, Preview/Production getrennt                            | ✅    | D-01    |
 |                          | E2E gegen die Test-Datenbank                                                       | ✅    | F-13    |
