@@ -139,18 +139,64 @@ export function LearningPath({ stage }: { stage: number }) {
  * geht – bis dahin zeigt der Chip nur das Fach. Ein Platzhalter wie „ohne
  * Thema" würde auf eine Lücke zeigen, statt Kontext zu geben.
  */
-export function ContextChip({ subject, topic }: { subject: string; topic?: string | null }) {
+/**
+ * Der Kontext-Chip „Fach › Thema" (§15).
+ *
+ * **Antippbar seit T-13 (ADR 0013 D4)**: Der Tutor startet ohne Fachwahl,
+ * ordnet die erste Nachricht selbst zu – und ein Chip, der das Ergebnis nur
+ * zeigt, hat keine Korrektur für eine falsche Zuordnung. `onClick` macht ihn
+ * zum Knopf statt zur reinen Anzeige; ohne `onClick` (Hausaufgaben-Dialog,
+ * der sein Fach von Anfang an kennt und nicht ändern lässt) bleibt er ein
+ * `<span>` wie zuvor. `subject: null` heißt „noch nicht zugeordnet" und
+ * zeigt „Fach wählen" statt eines Namens.
+ */
+export function ContextChip({
+  subject,
+  topic,
+  onClick,
+}: {
+  subject: string | null;
+  topic?: string | null;
+  onClick?: () => void;
+}) {
+  const topicInhalt = topic ? (
+    <>
+      <span aria-hidden="true" className="opacity-55">
+        ›
+      </span>
+      {topic}
+    </>
+  ) : null;
+  const klassen =
+    "bg-koenigsblau-hell text-koenigsblau inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-[0.8125rem] font-medium";
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={subject ? `Fach ${subject}, antippen zum Ändern` : "Fach wählen"}
+        className={`${klassen} hover:bg-koenigsblau/15 transition-colors`}
+      >
+        {/* `subject` in einem eigenen `<span>`, nicht lose im `<button>`:
+            Sonst gehört ein antippbarer Chip (mit dem `▾`-Pfeil daneben)
+            textlich zu „Französisch ▾“ statt zu „Französisch“ – und ein
+            Test, der genau den Fachnamen sucht
+            (`getByText(name, { exact: true })`), fände nichts mehr. Die
+            reine Anzeige unten braucht das nicht: Ohne Geschwistertext
+            bleibt ihr eigener Text schon exakt der Fachname. */}
+        <span>{subject ?? "Fach wählen"}</span>
+        {topicInhalt}
+        <span aria-hidden="true" className="opacity-55">
+          ▾
+        </span>
+      </button>
+    );
+  }
   return (
-    <span className="bg-koenigsblau-hell text-koenigsblau inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-[0.8125rem] font-medium">
-      {subject}
-      {topic ? (
-        <>
-          <span aria-hidden="true" className="opacity-55">
-            ›
-          </span>
-          {topic}
-        </>
-      ) : null}
+    <span className={klassen}>
+      {subject ?? "Fach wählen"}
+      {topicInhalt}
     </span>
   );
 }

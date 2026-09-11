@@ -34,13 +34,16 @@ export default async function GespraechPage({
   // Eintrag aus der Übersicht landet trotzdem hier, deshalb die Weiche.
   if (session.entryPoint === "hausaufgabe") redirect(`/tutor/hausaufgabe/${sessionId}`);
 
+  // Für den Fach-Chip (ADR 0013 D4) – die Auswahl, aus der geändert werden
+  // kann. `subjectId` kommt jetzt direkt aus `loadSession()`, kein
+  // Namensabgleich mehr nötig (der brach bei `subjectName: null`, ADR 0013
+  // D3, ohnehin).
   const overview = await loadTutorOverview();
-  const subject = overview?.subjects.find((s) => s.name === session.subjectName);
 
   return (
     <Conversation
       sessionId={session.id}
-      subjectId={subject?.id ?? ""}
+      subjectId={session.subjectId}
       subjectName={session.subjectName}
       subjectLanguage={session.subjectLanguage}
       topicTitle={session.topicTitle}
@@ -52,6 +55,7 @@ export default async function GespraechPage({
       }))}
       available={anthropicConfigured()}
       auslastung={await ladeAuslastung()}
+      alleFaecher={overview?.subjects ?? []}
     />
   );
 }
