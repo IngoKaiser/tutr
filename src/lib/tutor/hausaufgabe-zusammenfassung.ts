@@ -34,12 +34,18 @@ export function bilanziere(aufgaben: { status: HausaufgabeAusgang }[]): Aufgaben
 /**
  * Setzt Bilanz und Hinweis zum fertigen Satz zusammen – das Konzept-Beispiel
  * als Vorlage: „5 Aufgaben, 4 selbst gelöst, 1 mit Lösung – …". Eine Zahl,
- * die 0 ist, fällt aus der Aufzählung, statt „0 mit Lösung" mitzuschleppen;
- * „übersprungen" zählt zwar zu „gesamt", bekommt aber keine eigene Klausel –
- * sie ist für das Kind kein Ausgang, über den es sich rechtfertigen muss.
+ * die 0 ist, fällt aus der Aufzählung, statt „0 mit Lösung" mitzuschleppen.
+ *
+ * **Aussortierte zählen gar nicht mit** (T-17). Vorher zählten sie zu
+ * „gesamt", bekamen aber keine eigene Klausel – aus „5 Aufgaben, 4 selbst
+ * gelöst" wurde damit eine stille Lücke. Seit der Wisch „gehört nicht dazu"
+ * heißt, ist klar, was so eine Zeile ist: keine Aufgabe, sondern ein
+ * Merkkasten oder eine gestrichene Nummer, die Vision mitgelesen hat. Sie
+ * gehört nicht in die Bilanz einer Hausaufgabe.
  */
 export function zweizeiler(bilanz: AufgabenBilanz, hinweis: string): string {
-  const teile = [`${bilanz.gesamt} ${bilanz.gesamt === 1 ? "Aufgabe" : "Aufgaben"}`];
+  const echte = bilanz.gesamt - bilanz.uebersprungen;
+  const teile = [`${echte} ${echte === 1 ? "Aufgabe" : "Aufgaben"}`];
   if (bilanz.geloest > 0) teile.push(`${bilanz.geloest} selbst gelöst`);
   if (bilanz.loesungGezeigt > 0) teile.push(`${bilanz.loesungGezeigt} mit Lösung`);
 

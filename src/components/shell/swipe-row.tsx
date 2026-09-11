@@ -171,9 +171,17 @@ export function SwipeRow({
 export function UndoLoeschen({
   eintraege,
   onZurueck,
+  verb = "gelöscht",
 }: {
   eintraege: { id: string; label: string }[];
   onZurueck: (id: string) => void;
+  /**
+   * Was mit der Zeile geschehen ist – „gelöscht" (Vorgabe) oder etwas
+   * anderes, das dasselbe Fenster benutzt. Die Hausaufgabenliste sortiert
+   * damit aus („aussortiert", T-17): Dort verschwindet die Zeile nicht, sie
+   * wechselt den Status – rückgängig zu machen ist beides gleich.
+   */
+  verb?: string;
 }) {
   if (eintraege.length === 0) return null;
   return (
@@ -183,7 +191,9 @@ export function UndoLoeschen({
           key={e.id}
           className="border-linie-stark bg-flaeche flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2 text-[0.8125rem] shadow-lg"
         >
-          <span className="text-tinte-leise truncate">„{e.label}“ gelöscht</span>
+          <span className="text-tinte-leise truncate">
+            „{e.label}“ {verb}
+          </span>
           <button
             type="button"
             onClick={() => onZurueck(e.id)}

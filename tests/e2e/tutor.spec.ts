@@ -223,6 +223,59 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("link", { name: new RegExp(titel) })).toHaveCount(0);
   });
 
+  test("eine Aufgabe aussortieren, mit Rückgängig-Fenster (T-17)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
+    if (!admin) throw new Error("Seed fehlgeschlagen – TEST_MIGRATION_DATABASE_URL?");
+
+    const [session] = await admin<{ id: string }[]>`
+      insert into tutor_session (student_id, subject_id, title, entry_point)
+      values (${MIA}, ${FRANZOESISCH}, ${PREFIX + " Aussortieren"}, 'hausaufgabe')
+      returning id`;
+    // Zwei Zeilen: eine echte Aufgabe und ein Merkkasten, den Vision
+    // mitgelesen hat – genau der Fall, für den das Aussortieren da ist.
+    await admin`
+      insert into homework_task (student_id, session_id, position, label, prompt) values
+        (${MIA}, ${session!.id}, 1, '1', ${PREFIX + " Loese 3x + 5 = 20"}),
+        (${MIA}, ${session!.id}, 2, 'Merke', ${PREFIX + " Ein Bruch wird gekuerzt, indem man teilt"})`;
+
+    await alsMia(page);
+    await page.goto(`/tutor/hausaufgabe/${session!.id}`);
+
+    // Der frühere „Überspringen"-Knopf ist weg: Er stand neben jeder Aufgabe
+    // und lud zum Ausweichen ein, sobald es schwierig wurde.
+    await expect(page.getByRole("button", { name: "Überspringen" })).toHaveCount(0);
+
+    const merke = page.locator("li", { hasText: "Ein Bruch wird" });
+    await expect(merke).toContainText("offen");
+
+    // Wie beim Löschen liegt der Knopf hinter der Zeile – siehe die
+    // Begründung für `dispatchEvent` im T-15-Test oben.
+    await merke.locator("button", { hasText: "Gehört nicht dazu" }).dispatchEvent("click");
+    await expect(merke).toContainText("gehört nicht dazu");
+    await expect(page.getByText(/aussortiert/)).toBeVisible();
+
+    // Rückgängig holt sie zurück – in der Datenbank stand nie etwas.
+    await page.getByRole("button", { name: "Rückgängig" }).click();
+    await expect(merke).toContainText("offen");
+    await page.waitForTimeout(5200);
+    await page.reload();
+    await expect(page.locator("li", { hasText: "Ein Bruch wird" })).toContainText("offen");
+
+    // Und ohne Rückgängig bleibt es dabei.
+    await page
+      .locator("li", { hasText: "Ein Bruch wird" })
+      .locator("button", { hasText: "Gehört nicht dazu" })
+      .dispatchEvent("click");
+    await page.waitForTimeout(5200);
+    await page.reload();
+    await expect(page.locator("li", { hasText: "Ein Bruch wird" })).toContainText(
+      "gehört nicht dazu",
+    );
+  });
+
   test("ein gespeichertes Gespräch rendert und führt zurück zur Übersicht", async ({
     page,
     browserName,
