@@ -57,9 +57,9 @@ export default async function TodayPage() {
               Kamera-Button auf ‚Heute' erreichbar." Führte bis T-13 über die
               Tutor-Übersicht, wo die Fachwahl schon stand – die ist mit ADR
               0013 D1 verschwunden (der Tutor beginnt jetzt mit dem Dialog,
-              ohne Formular). Direkt auf `/tutor/hausaufgabe/neu`, das ohne
-              `?fach=` selbst nach dem Fach fragt (kleinstmögliche Fassung,
-              bis ADR 0013 D7 es aus dem Foto liest). */}
+              ohne Formular). Direkt auf `/tutor/hausaufgabe/neu`, das keine
+              Fachwahl mehr braucht: Das erste eingelesene Foto ordnet das
+              Fach selbst zu (ADR 0013 D7). */}
           <LinkButton href="/tutor/hausaufgabe/neu" quiet>
             Hausaufgabe fotografieren
           </LinkButton>

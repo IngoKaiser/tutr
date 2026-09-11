@@ -15,10 +15,11 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
   Gespräch ist jetzt antippbar und korrigiert sie mit einem Tipp. Die Historie bleibt weiterhin
   nach Fach gruppiert, mit einer eigenen Gruppe „Noch nicht einsortiert" für ein Gespräch ohne
   Zuordnung. „Freie Frage" und „Verstehen" waren als Kacheln nie mehr als zwei Formulierungen
-  derselben Absicht und sind zu einem Modus verschmolzen; die Hausaufgabe bleibt ein eigener
-  Ablauf, jetzt erreichbar über die Kamera auf „Heute" oder eine kleine Fachliste unter
-  „Hausaufgabe fotografieren" (bis auch sie ihr Fach aus dem Foto liest statt zu fragen – noch
-  offen). [ADR 0013](docs/adr/0013-tutor-beginnt-mit-dem-dialog.md).
+  derselben Absicht und sind zu einem Modus verschmolzen. Auch die Hausaufgabe braucht keine
+  Fachwahl mehr: Das erste abfotografierte Blatt ordnet sein Fach selbst zu – dieselbe Vision, die
+  ohnehin die Aufgaben liest, liefert das Fach gleich mit, ganz ohne zusätzlichen Aufruf. Der
+  Kamera-Knopf auf „Heute" und im Tutor führen jetzt direkt in den Foto-Schritt.
+  [ADR 0013](docs/adr/0013-tutor-beginnt-mit-dem-dialog.md).
 
 - **S-03c: der Kostendeckel für KI-Aufrufe rechnet jetzt in echtem Geld, nicht mehr in
   Anfragen.** Bisher zählte der Schutz vor explodierenden Kosten (S-03b) schlicht

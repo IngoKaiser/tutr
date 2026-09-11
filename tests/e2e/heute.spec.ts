@@ -102,12 +102,16 @@ test.describe("Heute", () => {
       page.getByRole("main").getByRole("link", { name: "Hausaufgabe fotografieren" }),
     ).toHaveAttribute("href", "/tutor/hausaufgabe/neu");
 
-    // --- Der Kamera-Knopf landet direkt beim Fach-Wähler der Hausaufgabe
-    // (ADR 0013 D1 hat die Fachwahl von `/tutor` entfernt; ohne `?fach=`
-    // fragt `/tutor/hausaufgabe/neu` selbst danach, siehe ADR 0013 D7).
+    // --- Der Kamera-Knopf landet direkt beim Foto-Schritt, ohne Fachwahl
+    // davor (ADR 0013 D1 hat sie von `/tutor` entfernt, D7 macht auch den
+    // kurzzeitigen Fach-Wähler unter `/tutor/hausaufgabe/neu` überflüssig –
+    // das erste Foto ordnet das Fach selbst zu).
     await page.getByRole("main").getByRole("link", { name: "Hausaufgabe fotografieren" }).click();
     await expect(page.getByRole("heading", { name: "Hausaufgabe", level: 1 })).toBeVisible();
-    await expect(page.getByRole("main").getByRole("link", { name: "Französisch" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Kamera" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Bild auswählen" })).toBeVisible();
+    // Noch kein Fach-Chip – der erscheint erst nach dem ersten Foto.
+    await expect(page.getByText("Französisch", { exact: true })).toHaveCount(0);
 
     // Ansicht zurückstellen – die anderen Specs erwarten die Elternrolle.
     await page.goto("/heute");

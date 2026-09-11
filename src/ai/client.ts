@@ -134,13 +134,20 @@ export type HomeworkExtractionResult = {
 };
 
 /**
- * Ein Foto einer Hausaufgabe → Aufgabenliste (T-03, §4a Schritt 1).
+ * Ein Foto einer Hausaufgabe → Fach-Zuordnung + Aufgabenliste (T-03, §4a
+ * Schritt 1; Fach seit T-13, ADR 0013 D7).
  *
  * Derselbe Weg wie `extractVocabularyFromImage()`: Structured Output über
  * `zodOutputFormat()`, Bild nur im Nutzerteil, Bild wird **nicht**
  * gespeichert. Der Systemprompt verbietet ausdrücklich, die Aufgaben zu
  * lösen – sonst stünde die Lösung schon in der Liste, bevor §4a überhaupt
  * greift.
+ *
+ * `extraction.fach` kommt **immer** mit zurück – kein zweiter Aufruf nur für
+ * die Zuordnung, das Foto geht ohnehin durch Vision. Der Aufrufer
+ * (`fotoZuAufgaben()`) übernimmt es nur, solange die Session noch kein Fach
+ * hat; bei weiteren Fotos derselben Hausaufgabe wird das Ergebnis verworfen,
+ * statt eine schon getroffene Zuordnung erneut zur Diskussion zu stellen.
  *
  * Gibt die Token-Zahlen mit zurück (anders als `extractVocabularyFromImage()`,
  * die vor S-03c entstand): Der Aufrufer bucht sie gegen `ai_usage`, damit ein
@@ -154,7 +161,7 @@ export async function extractHomeworkFromImage(
     model: VISION_MODEL,
     max_tokens: 4000,
     system: homeworkExtractionSystemPrompt(context),
-    output_config: { format: zodOutputFormat(homeworkExtractionSchema) },
+    output_config: { format: zodOutputFormat(homeworkExtractionSchema(context.faecher)) },
     messages: [
       {
         role: "user",

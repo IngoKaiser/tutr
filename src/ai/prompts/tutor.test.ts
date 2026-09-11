@@ -148,3 +148,19 @@ describe("beide Prompts tragen dieselben Formelregeln", () => {
     }
   });
 });
+
+describe("hausaufgabeSystemPrompt ohne Fach (ADR 0013 D7)", () => {
+  it("fragt nicht nach dem Fach, wenn die Zuordnung aus dem Foto „unklar“ ergab", () => {
+    const prompt = hausaufgabeSystemPrompt({
+      subjectName: null,
+      gradeLevel: 8,
+      aufgabe: "Kürze 12/18.",
+      zug: { art: "aufgabe_erklaeren" },
+    });
+    expect(prompt).not.toMatch(/Fach: /);
+    expect(prompt).toMatch(/noch nicht bekannt/);
+    // Ohne Fach greift `hausaufgabeFachHinweis()`s allgemeiner Fallback
+    // (kein Treffer in der Tabelle), nicht ein Absturz auf `undefined`.
+    expect(prompt).toMatch(/IN DIESEM FACH/);
+  });
+});

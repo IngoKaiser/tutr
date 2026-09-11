@@ -25,7 +25,8 @@ type FotoEintrag = {
 };
 
 /**
- * Foto → Aufgabenliste (T-03 PR 2, §4a Schritt 1).
+ * Foto → Fach-Zuordnung + Aufgabenliste (T-03 PR 2, §4a Schritt 1; Fach seit
+ * T-13, ADR 0013 D7).
  *
  * Bewusst kein „Modus"-Umschalter wie bei den Vokabeln: Diese Seite **ist**
  * schon der Foto-Schritt, es gibt hier nichts Einzufügen oder von Hand
@@ -33,20 +34,15 @@ type FotoEintrag = {
  *
  * Die Session entsteht erst beim ersten Klick auf „Aufgaben einlesen"
  * (`sessionIdRef`), nicht beim Rendern – sonst hinterließe ein Reload dieser
- * Seite jedes Mal eine leere Session.
+ * Seite jedes Mal eine leere Session. Kein Fach mehr als Prop: Das erste
+ * eingelesene Foto ordnet selbst zu (D7), `fach` ist deshalb eigener State,
+ * der erst nach dem ersten erfolgreichen Foto etwas zeigt.
  */
-export function FotoAufnahme({
-  subjectId,
-  subjectName,
-  available,
-}: {
-  subjectId: string;
-  subjectName: string;
-  available: boolean;
-}) {
+export function FotoAufnahme({ available }: { available: boolean }) {
   const router = useRouter();
   const [fotos, setFotos] = useState<FotoEintrag[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [fach, setFach] = useState<{ id: string; name: string } | null>(null);
   const [anlegeFehler, setAnlegeFehler] = useState<string | null>(null);
   const [wirdWeitergeleitet, setWirdWeitergeleitet] = useState(false);
   const galerieRef = useRef<HTMLInputElement>(null);
@@ -109,6 +105,10 @@ export function FotoAufnahme({
         return;
       }
       aktualisiereFoto(eintrag.id, { status: "fertig", erkannt: result.erkannt });
+      // Nur beim ersten Foto liefert die Zuordnung etwas (D7) – bei jedem
+      // weiteren bleibt `result.fach` dasselbe (die Session hat dann schon
+      // eins) oder `null` (bei „unklar" bleibt es das für die ganze Session).
+      if (result.fach) setFach(result.fach);
     } catch {
       aktualisiereFoto(eintrag.id, {
         status: "fehler",
@@ -122,7 +122,7 @@ export function FotoAufnahme({
     setAnlegeFehler(null);
     let sid = sessionId;
     if (!sid) {
-      const start = await starteHausaufgabe(subjectId);
+      const start = await starteHausaufgabe();
       if (!start) {
         setAnlegeFehler("Diese Hausaufgabe ließ sich nicht anlegen. Versuch es noch einmal.");
         return;
@@ -159,7 +159,10 @@ export function FotoAufnahme({
   return (
     <div className="flex flex-col gap-3">
       <PageHeader title="Hausaufgabe" back={{ href: "/tutor", label: "Tutor" }} />
-      <ContextChip subject={subjectName} />
+      {/* Kein Chip vor dem ersten Foto (D7) - vorher gibt es noch nichts
+          zuzuordnen, und "Fach wählen" wäre wieder die Frage, die diese
+          ganze Änderung vermeiden soll. */}
+      {fach ? <ContextChip subject={fach.name} /> : null}
 
       <Block title="Aufgaben abfotografieren">
         <Notice>

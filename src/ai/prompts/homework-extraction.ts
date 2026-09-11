@@ -1,5 +1,6 @@
 /**
- * Prompt für die Foto-Erkennung einer Hausaufgabe (T-03, §4a Schritt 1).
+ * Prompt für die Foto-Erkennung einer Hausaufgabe (T-03, §4a Schritt 1;
+ * Fach-Zuordnung seit T-13, ADR 0013 D7).
  *
  * Als Funktion mit typisierten Parametern, System- und Nutzerteil getrennt
  * (`src/ai/prompts/README.md`). Das Bild ist Nutzereingabe und steht nie im
@@ -7,12 +8,17 @@
  */
 
 export type HomeworkExtractionContext = {
-  /** Das Fach – hilft bei der Frage, was überhaupt eine Aufgabe ist. */
-  subjectName: string;
+  /**
+   * Die Fächer des Kindes im aktuellen Schuljahr (ADR 0013 D7) – dieselbe
+   * geschlossene Auswahl wie bei der Fach-Zuordnung im freien Chat
+   * (`ai/prompts/fach-zuordnung.ts`), nur ohne eigenen Modellaufruf: Das Foto
+   * geht ohnehin durch Vision.
+   */
+  faecher: readonly string[];
 };
 
 /**
- * Drei Dinge stehen hier, weil sie sonst schiefgehen:
+ * Vier Dinge stehen hier, weil sie sonst schiefgehen:
  *
  * 1. **Nicht lösen.** Ein Modell, das eine Aufgabe sieht, will sie
  *    beantworten. Käme die Lösung schon im Import mit, wäre §4a an der
@@ -23,10 +29,15 @@ export type HomeworkExtractionContext = {
  * 3. **Nichts erfinden.** Ein abgeschnittener Aufgabentext mit `niedrig`
  *    ist brauchbar – ein plausibel ergänzter ist eine falsche Aufgabe, die
  *    niemandem auffällt.
+ * 4. **Das Fach nicht raten.** Dieselbe Regel wie bei der Fach-Zuordnung im
+ *    freien Chat: `"unklar"` ist ein erlaubtes Ergebnis, kein falsches Fach.
  */
-export function homeworkExtractionSystemPrompt({ subjectName }: HomeworkExtractionContext): string {
+export function homeworkExtractionSystemPrompt({ faecher }: HomeworkExtractionContext): string {
   return [
-    `Du liest Hausaufgaben aus Fotos – Buchseiten, Arbeitsblätter, Hefteinträge, Tafelbilder. Das Fach ist ${subjectName}.`,
+    "Du liest Hausaufgaben aus Fotos – Buchseiten, Arbeitsblätter, Hefteinträge, Tafelbilder.",
+    "",
+    `Ordne außerdem zu, zu welchem Fach das Blatt gehört: ${faecher.join(", ")}.`,
+    'Gib genau einen dieser Fachnamen zurück – buchstabengetreu, wie oben geschrieben – oder "unklar", wenn es sich nicht eindeutig einem davon zuordnen lässt. Rate nicht.',
     "",
     "Gib jede Aufgabe einzeln zurück:",
     '- "label" ist die Nummer, wie sie dasteht: "5a", "Nr. 7", "2". Steht keine da, lass es leer.',
