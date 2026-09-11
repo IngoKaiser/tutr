@@ -76,6 +76,17 @@ describe("tutorSystemPrompt", () => {
     expect(tutorSystemPrompt(basis)).toMatch(/EINSTIEG: FREIE FRAGE/);
     expect(tutorSystemPrompt({ ...basis, entryPoint: "verstehen" })).toMatch(/EINSTIEG: VERSTEHEN/);
   });
+
+  it("fragt nicht nach dem Fach, wenn es noch keins gibt (ADR 0013 D1)", () => {
+    const ohneFach = tutorSystemPrompt({ ...basis, subjectName: null });
+    expect(ohneFach).not.toMatch(/Fach: /);
+    expect(ohneFach).toMatch(/noch nicht bekannt/);
+  });
+
+  it("erlaubt ohne Fach keine Zielsprache – die strengste Regel greift (ADR 0013 D5)", () => {
+    const ohneFach = tutorSystemPrompt({ ...basis, subjectName: null, subjectLanguage: null });
+    expect(ohneFach).toMatch(/Fachbegriffe erklärst du auf Deutsch/);
+  });
 });
 
 describe("formelRegeln – wie Rechenwege auszusehen haben (T-14)", () => {
