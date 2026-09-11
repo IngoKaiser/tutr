@@ -14,6 +14,8 @@ import { loginStatus } from "@/lib/auth/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { anthropicConfigured, databaseConfigured } from "@/lib/env";
 import {
+  bereinigeTitel,
+  kuerzeTitel,
   ladeFaecherFuerZuordnung,
   loeseFachZuordnungAuf,
   type FachOption,
@@ -103,12 +105,6 @@ function liesEingang(body: unknown): Eingang | null {
     loesungVerlangt: b.loesungVerlangt === true,
     image,
   };
-}
-
-/** Titel aus der ersten Frage kürzen (ADR 0010, „Konsequenzen"). */
-function kuerzeTitel(text: string): string {
-  const eine = text.replace(/\s+/g, " ").trim();
-  return eine.length <= 60 ? eine : `${eine.slice(0, 57)}…`;
 }
 
 function textAntwort(inhalt: string, status: number): Response {
@@ -286,6 +282,11 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
 
   let zuordnung: FachOption | null = null;
   let zuordnungTokens: { input: number; output: number } | null = null;
+  /**
+   * Der Titel aus demselben Aufruf (T-19a, ADR 0014 D2). `null` heißt: Es gab
+   * keine Zuordnung – dann bleibt es bei der gekürzten Frage wie bisher.
+   */
+  let titel: string | null = null;
 
   if (!eingang.sessionId && !eingang.subjectId) {
     // Limit **vor** dem Zuordnungsaufruf prüfen (wie vor jedem
@@ -307,10 +308,12 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
         });
         zuordnungTokens = { input: antwort.inputTokens, output: antwort.outputTokens };
         zuordnung = loeseFachZuordnungAuf(antwort.fach, vorab.faecher);
+        titel = bereinigeTitel(antwort.titel, eingang.message);
       } catch {
         // Netzwerk, Timeout, keine verwertbare Antwort: Das Gespräch
-        // startet ohne Fach (strengste Sprachregel, ADR 0013 D5) statt am
-        // ersten Wort zu scheitern.
+        // startet ohne Fach (strengste Sprachregel, ADR 0013 D5) und mit der
+        // gekürzten Frage als Titel (ADR 0014 D2), statt am ersten Wort zu
+        // scheitern.
       }
     }
   }
@@ -394,9 +397,13 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       subjectLanguage = zuordnung?.language ?? null;
       topicTitle = null;
 
+      // `titel` kommt aus der Zuordnung oben (ADR 0014 D2) und ist dort schon
+      // bereinigt – inklusive Rückfall auf die gekürzte Frage. `null` heißt,
+      // dass gar keine Zuordnung lief (keine Fächer, oder sie ist
+      // ausgefallen); dann steht hier, was bis T-19a überall stand.
       const [neu] = await tx.execute<{ id: string }>(sql`
         insert into tutor_session (student_id, subject_id, title, entry_point)
-        values (app.student_id(), ${subjectId}, ${kuerzeTitel(eingang.message)}, ${entryPoint})
+        values (app.student_id(), ${subjectId}, ${titel ?? kuerzeTitel(eingang.message)}, ${entryPoint})
         returning id`);
       sessionId = neu!.id;
     }

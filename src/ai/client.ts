@@ -283,15 +283,22 @@ export async function klassifiziereVersuch(
 
 export type FachZuordnungResult = {
   fach: FachZuordnungErgebnis;
+  /**
+   * Der Gesprächstitel (T-19a, ADR 0014 D2) – roh, wie das Modell ihn
+   * geliefert hat. Kann leer sein; `bereinigeTitel()`
+   * (`lib/tutor/fach-zuordnung.ts`) entscheidet, was daraus wird.
+   */
+  titel: string;
   inputTokens: number;
   outputTokens: number;
 };
 
 /**
- * Ordnet die erste Nachricht eines neuen Gesprächs einem Fach zu (T-13,
- * ADR 0013 D2). Haiku, nicht Sonnet (CLAUDE.md: „Haiku für Klassifikation") –
- * die Auswahl ist geschlossen (`fachZuordnungSchema()`, aus `faecher`
- * gebaut), keine eigene fachliche Einschätzung.
+ * Ordnet die erste Nachricht eines neuen Gesprächs einem Fach zu und benennt
+ * das Gespräch (T-13/T-19a, ADR 0013 D2 und ADR 0014 D2). Haiku, nicht Sonnet
+ * (CLAUDE.md: „Haiku für Klassifikation") – die Auswahl ist geschlossen
+ * (`fachZuordnungSchema()`, aus `faecher` gebaut), keine eigene fachliche
+ * Einschätzung.
  *
  * Läuft **vor** dem Streamen, nicht daneben: Der Systemprompt der
  * eigentlichen Antwort braucht `subjectLanguage`, um zu wissen, ob die
@@ -305,8 +312,12 @@ export type FachZuordnungResult = {
  */
 export async function ordneFachZu(context: FachZuordnungContext): Promise<FachZuordnungResult> {
   const message = await anthropic().messages.parse({
+    // 20 reichten, solange nur der Fachname zurückkam. Mit dem Titel
+    // daneben (T-19a) braucht dieselbe Antwort ein Feld mehr – zu knapp
+    // bemessen bräche sie mitten im JSON ab, und `parsed_output` bliebe
+    // leer: aus einem Titel-Problem würde ein Fach-Problem.
     model: KLASSIFIKATION_MODEL,
-    max_tokens: 20,
+    max_tokens: 120,
     system: fachZuordnungSystemPrompt(context),
     output_config: { format: zodOutputFormat(fachZuordnungSchema(context.faecher)) },
     messages: [{ role: "user", content: fachZuordnungUserPrompt(context) }],
@@ -317,6 +328,7 @@ export async function ordneFachZu(context: FachZuordnungContext): Promise<FachZu
   }
   return {
     fach: message.parsed_output.fach,
+    titel: message.parsed_output.titel,
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
   };
