@@ -1,165 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import { Block, Notice, PageHeader } from "@/components/shell/primitives";
+import type { Auslastung } from "@/lib/ai/rate-limit";
 
 import type { TutorOverview } from "./actions";
-
-const FIELD =
-  "border-linie-stark bg-flaeche text-tinte focus-visible:outline-koenigsblau rounded-[9px] border px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1";
+import { Conversation } from "./chat";
 
 /**
- * Die Gesprächsübersicht (T-07) – Ebene 1 des Tutors.
+ * `/tutor` (T-07, umgebaut in T-13): Historie plus der Beginn eines neuen
+ * Gesprächs, in einer Komponente.
  *
- * Vorher hing die Historie unter dem laufenden Gespräch, wo sie niemand
- * braucht und wo sie den Composer nach unten schob. Jetzt ist sie das, was
- * §15 verlangt: „Chatverlauf mit Titeln pro Fach … Wiedereinstieg in eine
- * alte Session möglich" – und der Ort, an dem ein neues Gespräch beginnt.
+ * **Kein eigenes Formular mehr** (ADR 0013 D1): Diese Seite rendert einfach
+ * `Conversation` mit `sessionId={null}`, `subjectId={null}` – genau dieselbe
+ * Komponente wie ein bestehendes Gespräch auf `/tutor/<id>`. Solange nichts
+ * geschickt wurde, füllt `leerInhalt` (die Historie hier unten) den Platz,
+ * an dem sonst Nachrichten stünden; sobald die erste Frage raus ist, blendet
+ * `Conversation` sie automatisch aus (`leer` wird `false`) und zeigt
+ * stattdessen die Antwort. Kopfzeile (Rückweg + Fach-Chip) erscheint erst,
+ * sobald ein Gespräch existiert – auf dieser Seite gibt es vorher nichts,
+ * wohin man „zurück" gehen könnte.
  *
- * Angelegt wird ein Gespräch **nicht** hier: `/tutor/neu` trägt Fach und
- * Einstieg in der URL, die Zeile in der Datenbank entsteht erst mit der
- * ersten Frage. So sammeln sich keine leeren Gespräche an, nur weil jemand
- * einmal geschaut hat.
+ * Angelegt wird die Session **nicht** hier: Die Zeile in der Datenbank
+ * entsteht erst mit der ersten Frage, drüben im Sendeweg. So sammeln sich
+ * keine leeren Gespräche an, nur weil jemand einmal geschaut hat.
  */
 export function TutorOverviewView({
   overview,
-  einstieg = "freie_frage",
+  available,
+  auslastung,
 }: {
   overview: TutorOverview | null;
-  /** Vorgewählter Einstieg aus `?einstieg=` – der Kamera-Knopf auf „Heute“ kommt so direkt auf „Hausaufgabe“ (H-01). */
-  einstieg?: Einstieg;
+  available: boolean;
+  auslastung: Auslastung | null;
 }) {
   if (!overview) {
     return (
       <div className="flex flex-col gap-3">
         <PageHeader title="Tutor" />
-        <Notice>Der Tutor ist gerade nicht verfügbar.</Notice>
+        <Block>
+          <Notice>Der Tutor ist gerade nicht verfügbar.</Notice>
+        </Block>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Tutor" />
-      <NeuesGespraech subjects={overview.subjects} einstieg={einstieg} />
-      <Historie sessions={overview.sessions} />
-    </div>
-  );
-}
-
-type Einstieg = "freie_frage" | "verstehen" | "hausaufgabe";
-
-function NeuesGespraech({
-  subjects,
-  einstieg,
-}: {
-  subjects: TutorOverview["subjects"];
-  einstieg: Einstieg;
-}) {
-  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
-  const [entryPoint, setEntryPoint] = useState<Einstieg>(einstieg);
-
-  if (subjects.length === 0) {
-    return (
-      <Block>
-        <Notice>
-          Leg zuerst unter „Fächer&ldquo; ein Fach im aktuellen Schuljahr an — der Tutor braucht ein
-          Fach, um zu wissen, worüber ihr redet.
-        </Notice>
-      </Block>
-    );
-  }
-
-  return (
-    <Block title="Neues Gespräch">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[0.8125rem] font-medium">Fach</span>
-        <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} className={FIELD}>
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-[0.8125rem] font-medium">Einstieg</legend>
-        <div className="flex gap-1.5">
-          {(
-            [
-              ["freie_frage", "Freie Frage"],
-              ["verstehen", "Verstehen"],
-              ["hausaufgabe", "Hausaufgabe"],
-            ] as const
-          ).map(([wert, label]) => (
-            <label
-              key={wert}
-              className={`flex-1 cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium ${
-                entryPoint === wert
-                  ? "border-koenigsblau bg-koenigsblau-hell text-koenigsblau"
-                  : "border-linie-stark bg-flaeche text-tinte-weich"
-              }`}
-            >
-              <input
-                type="radio"
-                name="einstieg"
-                value={wert}
-                checked={entryPoint === wert}
-                onChange={() => setEntryPoint(wert)}
-                className="sr-only"
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        <span className="text-tinte-leise text-[0.6875rem]">
-          {entryPoint === "verstehen"
-            ? "Du hast etwas im Unterricht nicht verstanden — der Tutor fragt nach, wo es hakt."
-            : entryPoint === "hausaufgabe"
-              ? "Foto von den Aufgaben — der Tutor legt daraus eine Liste an, eine nach der anderen."
-              : "Stell irgendeine Frage zum Fach."}
-        </span>
-      </fieldset>
-
-      {/* `URLSearchParams` statt Zusammenkleben: kodiert die Werte, egal was
-          im Feld steht. CodeQL hatte die Interpolation zu Recht als
-          „DOM text reinterpreted as HTML" markiert – und ein Fach-Name mit
-          `&` hätte die URL ohnehin zerlegt.
-
-          Hausaufgabe führt auf eine eigene Route (`/tutor/hausaufgabe/neu`),
-          nicht auf `/tutor/neu`: Der erste Schritt ist dort ein Foto, kein
-          Chatfenster – ein eigener Einstieg statt eines dritten `entryPoint`-
-          Zweigs in `chat.tsx`, der dessen Composer hätte verzweigen müssen. */}
-      <Link
-        href={
-          entryPoint === "hausaufgabe"
-            ? `/tutor/hausaufgabe/neu?${new URLSearchParams({ fach: subjectId }).toString()}`
-            : `/tutor/neu?${new URLSearchParams({ fach: subjectId, einstieg: entryPoint }).toString()}`
-        }
-        className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau w-full rounded-[9px] border border-transparent px-4 py-2.5 text-center text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
-      >
-        {entryPoint === "hausaufgabe" ? "Foto aufnehmen" : "Gespräch beginnen"}
-      </Link>
-    </Block>
+    <Conversation
+      sessionId={null}
+      subjectId={null}
+      subjectName={null}
+      subjectLanguage={null}
+      topicTitle={null}
+      entryPoint="freie_frage"
+      initialMessages={[]}
+      available={available}
+      auslastung={auslastung}
+      alleFaecher={overview.subjects}
+      leerInhalt={<Historie sessions={overview.sessions} />}
+    />
   );
 }
 
 function Historie({ sessions }: { sessions: TutorOverview["sessions"] }) {
   if (sessions.length === 0) {
     return (
-      <div className="flex flex-col gap-2">
-        <Ueberschrift>Frühere Gespräche</Ueberschrift>
-        <Notice>Noch keine. Das erste steht oben.</Notice>
-      </div>
+      <Notice>Noch keine Gespräche. Schreib einfach los – die erste Frage startet eins.</Notice>
     );
   }
 
-  // Nach Fach gruppieren (§15: „Chatverlauf mit Titeln pro Fach").
+  // Nach Fach gruppieren (§15: „Chatverlauf mit Titeln pro Fach"). Ein
+  // Gespräch ohne Fach (ADR 0013 D3, „noch nicht einsortiert") bekommt eine
+  // eigene Gruppe am Ende, statt sich unter ein beliebiges Fach zu mischen.
   const nachFach = new Map<string, TutorOverview["sessions"]>();
+  const ohneFach: TutorOverview["sessions"] = [];
   for (const s of sessions) {
+    if (s.subjectName === null) {
+      ohneFach.push(s);
+      continue;
+    }
     const liste = nachFach.get(s.subjectName) ?? [];
     liste.push(s);
     nachFach.set(s.subjectName, liste);
@@ -170,27 +90,34 @@ function Historie({ sessions }: { sessions: TutorOverview["sessions"] }) {
     <div className="flex flex-col gap-3">
       <Ueberschrift>Frühere Gespräche</Ueberschrift>
       {faecher.map((fach) => (
-        <div key={fach} className="flex flex-col gap-1.5">
-          <span className="text-tinte-weich text-[0.75rem] font-medium">{fach}</span>
-          <ul className="flex flex-col gap-1.5">
-            {(nachFach.get(fach) ?? []).map((s) => (
-              <li key={s.id}>
-                <Link
-                  href={s.hausaufgabe ? `/tutor/hausaufgabe/${s.id}` : `/tutor/${s.id}`}
-                  className="border-linie bg-papier hover:bg-papier-tief flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2.5"
-                >
-                  <span className="text-tinte min-w-0 flex-1 truncate text-[0.8125rem]">
-                    {s.title}
-                  </span>
-                  <span className="text-tinte-leise shrink-0 text-[0.75rem] tabular-nums">
-                    {kurzDatum(s.updatedAt)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <FachGruppe key={fach} titel={fach} sessions={nachFach.get(fach) ?? []} />
       ))}
+      {ohneFach.length > 0 ? (
+        <FachGruppe titel="Noch nicht einsortiert" sessions={ohneFach} />
+      ) : null}
+    </div>
+  );
+}
+
+function FachGruppe({ titel, sessions }: { titel: string; sessions: TutorOverview["sessions"] }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-tinte-weich text-[0.75rem] font-medium">{titel}</span>
+      <ul className="flex flex-col gap-1.5">
+        {sessions.map((s) => (
+          <li key={s.id}>
+            <Link
+              href={s.hausaufgabe ? `/tutor/hausaufgabe/${s.id}` : `/tutor/${s.id}`}
+              className="border-linie bg-papier hover:bg-papier-tief flex items-center justify-between gap-3 rounded-[9px] border px-3 py-2.5"
+            >
+              <span className="text-tinte min-w-0 flex-1 truncate text-[0.8125rem]">{s.title}</span>
+              <span className="text-tinte-leise shrink-0 text-[0.75rem] tabular-nums">
+                {kurzDatum(s.updatedAt)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

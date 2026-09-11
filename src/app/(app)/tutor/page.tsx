@@ -2,32 +2,28 @@ import { redirect } from "next/navigation";
 
 import { Block, Notice, PageHeader } from "@/components/shell/primitives";
 import { loginStatus } from "@/lib/auth/actor";
+import { anthropicConfigured } from "@/lib/env";
 
-import { loadTutorOverview } from "./actions";
+import { ladeAuslastung, loadTutorOverview } from "./actions";
 import { TutorOverviewView } from "./overview";
 
 export const metadata = { title: "Tutor · tutr" };
 
 /**
- * Ebene 1 des Tutors: die Gesprächsübersicht (T-07).
+ * Der Tutor – Historie und der Beginn eines neuen Gesprächs in einem (T-07,
+ * umgebaut in T-13).
  *
- * Vorher war `/tutor` gleichzeitig Startmaske und Chat, mit der Historie
- * darunter – dadurch gab es weder einen Ort für „alle Gespräche" noch einen
- * Weg zurück aus einem Gespräch. Jetzt: hier die Übersicht, unter
- * `/tutor/neu` und `/tutor/[sessionId]` das Gespräch.
+ * **Kein Formular mehr davor** (ADR 0013 D1): Bis T-13 stand hier eine
+ * Fachwahl, drei Einstiegs-Kacheln und ein „Gespräch beginnen"-Knopf, bevor
+ * überhaupt ein Wort fiel. Jetzt zeigt diese Seite direkt die Historie
+ * (`TutorOverviewView` → `Conversation` mit `sessionId={null}`) und das
+ * Eingabefeld darunter – wer tippt und abschickt, ist im Gespräch. Welches
+ * Fach gemeint ist, ordnet der Server aus der ersten Nachricht zu
+ * (`ordneFachZu()`, ADR 0013 D2), statt danach zu fragen.
  *
- * `?einstieg=` wählt den Einstieg vor – der Kamera-Knopf auf „Heute" (H-01,
- * §5) landet damit direkt auf „Hausaufgabe" und nicht auf „Freie Frage".
- * Ein unbekannter Wert fällt still auf „Freie Frage" zurück: Die URL ist
- * Nutzereingabe, kein Vertrag.
- *
- * Für Eltern gibt es hier nichts (ADR 0010 D2).
+ * Für Eltern gibt es hier weiterhin nichts (ADR 0010 D2).
  */
-export default async function TutorPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ einstieg?: string }>;
-}) {
+export default async function TutorPage() {
   const { actor } = await loginStatus();
   if (!actor) redirect("/anmelden");
 
@@ -45,11 +41,11 @@ export default async function TutorPage({
     );
   }
 
-  const { einstieg } = await searchParams;
   return (
     <TutorOverviewView
       overview={await loadTutorOverview()}
-      einstieg={einstieg === "hausaufgabe" || einstieg === "verstehen" ? einstieg : "freie_frage"}
+      available={anthropicConfigured()}
+      auslastung={await ladeAuslastung()}
     />
   );
 }

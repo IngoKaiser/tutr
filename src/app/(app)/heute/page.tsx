@@ -54,11 +54,13 @@ export default async function TodayPage() {
           <FaelligBlock faellig={faellig} />
 
           {/* §5: „‚Hausaufgabe' ist der prominenteste Chip und zusätzlich als
-              Kamera-Button auf ‚Heute' erreichbar." Der Weg führt über die
-              Tutor-Übersicht statt direkt in die Aufnahme: Welches Fach, weiß
-              nur das Kind, und die Auswahl steht dort schon – ein zweiter
-              Fachwähler hier wäre dieselbe Frage an zwei Orten. */}
-          <LinkButton href="/tutor?einstieg=hausaufgabe" quiet>
+              Kamera-Button auf ‚Heute' erreichbar." Führte bis T-13 über die
+              Tutor-Übersicht, wo die Fachwahl schon stand – die ist mit ADR
+              0013 D1 verschwunden (der Tutor beginnt jetzt mit dem Dialog,
+              ohne Formular). Direkt auf `/tutor/hausaufgabe/neu`, das ohne
+              `?fach=` selbst nach dem Fach fragt (kleinstmögliche Fassung,
+              bis ADR 0013 D7 es aus dem Foto liest). */}
+          <LinkButton href="/tutor/hausaufgabe/neu" quiet>
             Hausaufgabe fotografieren
           </LinkButton>
         </>

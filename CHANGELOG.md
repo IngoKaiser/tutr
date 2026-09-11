@@ -6,6 +6,20 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **T-13: der Tutor beginnt mit dem Dialog, nicht mit einem Formular.** Bisher standen eine
+  Fachwahl, drei Einstiegs-Kacheln und ein „Gespräch beginnen"-Knopf vor der ersten Frage. Jetzt
+  zeigt `/tutor` direkt die Historie und das Eingabefeld darunter – wer tippt und abschickt, ist
+  im Gespräch. Welches Fach gemeint ist, ordnet der Tutor selbst aus der ersten Nachricht zu
+  (Haiku, geschlossene Auswahl aus den eigenen Fächern, „unklar" ein erlaubtes Ergebnis) – kein
+  Raten, sondern eine echte Zuordnung, die auch danebenliegen darf. Der Kontext-Chip über dem
+  Gespräch ist jetzt antippbar und korrigiert sie mit einem Tipp. Die Historie bleibt weiterhin
+  nach Fach gruppiert, mit einer eigenen Gruppe „Noch nicht einsortiert" für ein Gespräch ohne
+  Zuordnung. „Freie Frage" und „Verstehen" waren als Kacheln nie mehr als zwei Formulierungen
+  derselben Absicht und sind zu einem Modus verschmolzen; die Hausaufgabe bleibt ein eigener
+  Ablauf, jetzt erreichbar über die Kamera auf „Heute" oder eine kleine Fachliste unter
+  „Hausaufgabe fotografieren" (bis auch sie ihr Fach aus dem Foto liest statt zu fragen – noch
+  offen). [ADR 0013](docs/adr/0013-tutor-beginnt-mit-dem-dialog.md).
+
 - **S-03c: der Kostendeckel für KI-Aufrufe rechnet jetzt in echtem Geld, nicht mehr in
   Anfragen.** Bisher zählte der Schutz vor explodierenden Kosten (S-03b) schlicht
   Anfragen – 20/Stunde, 60/Tag –, egal ob kurze oder lange Antwort. Jetzt rechnet

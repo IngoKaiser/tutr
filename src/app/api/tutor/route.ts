@@ -119,6 +119,15 @@ type Vorarbeit =
   | {
       ok: true;
       sessionId: string;
+      /**
+       * Das aufgelöste Fach dieser Session (T-13, ADR 0013 D2/D4) – über
+       * Antwort-Header an den Client zurückgegeben (`x-tutor-subject-*`),
+       * damit die Oberfläche den Fach-Chip nach einer Zuordnung ohne
+       * Neuladen aktuell zeigen kann. `null`, solange kein Fach feststeht.
+       */
+      subjectId: string | null;
+      subjectName: string | null;
+      subjectLanguage: string | null;
       system: string;
       verlauf: TutorTurn[];
       usageId: string;
@@ -232,6 +241,15 @@ export async function POST(request: Request): Promise<Response> {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
       "x-tutor-session": vor.sessionId,
+      // ADR 0013 D4: Der Client kennt das Fach vor dem Senden nicht (es
+      // wurde gerade erst zugeordnet) – diese drei Header sind die einzige
+      // Quelle, aus der die Oberfläche den Fach-Chip danach aktuell halten
+      // kann, ohne die Seite neu zu laden. `encodeURIComponent()` auf dem
+      // Namen: HTTP-Header-Werte sind auf ISO-8859-1 beschränkt, ein
+      // Fachname mit Umlauten wäre sonst nicht sicher übertragbar.
+      "x-tutor-subject-id": vor.subjectId ?? "",
+      "x-tutor-subject-name": vor.subjectName ? encodeURIComponent(vor.subjectName) : "",
+      "x-tutor-subject-language": vor.subjectLanguage ?? "",
     },
   });
 }
@@ -308,6 +326,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
     }
 
     let sessionId: string;
+    let subjectId: string | null;
     let subjectName: string | null;
     let subjectLanguage: string | null;
     let topicTitle: string | null;
@@ -318,12 +337,13 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       // zugeordnet, ADR 0013 D3) hat kein `subject_id` – ein `join` fände
       // dann keine Zeile und meldete fälschlich „gibt es nicht".
       const [row] = await tx.execute<{
+        subject_id: string | null;
         subject_name: string | null;
         subject_language: string | null;
         topic_title: string | null;
         entry_point: string;
       }>(sql`
-        select s.name as subject_name, s.language as subject_language,
+        select ts.subject_id, s.name as subject_name, s.language as subject_language,
                t.title as topic_title, ts.entry_point
         from tutor_session ts
         left join subject s on s.id = ts.subject_id
@@ -332,6 +352,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       if (!row) return { ok: false, status: 404, nachricht: "Dieses Gespräch gibt es nicht." };
 
       sessionId = eingang.sessionId;
+      subjectId = row.subject_id;
       subjectName = row.subject_name;
       subjectLanguage = row.subject_language;
       topicTitle = row.topic_title;
@@ -356,6 +377,7 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       }
 
       entryPoint = eingang.entryPoint === "verstehen" ? "verstehen" : "freie_frage";
+      subjectId = eingang.subjectId;
       subjectName = subject.name;
       subjectLanguage = subject.language;
       topicTitle = null;
@@ -371,13 +393,14 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
       // Zuordnung ist ausgefallen). „Verstehen" ist keine eigene Wahl mehr –
       // die Kachel dafür entfällt mit der Fachwahl (D1).
       entryPoint = "freie_frage";
+      subjectId = zuordnung?.id ?? null;
       subjectName = zuordnung?.name ?? null;
       subjectLanguage = zuordnung?.language ?? null;
       topicTitle = null;
 
       const [neu] = await tx.execute<{ id: string }>(sql`
         insert into tutor_session (student_id, subject_id, title, entry_point)
-        values (app.student_id(), ${zuordnung?.id ?? null}, ${kuerzeTitel(eingang.message)}, ${entryPoint})
+        values (app.student_id(), ${subjectId}, ${kuerzeTitel(eingang.message)}, ${entryPoint})
         returning id`);
       sessionId = neu!.id;
     }
@@ -402,6 +425,9 @@ async function bereiteVor(actor: Actor, eingang: Eingang): Promise<Vorarbeit> {
     return {
       ok: true,
       sessionId,
+      subjectId,
+      subjectName,
+      subjectLanguage,
       usageId,
       zuordnungTokens,
       system: tutorSystemPrompt({
@@ -449,11 +475,12 @@ async function bereiteHausaufgabeVor(
       status: "offen" | "in_arbeit" | "geloest" | "loesung_gezeigt" | "uebersprungen";
       attempts: number;
       hint_level: number;
+      subject_id: string;
       subject_name: string;
       grade_level: number;
     }>(sql`
       select ht.session_id, ht.prompt, ht.status, ht.attempts, ht.hint_level,
-             s.name as subject_name, st.grade_level
+             s.id as subject_id, s.name as subject_name, st.grade_level
       from homework_task ht
       join tutor_session ts on ts.id = ht.session_id
       join subject s on s.id = ts.subject_id
@@ -496,6 +523,9 @@ async function bereiteHausaufgabeVor(
     return {
       ok: true,
       sessionId: row.session_id,
+      subjectId: row.subject_id,
+      subjectName: row.subject_name,
+      subjectLanguage: null,
       usageId,
       zuordnungTokens: null,
       system: hausaufgabeSystemPrompt({

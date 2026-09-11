@@ -10,7 +10,7 @@ import type { Auslastung } from "@/lib/ai/rate-limit";
 import type { PreparedImage } from "@/lib/image";
 import { istEingeholt, naechsteLaenge } from "@/lib/tutor/stream-text";
 
-import { ladeAuslastung } from "./actions";
+import { ladeAuslastung, waehleFach, type SubjectChoice } from "./actions";
 import { Composer, type ComposerAnhang } from "./composer";
 import { useVorlesen, type VorlesenSteuerung } from "./use-speech";
 
@@ -23,32 +23,45 @@ const NICHT_EINGERICHTET =
 export type ChatMessage = { id: string; role: "nutzer" | "tutor"; content: string };
 
 /**
- * Ein Tutor-Gespräch (T-02, umgebaut in T-07).
+ * Ein Tutor-Gespräch (T-02, umgebaut in T-07, T-13).
  *
  * Zwei Ebenen (wie ChatGPT und Claude): `/tutor` ist die Übersicht, hier ist
  * das Gespräch. Der Kopf trägt deshalb einen `back` auf die Übersicht –
  * `primitives.tsx` verlangt das für jede Seite unterhalb eines
  * Fußleisten-Bereichs, und genau das hatte die erste Fassung vergessen.
  *
- * `sessionId` ist `null`, solange das Gespräch nur gedacht ist
- * (`/tutor/neu`): Erst die erste Frage legt es an, dann wandert die URL per
- * `replaceState` auf `/tutor/<id>` – ohne Navigation, damit der laufende
- * Stream nicht abreißt.
+ * `sessionId` ist `null`, solange das Gespräch nur gedacht ist: Erst die
+ * erste Frage legt es an, dann wandert die URL per `replaceState` auf
+ * `/tutor/<id>` – ohne Navigation, damit der laufende Stream nicht abreißt.
+ * Seit T-13 (ADR 0013 D1) ist das **der Normalfall auf `/tutor` selbst**,
+ * nicht mehr eine eigene `/tutor/neu`-Route mit vorgewählten Fach und
+ * Einstieg: Die Übersicht rendert dieselbe Komponente mit `sessionId={null}`,
+ * `subjectId={null}`, reicht die Historie über `leerInhalt` durch und zeigt
+ * so lange keinen Kopf (kein Rückweg, kein Fach-Chip), bis ein Gespräch
+ * tatsächlich existiert.
+ *
+ * `subjectId`/`subjectName`/`subjectLanguage` sind eigener State, nicht nur
+ * Props (ADR 0013 D2/D4): Die erste Antwort kann das Fach erst zuordnen,
+ * *nachdem* gesendet wurde – der Server trägt das Ergebnis in den
+ * Antwort-Headern nach (`streameAntwort()`), und der Fach-Chip liest von
+ * Hand über `waehleFach()` nach (D4).
  */
 export function Conversation({
   sessionId: anfangsId,
-  subjectId,
-  subjectName,
-  subjectLanguage,
+  subjectId: anfangsSubjectId,
+  subjectName: anfangsSubjectName,
+  subjectLanguage: anfangsSubjectLanguage,
   topicTitle,
   entryPoint,
   initialMessages,
   available,
   auslastung: anfangsAuslastung,
+  alleFaecher,
+  leerInhalt,
 }: {
   sessionId: string | null;
-  subjectId: string;
-  subjectName: string;
+  subjectId: string | null;
+  subjectName: string | null;
   subjectLanguage: string | null;
   topicTitle: string | null;
   entryPoint: "freie_frage" | "verstehen";
@@ -56,8 +69,19 @@ export function Conversation({
   available: boolean;
   /** Stand beim Öffnen der Seite; nach jeder Antwort frischt `ladeAuslastung()` ihn auf (S-03e). */
   auslastung: Auslastung | null;
+  /** Für den Fach-Chip (ADR 0013 D4) – die Fächer, unter denen gewählt werden kann. */
+  alleFaecher: SubjectChoice[];
+  /**
+   * Ersetzt den Standardhinweis, solange noch nichts geschrieben wurde. Auf
+   * `/tutor` die Historie (ADR 0013 D1/D6) – an jeder anderen Stelle
+   * ungesetzt, dann greift der übliche Platzhaltertext.
+   */
+  leerInhalt?: React.ReactNode;
 }) {
   const [sessionId, setSessionId] = useState(anfangsId);
+  const [subjectId, setSubjectId] = useState(anfangsSubjectId);
+  const [subjectName, setSubjectName] = useState(anfangsSubjectName);
+  const [subjectLanguage, setSubjectLanguage] = useState(anfangsSubjectLanguage);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [zielText, setZielText] = useState("");
   const [pending, setPending] = useState(false);
@@ -93,16 +117,29 @@ export function Conversation({
     setAnhang(null);
 
     try {
+      // ADR 0013 D1: Ohne `subjectId` (der Normalfall auf `/tutor` seit
+      // T-13) schickt der Client gar kein Fach mit – der Server ordnet die
+      // erste Nachricht selbst zu, statt eine leere Wahl zu erzwingen.
       const payload = sessionId
         ? { sessionId, message: frage, image: bild }
-        : { subjectId, entryPoint, message: frage, image: bild };
-      const { text, neueSessionId } = await streameAntwort(payload, setZielText);
+        : subjectId
+          ? { subjectId, entryPoint, message: frage, image: bild }
+          : { message: frage, image: bild };
+      const { text, neueSessionId, fach } = await streameAntwort(payload, setZielText);
       setMessages((prev) => [...prev, { id: `tutor-${Date.now()}`, role: "tutor", content: text }]);
       if (!sessionId && neueSessionId) {
         setSessionId(neueSessionId);
         // URL nachziehen, ohne zu navigieren – ein Reload landet danach im
         // richtigen Gespräch, der Stream bleibt aber unangetastet.
         window.history.replaceState(null, "", `/tutor/${neueSessionId}`);
+      }
+      // Das Fach steht erst jetzt fest (ADR 0013 D2) – der Server trägt es
+      // in den Antwort-Headern nach, sonst zeigte der Chip weiter „Fach
+      // wählen", obwohl längst zugeordnet ist.
+      if (fach) {
+        setSubjectId(fach.id);
+        setSubjectName(fach.name);
+        setSubjectLanguage(fach.language);
       }
       // Der Pegel im Composer zeigt sonst bis zum nächsten Seitenaufruf den
       // Stand von vorhin – gerade nach einer langen Antwort ist das die
@@ -133,30 +170,48 @@ export function Conversation({
     // das `py-5` der Hülle darin – Kopfzeile und Composer holen sich diesen
     // Rand über `-mt-5`/`-mb-5` ohnehin zurück.
     <div className="flex h-[calc(100cqh-2.5rem)] min-h-0 flex-col">
-      {/* Kopfzeile: Weg zurück und Fach-Kontext (T-07b). Keine
+      {/* Kopfzeile: Weg zurück und Fach-Kontext (T-07b), nur wenn es schon
+          ein Gespräch gibt. Auf `/tutor` selbst (ADR 0013 D1) ist
+          `sessionId` anfangs `null` – ein Rückweg „zu den Gesprächen" wäre
+          dort sinnlos, man ist ja schon da, und einen Fach-Chip gibt es
+          nicht, solange keine Zuordnung gelaufen ist. Keine
           „Tutor“-Überschrift – der aktive Fußleisten-Reiter sagt das schon.
           `-mx-4 px-4` lässt den Hintergrund bis an den Rand laufen, `-mt-5`
           frisst das `py-5` der Hülle. */}
-      <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
-        <Link
-          href="/tutor"
-          className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
-        >
-          <span aria-hidden="true">‹</span>
-          Gespräche
-        </Link>
-        <ContextChip subject={subjectName} topic={topicTitle} />
-      </div>
+      {sessionId ? (
+        <div className="bg-papier border-linie -mx-4 -mt-5 flex shrink-0 items-center gap-3 border-b px-4 py-2">
+          <Link
+            href="/tutor"
+            className="text-tinte-leise hover:text-koenigsblau -ml-1 inline-flex shrink-0 items-center gap-1 px-1 py-1 text-[0.8125rem] font-medium"
+          >
+            <span aria-hidden="true">‹</span>
+            Gespräche
+          </Link>
+          <FachChip
+            sessionId={sessionId}
+            subjectName={subjectName}
+            topicTitle={topicTitle}
+            alleFaecher={alleFaecher}
+            onGewaehlt={(fach) => {
+              setSubjectId(fach.id);
+              setSubjectName(fach.name);
+              setSubjectLanguage(fach.language);
+            }}
+          />
+        </div>
+      ) : null}
 
       {/* Die einzige scrollende Fläche. `min-h-0`, sonst weigert sich das
           Flex-Kind zu schrumpfen und schiebt den Composer aus dem Bild. */}
       <div ref={verlaufRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
         {leer ? (
-          <Notice>
-            {entryPoint === "verstehen"
-              ? "Erzähl, was ihr gemacht habt und wo du aussteigst."
-              : "Stell deine Frage — der Tutor kennt dein Fach, aber noch nicht dein Material."}
-          </Notice>
+          (leerInhalt ?? (
+            <Notice>
+              {entryPoint === "verstehen"
+                ? "Erzähl, was ihr gemacht habt und wo du aussteigst."
+                : "Stell deine Frage — der Tutor kennt dein Fach, aber noch nicht dein Material."}
+            </Notice>
+          ))
         ) : (
           <ol className="flex flex-col gap-2.5">
             {messages.map((m) => (
@@ -199,6 +254,74 @@ export function Conversation({
           <Notice>{NICHT_EINGERICHTET}</Notice>
         </Block>
       )}
+    </div>
+  );
+}
+
+// --- Fach-Chip ---------------------------------------------------------
+
+/**
+ * Der antippbare Kontext-Chip (T-13, ADR 0013 D4): zeigt das zugeordnete
+ * Fach, oder „Fach wählen", wenn die Zuordnung „unklar" ergab. Ein Tipp öffnet
+ * ein kleines Menü mit den Fächern des Kindes; die Wahl schreibt sofort über
+ * `waehleFach()` und optimistisch in den State des Aufrufers (`onGewaehlt`) –
+ * kein Neuladen der Seite nötig.
+ *
+ * Ohne Fächer (Kind hat noch keins angelegt) bleibt der Chip eine reine
+ * Anzeige: Ein Menü ohne Einträge wäre nur ein Tipp ins Leere.
+ */
+function FachChip({
+  sessionId,
+  subjectName,
+  topicTitle,
+  alleFaecher,
+  onGewaehlt,
+}: {
+  sessionId: string;
+  subjectName: string | null;
+  topicTitle: string | null;
+  alleFaecher: SubjectChoice[];
+  onGewaehlt: (fach: SubjectChoice) => void;
+}) {
+  const [offen, setOffen] = useState(false);
+  const menueRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!offen) return;
+    const zu = (e: MouseEvent) => {
+      if (!menueRef.current?.contains(e.target as Node)) setOffen(false);
+    };
+    document.addEventListener("mousedown", zu);
+    return () => document.removeEventListener("mousedown", zu);
+  }, [offen]);
+
+  if (alleFaecher.length === 0) {
+    return <ContextChip subject={subjectName} topic={topicTitle} />;
+  }
+
+  return (
+    <div ref={menueRef} className="relative">
+      <ContextChip subject={subjectName} topic={topicTitle} onClick={() => setOffen((o) => !o)} />
+      {offen ? (
+        <div className="border-linie-stark bg-flaeche absolute top-9 left-0 z-20 flex w-44 flex-col overflow-hidden rounded-[10px] border shadow-lg">
+          {alleFaecher.map((fach, i) => (
+            <button
+              key={fach.id}
+              type="button"
+              onClick={() => {
+                setOffen(false);
+                onGewaehlt(fach);
+                void waehleFach(sessionId, fach.id);
+              }}
+              className={`text-tinte hover:bg-papier-tief px-3 py-2 text-left text-[0.8125rem] ${
+                i === 0 ? "" : "border-linie border-t"
+              }`}
+            >
+              {fach.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -454,20 +577,41 @@ function useAutoVorlesen(messages: ChatMessage[], vorlesen: VorlesenSteuerung) {
 
 // --- Stream lesen ----------------------------------------------------
 
-type SendePayload = { message: string; image: PreparedImage | null } & (
-  { sessionId: string } | { subjectId: string; entryPoint: "freie_frage" | "verstehen" }
-);
+/**
+ * Drei Formen: ein bestehendes Gespräch (`sessionId`), ein neues mit
+ * expliziter Fachwahl (`subjectId` + `entryPoint` – der Übergangspfad,
+ * solange irgendeine Oberfläche ihn noch anbietet), oder seit T-13 (ADR 0013
+ * D1) der Normalfall auf `/tutor`: **kein Fach mitgeschickt**, der Server
+ * ordnet die erste Nachricht selbst zu.
+ */
+type SendePayload =
+  | { sessionId: string; message: string; image: PreparedImage | null }
+  | {
+      subjectId: string;
+      entryPoint: "freie_frage" | "verstehen";
+      message: string;
+      image: PreparedImage | null;
+    }
+  | { message: string; image: PreparedImage | null };
 
 /**
  * Schickt die Frage an `POST /api/tutor` und reicht den bisher angekommenen
  * Text an `onDelta` weiter. Wirft mit der Server-Fehlermeldung (deutscher
  * Satz), wenn die Antwort kein 2xx ist – auch das Rate-Limit (429) landet so
  * als lesbarer Hinweis in der Oberfläche.
+ *
+ * `fach` kommt aus den Antwort-Headern (ADR 0013 D2/D4) – der einzige Weg,
+ * auf dem der Client erfährt, welches Fach eine gerade erst gelaufene
+ * Zuordnung getroffen hat, ohne die Seite neu zu laden.
  */
 async function streameAntwort(
   payload: SendePayload,
   onDelta: (voll: string) => void,
-): Promise<{ text: string; neueSessionId: string | null }> {
+): Promise<{
+  text: string;
+  neueSessionId: string | null;
+  fach: { id: string; name: string; language: string | null } | null;
+}> {
   const res = await fetch("/api/tutor", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -480,6 +624,14 @@ async function streameAntwort(
   }
 
   const neueSessionId = res.headers.get("x-tutor-session");
+  const fachId = res.headers.get("x-tutor-subject-id");
+  const fachNameRoh = res.headers.get("x-tutor-subject-name");
+  const fachSprache = res.headers.get("x-tutor-subject-language");
+  const fach =
+    fachId && fachNameRoh
+      ? { id: fachId, name: decodeURIComponent(fachNameRoh), language: fachSprache || null }
+      : null;
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let voll = "";
@@ -491,5 +643,5 @@ async function streameAntwort(
     onDelta(voll);
   }
 
-  return { text: voll, neueSessionId };
+  return { text: voll, neueSessionId, fach };
 }

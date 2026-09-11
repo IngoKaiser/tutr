@@ -4,20 +4,23 @@ import type postgres from "postgres";
 import { adminClient } from "./test-db";
 
 /**
- * Tutor (T-02, umgebaut in T-07).
+ * Tutor (T-02, umgebaut in T-07, T-13).
  *
  * Der Modellaufruf selbst läuft hier **nicht**: In CI fehlt der
- * `ANTHROPIC_API_KEY` absichtlich (wie beim Foto-Import, V-03b). Geprüft wird
- * deshalb ohne echte Antwort:
+ * `ANTHROPIC_API_KEY` absichtlich (wie beim Foto-Import, V-03b) – und die
+ * DB-gestützten Tests in diesem Block laufen ohnehin nur lokal
+ * (`RUN_DB_TESTS=1`, CI setzt das nie). Geprüft wird deshalb ohne echte
+ * Antwort und ohne zu senden:
  * - Für ein Elternteil gibt es hier nichts (ADR 0010 D2) – nur der Hinweis.
- * - Die Übersicht (`/tutor`) trägt Fachwahl, Einstieg und die Historie.
+ * - Die Übersicht (`/tutor`) zeigt seit T-13 (ADR 0013 D1) direkt das
+ *   Eingabefeld statt eines Formulars davor, und daneben die Historie.
  * - Ein gespeichertes Gespräch (`/tutor/[id]`) rendert vollständig, hat einen
  *   Weg zurück zur Übersicht und den festen Hinweis „Allgemeinwissen“.
  * - Diktat füllt das Eingabefeld, Vorlesen merkt sich seinen Zustand.
  *
- * Der Sende-Weg (`POST /api/tutor`, Streaming, Sprachwächter, Rate Limit) ist
- * durch die Unit- und DB-Tests abgedeckt und von Hand gegen die echte API
- * geprüft.
+ * Der Sende-Weg (`POST /api/tutor`, Streaming, Sprachwächter, Rate Limit,
+ * seit T-13 die Fach-Zuordnung) ist durch die Unit- und DB-Tests abgedeckt
+ * und von Hand gegen die echte API geprüft.
  */
 
 const WITH_DB = process.env.RUN_DB_TESTS === "1";
@@ -78,18 +81,26 @@ test.describe("Tutor als Kind", () => {
     await admin.end();
   });
 
-  test("die Übersicht trägt Fachwahl, Einstieg und die Historie", async ({ page, browserName }) => {
+  test("die Übersicht zeigt das Eingabefeld direkt, ohne Formular davor (ADR 0013 D1)", async ({
+    page,
+    browserName,
+  }) => {
     test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
 
     await alsMia(page);
     await page.goto("/tutor");
 
-    await expect(page.getByLabel("Fach")).toContainText("Französisch");
-    await expect(page.getByText("Freie Frage")).toBeVisible();
-    await expect(page.getByText("Verstehen")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Gespräch beginnen" })).toBeVisible();
+    // Keine Fachwahl, keine Einstiegs-Kacheln, kein „Gespräch beginnen“ mehr
+    // – der Tutor beginnt mit dem Dialog, das Fach ordnet der Server zu.
+    await expect(page.getByLabel("Fach")).toHaveCount(0);
+    await expect(page.getByText("Freie Frage")).toHaveCount(0);
+    await expect(page.getByText("Verstehen", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Gespräch beginnen" })).toHaveCount(0);
 
-    // Die Historie steht auf der Übersicht – nicht mehr unter dem Gespräch.
+    // Stattdessen direkt das Eingabefeld …
+    await expect(page.getByRole("textbox")).toBeVisible();
+
+    // … und die Historie steht daneben, genau wie zuvor unter dem Formular.
     await expect(page.getByRole("link", { name: new RegExp(PREFIX) })).toBeVisible();
   });
 
@@ -136,7 +147,9 @@ test.describe("Tutor als Kind", () => {
     // Der Weg zurück (primitives.tsx: jede Unterseite trägt einen `back`).
     await page.getByRole("main").getByRole("link", { name: "Gespräche" }).click();
     await expect(page).toHaveURL(/\/tutor$/);
-    await expect(page.getByRole("link", { name: "Gespräch beginnen" })).toBeVisible();
+    // Zurück auf der Übersicht: das Eingabefeld für ein neues Gespräch
+    // (ADR 0013 D1) – kein „Gespräch beginnen“-Knopf mehr.
+    await expect(page.getByRole("textbox")).toBeVisible();
   });
 
   test("Nur der Verlauf scrollt – Kopfzeile und Eingabefeld stehen fest", async ({
@@ -246,9 +259,9 @@ test.describe("Tutor als Kind", () => {
     });
 
     await alsMia(page);
+    // ADR 0013 D1: kein Formular mehr davor – das Eingabefeld steht direkt
+    // auf der Übersicht.
     await page.goto("/tutor");
-    await page.getByRole("link", { name: "Gespräch beginnen" }).click();
-    await expect(page).toHaveURL(/\/tutor\/neu/);
 
     const mikro = page.getByRole("button", { name: "Diktieren" });
     await expect(mikro).toBeVisible();
@@ -277,9 +290,9 @@ test.describe("Tutor als Kind", () => {
     test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
 
     await alsMia(page);
+    // ADR 0013 D1: kein Formular mehr davor – das Eingabefeld steht direkt
+    // auf der Übersicht.
     await page.goto("/tutor");
-    await page.getByRole("link", { name: "Gespräch beginnen" }).click();
-    await expect(page).toHaveURL(/\/tutor\/neu/);
 
     const feld = page.getByRole("textbox");
     await expect(feld).toBeVisible();
@@ -321,9 +334,9 @@ test.describe("Tutor als Kind", () => {
     test.skip(browserName !== "chromium", "WebKit: Dev-Server bricht nach dem Rollenwechsel ab.");
 
     await alsMia(page);
+    // ADR 0013 D1: kein Formular mehr davor – das Eingabefeld steht direkt
+    // auf der Übersicht.
     await page.goto("/tutor");
-    await page.getByRole("link", { name: "Gespräch beginnen" }).click();
-    await expect(page).toHaveURL(/\/tutor\/neu/);
 
     // Zu ist zu: Das Menü darf die Tastenreihe nicht dauerhaft verdecken.
     await expect(page.getByRole("button", { name: "Foto aufnehmen" })).toHaveCount(0);
@@ -350,12 +363,9 @@ test.describe("Tutor als Kind", () => {
     await expect(page.getByRole("button", { name: "Foto aufnehmen" })).toHaveCount(0);
 
     // Der Pegel sitzt im Feld und nennt sein Fenster – „Diese Stunde" gibt
-    // es nicht mehr (S-03e), und auf der Übersicht steht er auch nicht mehr.
+    // es nicht mehr (S-03e).
     const pegel = page.getByRole("img", { name: /genutzt/ });
     await expect(pegel).toBeVisible();
     await expect(pegel).toHaveAttribute("aria-label", /^(Heute|Diese Woche): \d+ % genutzt$/);
-
-    await page.goto("/tutor");
-    await expect(page.getByRole("img", { name: /genutzt/ })).toHaveCount(0);
   });
 });

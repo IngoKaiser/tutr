@@ -83,7 +83,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 | **Tutor & Hausaufgaben** |                                                                                    | 🌓    |         |
 |                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                      | ✅    | T-01a   |
 |                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen“, Streaming             | ✅    | T-02    |
-|                          | Kein Formular mehr: Fach wird aus der ersten Nachricht erkannt (ADR 0013)          | 🌒    | T-13    |
+|                          | Kein Formular mehr: Fach wird aus der ersten Nachricht erkannt (ADR 0013)          | 🌓    | T-13    |
 |                          | Sprachwächter (Tutor antwortet auf Deutsch, Fach-Ausnahme)                         | ✅    | T-02a   |
 |                          | Rate Limits auf KI-Endpunkten (`ai_usage`, 20/h · 60/Tag)                          | ✅    | S-03b   |
 |                          | Kostendeckel in echtem Geld statt Anfragenzahl, plus Wochenfenster                 | ✅    | S-03c   |

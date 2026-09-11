@@ -30,7 +30,8 @@ export type SubjectChoice = { id: string; name: string; language: string | null 
 export type SessionSummary = {
   id: string;
   title: string;
-  subjectName: string;
+  /** `null` heißt „noch nicht einsortiert" (ADR 0013 D3) – die Historie gruppiert das eigens (D6). */
+  subjectName: string | null;
   updatedAt: string;
   /** `true` bei `entry_point = 'hausaufgabe'` (T-03 PR 2) – die Übersicht verlinkt dann auf `/tutor/hausaufgabe/<id>` statt auf den freien Chat. */
   hausaufgabe: boolean;
@@ -53,16 +54,18 @@ export async function loadTutorOverview(): Promise<TutorOverview | null> {
       join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
       order by s.name`);
 
+    // `left join`, nicht `join`: Ein Gespräch ohne Fach (ADR 0013 D3) darf
+    // in der Historie nicht einfach fehlen.
     const sessions = await tx.execute<{
       id: string;
       title: string;
-      subject_name: string;
+      subject_name: string | null;
       updated_at: string;
       entry_point: string;
     }>(sql`
       select ts.id, ts.title, s.name as subject_name, ts.updated_at, ts.entry_point
       from tutor_session ts
-      join subject s on s.id = ts.subject_id
+      left join subject s on s.id = ts.subject_id
       order by ts.updated_at desc
       limit 20`);
 
@@ -89,7 +92,9 @@ export type TutorMessageView = {
 
 export type SessionView = {
   id: string;
-  subjectName: string;
+  /** `null`, solange die Session keinem Fach zugeordnet ist (ADR 0013 D3). */
+  subjectId: string | null;
+  subjectName: string | null;
   subjectLanguage: string | null;
   topicTitle: string | null;
   entryPoint: "freie_frage" | "verstehen" | string;
@@ -102,17 +107,20 @@ export async function loadSession(sessionId: string): Promise<SessionView | null
   if (!actor) return null;
 
   return withActor(actor, async (tx) => {
+    // `left join`, nicht `join`: Ein Gespräch ohne Fach (ADR 0013 D3) gäbe
+    // es sonst hier nicht – die Seite meldete fälschlich „gibt es nicht".
     const [meta] = await tx.execute<{
       id: string;
-      subject_name: string;
+      subject_id: string | null;
+      subject_name: string | null;
       subject_language: string | null;
       topic_title: string | null;
       entry_point: string;
     }>(sql`
-      select ts.id, s.name as subject_name, s.language as subject_language,
+      select ts.id, ts.subject_id, s.name as subject_name, s.language as subject_language,
              t.title as topic_title, ts.entry_point
       from tutor_session ts
-      join subject s on s.id = ts.subject_id
+      left join subject s on s.id = ts.subject_id
       left join topic t on t.id = ts.topic_id
       where ts.id = ${sessionId}`);
     if (!meta) return null;
@@ -130,6 +138,7 @@ export async function loadSession(sessionId: string): Promise<SessionView | null
 
     return {
       id: meta.id,
+      subjectId: meta.subject_id,
       subjectName: meta.subject_name,
       subjectLanguage: meta.subject_language,
       topicTitle: meta.topic_title,
@@ -142,6 +151,26 @@ export async function loadSession(sessionId: string): Promise<SessionView | null
       })),
     };
   });
+}
+
+/**
+ * Ordnet ein Gespräch von Hand einem Fach zu (T-13, ADR 0013 D4) – über den
+ * antippbaren Kontext-Chip, egal ob er gerade „Fach wählen" zeigt (nach
+ * „unklar") oder einen Namen, der geändert werden soll.
+ *
+ * Kein eigener „Fach entfernen"-Weg: Die Fach-Zuordnung schlägt höchstens auf
+ * `null` fehl (D2), nie zurück von einem gesetzten Fach – wer eins gewählt
+ * hat, wollte selten wieder keins.
+ */
+export async function waehleFach(sessionId: string, subjectId: string): Promise<void> {
+  const actor = await requireStudentActor();
+  if (!actor) return;
+
+  await withActor(actor, (tx) =>
+    tx.execute(sql`update tutor_session set subject_id = ${subjectId} where id = ${sessionId}`),
+  );
+  revalidatePath(`/tutor/${sessionId}`);
+  revalidatePath("/tutor");
 }
 
 /** Ein Gespräch samt Nachrichten löschen (kaskadiert). */
