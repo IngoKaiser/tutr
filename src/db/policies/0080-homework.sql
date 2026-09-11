@@ -23,3 +23,19 @@ create policy homework_task_student on homework_task
   for all to tutr_app
   using (student_id = app.student_id() and app.actor_role() = 'student')
   with check (student_id = app.student_id() and app.actor_role() = 'student');
+
+-- --- tutor_session_summary ------------------------------------------------
+-- Der Zweizeiler (T-03 PR 2). Stand ADR 0004 D4 noch für Eltern lesbar vor;
+-- ADR 0012 D3 hat das zurückgenommen (CLAUDE.md führt die Tabelle
+-- ausdrücklich in der Kein-Zugriff-Liste für Eltern). Dieselbe Richtung wie
+-- `homework_task` oben, aus demselben Grund.
+
+grant select, insert on tutor_session_summary to tutr_app;
+
+alter table tutor_session_summary enable row level security;
+
+drop policy if exists tutor_session_summary_student on tutor_session_summary;
+create policy tutor_session_summary_student on tutor_session_summary
+  for all to tutr_app
+  using (student_id = app.student_id() and app.actor_role() = 'student')
+  with check (student_id = app.student_id() and app.actor_role() = 'student');

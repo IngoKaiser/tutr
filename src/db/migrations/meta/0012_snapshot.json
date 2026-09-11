@@ -1,0 +1,2533 @@
+{
+  "id": "123dfdf9-391d-4cb9-9f6e-b0b6177c51ad",
+  "prevId": "9fff12fa-5b4d-4ea1-b08c-bac88431fe5c",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.student_credential": {
+      "name": "student_credential",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credential_id": {
+          "name": "credential_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_key": {
+          "name": "public_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "counter": {
+          "name": "counter",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "transports": {
+          "name": "transports",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_label": {
+          "name": "device_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "student_credential_student_id_student_id_fk": {
+          "name": "student_credential_student_id_student_id_fk",
+          "tableFrom": "student_credential",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "student_credential_credential_id_key": {
+          "name": "student_credential_credential_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["credential_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.student_session": {
+      "name": "student_session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_label": {
+          "name": "device_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "student_session_student_idx": {
+          "name": "student_session_student_idx",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "student_session_student_id_student_id_fk": {
+          "name": "student_session_student_id_student_id_fk",
+          "tableFrom": "student_session",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "student_session_token_hash_key": {
+          "name": "student_session_token_hash_key",
+          "nullsNotDistinct": false,
+          "columns": ["token_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.calendar_event": {
+      "name": "calendar_event",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "school_year_id": {
+          "name": "school_year_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "calendar_event_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "calendar_event_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'geplant'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "calendar_event_student_id_student_id_fk": {
+          "name": "calendar_event_student_id_student_id_fk",
+          "tableFrom": "calendar_event",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "calendar_event_subject_fk": {
+          "name": "calendar_event_subject_fk",
+          "tableFrom": "calendar_event",
+          "tableTo": "subject",
+          "columnsFrom": ["subject_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "calendar_event_school_year_fk": {
+          "name": "calendar_event_school_year_fk",
+          "tableFrom": "calendar_event",
+          "tableTo": "school_year",
+          "columnsFrom": ["school_year_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "calendar_event_id_student_id_key": {
+          "name": "calendar_event_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        },
+        "calendar_event_id_subject_id_key": {
+          "name": "calendar_event_id_subject_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "subject_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.learning_objective": {
+      "name": "learning_objective",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "topic_id": {
+          "name": "topic_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description_grundlegend": {
+          "name": "description_grundlegend",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description_regel": {
+          "name": "description_regel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description_erhoeht": {
+          "name": "description_erhoeht",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "learning_objective_student_id_student_id_fk": {
+          "name": "learning_objective_student_id_student_id_fk",
+          "tableFrom": "learning_objective",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "learning_objective_topic_id_student_id_topic_id_student_id_fk": {
+          "name": "learning_objective_topic_id_student_id_topic_id_student_id_fk",
+          "tableFrom": "learning_objective",
+          "tableTo": "topic",
+          "columnsFrom": ["topic_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "learning_objective_id_student_id_key": {
+          "name": "learning_objective_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.objective_prerequisite": {
+      "name": "objective_prerequisite",
+      "schema": "",
+      "columns": {
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objective_id": {
+          "name": "objective_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prerequisite_objective_id": {
+          "name": "prerequisite_objective_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "objective_prerequisite_student_id_student_id_fk": {
+          "name": "objective_prerequisite_student_id_student_id_fk",
+          "tableFrom": "objective_prerequisite",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "objective_prerequisite_objective_fk": {
+          "name": "objective_prerequisite_objective_fk",
+          "tableFrom": "objective_prerequisite",
+          "tableTo": "learning_objective",
+          "columnsFrom": ["objective_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "objective_prerequisite_prerequisite_fk": {
+          "name": "objective_prerequisite_prerequisite_fk",
+          "tableFrom": "objective_prerequisite",
+          "tableTo": "learning_objective",
+          "columnsFrom": ["prerequisite_objective_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "objective_prerequisite_pk": {
+          "name": "objective_prerequisite_pk",
+          "nullsNotDistinct": false,
+          "columns": ["objective_id", "prerequisite_objective_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "objective_prerequisite_not_self": {
+          "name": "objective_prerequisite_not_self",
+          "value": "\"objective_prerequisite\".\"objective_id\" <> \"objective_prerequisite\".\"prerequisite_objective_id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.school_year": {
+      "name": "school_year",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grade_level": {
+          "name": "grade_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "class_name": {
+          "name": "class_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "school_profile_id": {
+          "name": "school_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "curriculum_pack_id": {
+          "name": "curriculum_pack_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "school_year_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "school_year_one_active_per_student": {
+          "name": "school_year_one_active_per_student",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"school_year\".\"status\" = 'aktiv'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "school_year_student_id_student_id_fk": {
+          "name": "school_year_student_id_student_id_fk",
+          "tableFrom": "school_year",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "school_year_id_student_id_key": {
+          "name": "school_year_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.school_year_subject": {
+      "name": "school_year_subject",
+      "schema": "",
+      "columns": {
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "school_year_id": {
+          "name": "school_year_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "school_year_subject_student_id_student_id_fk": {
+          "name": "school_year_subject_student_id_student_id_fk",
+          "tableFrom": "school_year_subject",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "school_year_subject_year_fk": {
+          "name": "school_year_subject_year_fk",
+          "tableFrom": "school_year_subject",
+          "tableTo": "school_year",
+          "columnsFrom": ["school_year_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "school_year_subject_subject_fk": {
+          "name": "school_year_subject_subject_fk",
+          "tableFrom": "school_year_subject",
+          "tableTo": "subject",
+          "columnsFrom": ["subject_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "school_year_subject_pair_key": {
+          "name": "school_year_subject_pair_key",
+          "nullsNotDistinct": false,
+          "columns": ["school_year_id", "subject_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.subject": {
+      "name": "subject",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "subject_student_id_student_id_fk": {
+          "name": "subject_student_id_student_id_fk",
+          "tableFrom": "subject",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "subject_id_student_id_key": {
+          "name": "subject_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        },
+        "subject_student_id_name_key": {
+          "name": "subject_student_id_name_key",
+          "nullsNotDistinct": false,
+          "columns": ["student_id", "name"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.topic": {
+      "name": "topic",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "school_year_id": {
+          "name": "school_year_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "curriculum_node_ref": {
+          "name": "curriculum_node_ref",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "textbook_ref": {
+          "name": "textbook_ref",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "topic_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pathway_stage": {
+          "name": "pathway_stage",
+          "type": "pathway_stage",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'vorschau'"
+        },
+        "self_assessment": {
+          "name": "self_assessment",
+          "type": "self_assessment_level",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "topic_student_id_student_id_fk": {
+          "name": "topic_student_id_student_id_fk",
+          "tableFrom": "topic",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "topic_subject_id_student_id_subject_id_student_id_fk": {
+          "name": "topic_subject_id_student_id_subject_id_student_id_fk",
+          "tableFrom": "topic",
+          "tableTo": "subject",
+          "columnsFrom": ["subject_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "topic_school_year_id_student_id_school_year_id_student_id_fk": {
+          "name": "topic_school_year_id_student_id_school_year_id_student_id_fk",
+          "tableFrom": "topic",
+          "tableTo": "school_year",
+          "columnsFrom": ["school_year_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "topic_id_subject_id_key": {
+          "name": "topic_id_subject_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "subject_id"]
+        },
+        "topic_id_student_id_key": {
+          "name": "topic_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.student": {
+      "name": "student",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grade_level": {
+          "name": "grade_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "class_name": {
+          "name": "class_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_email": {
+          "name": "parent_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recovery_token_hash": {
+          "name": "recovery_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recovery_expires_at": {
+          "name": "recovery_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "student_id_key": {
+          "name": "student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parent_account": {
+      "name": "parent_account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "auth_user_id": {
+          "name": "auth_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "parent_account_auth_user_id_key": {
+          "name": "parent_account_auth_user_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["auth_user_id"]
+        },
+        "parent_account_email_key": {
+          "name": "parent_account_email_key",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parent_student": {
+      "name": "parent_student",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "parent_account_id": {
+          "name": "parent_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consent_at": {
+          "name": "consent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "parent_student_parent_account_id_parent_account_id_fk": {
+          "name": "parent_student_parent_account_id_parent_account_id_fk",
+          "tableFrom": "parent_student",
+          "tableTo": "parent_account",
+          "columnsFrom": ["parent_account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "parent_student_student_id_student_id_fk": {
+          "name": "parent_student_student_id_student_id_fk",
+          "tableFrom": "parent_student",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "parent_student_pair_key": {
+          "name": "parent_student_pair_key",
+          "nullsNotDistinct": false,
+          "columns": ["parent_account_id", "student_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ai_usage": {
+      "name": "ai_usage",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint": {
+          "name": "endpoint",
+          "type": "ai_endpoint",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "input_tokens": {
+          "name": "input_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "output_tokens": {
+          "name": "output_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ai_usage_student_id_student_id_fk": {
+          "name": "ai_usage_student_id_student_id_fk",
+          "tableFrom": "ai_usage",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.homework_task": {
+      "name": "homework_task",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "homework_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'offen'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "hint_level": {
+          "name": "hint_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "homework_task_student_id_student_id_fk": {
+          "name": "homework_task_student_id_student_id_fk",
+          "tableFrom": "homework_task",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "homework_task_session_fk": {
+          "name": "homework_task_session_fk",
+          "tableFrom": "homework_task",
+          "tableTo": "tutor_session",
+          "columnsFrom": ["session_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "homework_task_id_student_id_key": {
+          "name": "homework_task_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        },
+        "homework_task_session_position_key": {
+          "name": "homework_task_session_position_key",
+          "nullsNotDistinct": false,
+          "columns": ["session_id", "position"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tutor_message": {
+      "name": "tutor_message",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "task_id": {
+          "name": "task_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "tutor_message_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_count": {
+          "name": "token_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language_ok": {
+          "name": "language_ok",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tutor_message_student_id_student_id_fk": {
+          "name": "tutor_message_student_id_student_id_fk",
+          "tableFrom": "tutor_message",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tutor_message_session_fk": {
+          "name": "tutor_message_session_fk",
+          "tableFrom": "tutor_message",
+          "tableTo": "tutor_session",
+          "columnsFrom": ["session_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tutor_message_task_fk": {
+          "name": "tutor_message_task_fk",
+          "tableFrom": "tutor_message",
+          "tableTo": "homework_task",
+          "columnsFrom": ["task_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tutor_session": {
+      "name": "tutor_session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "topic_id": {
+          "name": "topic_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entry_point": {
+          "name": "entry_point",
+          "type": "tutor_entry_point",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tutor_session_student_id_student_id_fk": {
+          "name": "tutor_session_student_id_student_id_fk",
+          "tableFrom": "tutor_session",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tutor_session_subject_fk": {
+          "name": "tutor_session_subject_fk",
+          "tableFrom": "tutor_session",
+          "tableTo": "subject",
+          "columnsFrom": ["subject_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tutor_session_topic_fk": {
+          "name": "tutor_session_topic_fk",
+          "tableFrom": "tutor_session",
+          "tableTo": "topic",
+          "columnsFrom": ["topic_id", "subject_id"],
+          "columnsTo": ["id", "subject_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "tutor_session_id_student_id_key": {
+          "name": "tutor_session_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.chapter": {
+      "name": "chapter",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "textbook_id": {
+          "name": "textbook_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pages": {
+          "name": "pages",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "units": {
+          "name": "units",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "chapter_student_id_student_id_fk": {
+          "name": "chapter_student_id_student_id_fk",
+          "tableFrom": "chapter",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "chapter_textbook_id_textbook_id_fk": {
+          "name": "chapter_textbook_id_textbook_id_fk",
+          "tableFrom": "chapter",
+          "tableTo": "textbook",
+          "columnsFrom": ["textbook_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.school_year_textbook": {
+      "name": "school_year_textbook",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "school_year_id": {
+          "name": "school_year_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "textbook_id": {
+          "name": "textbook_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "school_year_textbook_student_id_student_id_fk": {
+          "name": "school_year_textbook_student_id_student_id_fk",
+          "tableFrom": "school_year_textbook",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "school_year_textbook_school_year_fk": {
+          "name": "school_year_textbook_school_year_fk",
+          "tableFrom": "school_year_textbook",
+          "tableTo": "school_year",
+          "columnsFrom": ["school_year_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "school_year_textbook_subject_fk": {
+          "name": "school_year_textbook_subject_fk",
+          "tableFrom": "school_year_textbook",
+          "tableTo": "subject",
+          "columnsFrom": ["subject_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "school_year_textbook_textbook_id_textbook_id_fk": {
+          "name": "school_year_textbook_textbook_id_textbook_id_fk",
+          "tableFrom": "school_year_textbook",
+          "tableTo": "textbook",
+          "columnsFrom": ["textbook_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "school_year_textbook_year_subject_key": {
+          "name": "school_year_textbook_year_subject_key",
+          "nullsNotDistinct": false,
+          "columns": ["school_year_id", "subject_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.textbook": {
+      "name": "textbook",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grade_level": {
+          "name": "grade_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publisher": {
+          "name": "publisher",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "textbook_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "textbook_student_id_student_id_fk": {
+          "name": "textbook_student_id_student_id_fk",
+          "tableFrom": "textbook",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.school_profile": {
+      "name": "school_profile",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "federal_state": {
+          "name": "federal_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "school_type": {
+          "name": "school_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grading_scale": {
+          "name": "grading_scale",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holidays": {
+          "name": "holidays",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "calendar_import_source": {
+          "name": "calendar_import_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "school_profile_student_id_student_id_fk": {
+          "name": "school_profile_student_id_student_id_fk",
+          "tableFrom": "school_profile",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.card": {
+      "name": "card",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vocab_item_id": {
+          "name": "vocab_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "objective_id": {
+          "name": "objective_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direction": {
+          "name": "direction",
+          "type": "vocab_direction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fsrs_state": {
+          "name": "fsrs_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "due_at": {
+          "name": "due_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "state": {
+          "name": "state",
+          "type": "card_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'neu'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "card_student_id_student_id_fk": {
+          "name": "card_student_id_student_id_fk",
+          "tableFrom": "card",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "card_vocab_item_fk": {
+          "name": "card_vocab_item_fk",
+          "tableFrom": "card",
+          "tableTo": "vocab_item",
+          "columnsFrom": ["vocab_item_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "card_objective_fk": {
+          "name": "card_objective_fk",
+          "tableFrom": "card",
+          "tableTo": "learning_objective",
+          "columnsFrom": ["objective_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "card_id_student_id_key": {
+          "name": "card_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        },
+        "card_vocab_item_direction_key": {
+          "name": "card_vocab_item_direction_key",
+          "nullsNotDistinct": false,
+          "columns": ["vocab_item_id", "direction"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "card_exactly_one_source": {
+          "name": "card_exactly_one_source",
+          "value": "(vocab_item_id is not null) <> (objective_id is not null)"
+        },
+        "card_direction_only_for_vocab": {
+          "name": "card_direction_only_for_vocab",
+          "value": "(vocab_item_id is null) = (direction is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.review": {
+      "name": "review",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "card_id": {
+          "name": "card_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating": {
+          "name": "rating",
+          "type": "review_rating",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "response_ms": {
+          "name": "response_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "review_student_id_student_id_fk": {
+          "name": "review_student_id_student_id_fk",
+          "tableFrom": "review",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "review_card_fk": {
+          "name": "review_card_fk",
+          "tableFrom": "review",
+          "tableTo": "card",
+          "columnsFrom": ["card_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vocab_item": {
+      "name": "vocab_item",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "term": {
+          "name": "term",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "translation": {
+          "name": "translation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recognition_uncertain": {
+          "name": "recognition_uncertain",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "part_of_speech": {
+          "name": "part_of_speech",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "example": {
+          "name": "example",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hint": {
+          "name": "hint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "page": {
+          "name": "page",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "vocab_item_student_id_student_id_fk": {
+          "name": "vocab_item_student_id_student_id_fk",
+          "tableFrom": "vocab_item",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "vocab_item_subject_fk": {
+          "name": "vocab_item_subject_fk",
+          "tableFrom": "vocab_item",
+          "tableTo": "subject",
+          "columnsFrom": ["subject_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "vocab_item_id_student_id_key": {
+          "name": "vocab_item_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        },
+        "vocab_item_id_student_id_subject_id_key": {
+          "name": "vocab_item_id_student_id_subject_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id", "subject_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vocab_set": {
+      "name": "vocab_set",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "school_year_id": {
+          "name": "school_year_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chapter_id": {
+          "name": "chapter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "vocab_set_student_id_student_id_fk": {
+          "name": "vocab_set_student_id_student_id_fk",
+          "tableFrom": "vocab_set",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "vocab_set_subject_fk": {
+          "name": "vocab_set_subject_fk",
+          "tableFrom": "vocab_set",
+          "tableTo": "subject",
+          "columnsFrom": ["subject_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "vocab_set_school_year_fk": {
+          "name": "vocab_set_school_year_fk",
+          "tableFrom": "vocab_set",
+          "tableTo": "school_year",
+          "columnsFrom": ["school_year_id", "student_id"],
+          "columnsTo": ["id", "student_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "vocab_set_chapter_id_chapter_id_fk": {
+          "name": "vocab_set_chapter_id_chapter_id_fk",
+          "tableFrom": "vocab_set",
+          "tableTo": "chapter",
+          "columnsFrom": ["chapter_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "vocab_set_id_student_id_key": {
+          "name": "vocab_set_id_student_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id"]
+        },
+        "vocab_set_id_student_id_subject_id_key": {
+          "name": "vocab_set_id_student_id_subject_id_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "student_id", "subject_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vocab_set_item": {
+      "name": "vocab_set_item",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vocab_set_id": {
+          "name": "vocab_set_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vocab_item_id": {
+          "name": "vocab_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "vocab_set_item_student_id_student_id_fk": {
+          "name": "vocab_set_item_student_id_student_id_fk",
+          "tableFrom": "vocab_set_item",
+          "tableTo": "student",
+          "columnsFrom": ["student_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "vocab_set_item_set_fk": {
+          "name": "vocab_set_item_set_fk",
+          "tableFrom": "vocab_set_item",
+          "tableTo": "vocab_set",
+          "columnsFrom": ["vocab_set_id", "student_id", "subject_id"],
+          "columnsTo": ["id", "student_id", "subject_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "vocab_set_item_item_fk": {
+          "name": "vocab_set_item_item_fk",
+          "tableFrom": "vocab_set_item",
+          "tableTo": "vocab_item",
+          "columnsFrom": ["vocab_item_id", "student_id", "subject_id"],
+          "columnsTo": ["id", "student_id", "subject_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "vocab_set_item_pair_key": {
+          "name": "vocab_set_item_pair_key",
+          "nullsNotDistinct": false,
+          "columns": ["vocab_set_id", "vocab_item_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.calendar_event_status": {
+      "name": "calendar_event_status",
+      "schema": "public",
+      "values": ["geplant", "abgesagt"]
+    },
+    "public.calendar_event_type": {
+      "name": "calendar_event_type",
+      "schema": "public",
+      "values": ["klassenarbeit", "test", "muendlich", "abgabe", "sonstiges"]
+    },
+    "public.pathway_stage": {
+      "name": "pathway_stage",
+      "schema": "public",
+      "values": ["vorschau", "verstehen", "festigen", "anwenden", "pruefen", "nachbereitung"]
+    },
+    "public.school_year_status": {
+      "name": "school_year_status",
+      "schema": "public",
+      "values": ["geplant", "aktiv", "archiviert"]
+    },
+    "public.self_assessment_level": {
+      "name": "self_assessment_level",
+      "schema": "public",
+      "values": ["neu", "gehoert", "grundlagen", "versteht_gut", "sicher"]
+    },
+    "public.topic_status": {
+      "name": "topic_status",
+      "schema": "public",
+      "values": ["vorauswahl", "aktiv"]
+    },
+    "public.ai_endpoint": {
+      "name": "ai_endpoint",
+      "schema": "public",
+      "values": ["tutor", "vision"]
+    },
+    "public.homework_status": {
+      "name": "homework_status",
+      "schema": "public",
+      "values": ["offen", "in_arbeit", "geloest", "loesung_gezeigt", "uebersprungen"]
+    },
+    "public.tutor_entry_point": {
+      "name": "tutor_entry_point",
+      "schema": "public",
+      "values": [
+        "freie_frage",
+        "verstehen",
+        "vorschau",
+        "vertiefen",
+        "hausaufgabe",
+        "pruefung",
+        "nachbereitung"
+      ]
+    },
+    "public.tutor_message_role": {
+      "name": "tutor_message_role",
+      "schema": "public",
+      "values": ["nutzer", "tutor"]
+    },
+    "public.textbook_source": {
+      "name": "textbook_source",
+      "schema": "public",
+      "values": ["foto", "manuell", "claude_vorwissen", "verlags_pdf"]
+    },
+    "public.card_state": {
+      "name": "card_state",
+      "schema": "public",
+      "values": ["neu", "lernen", "wiederholen", "erneut_lernen"]
+    },
+    "public.review_rating": {
+      "name": "review_rating",
+      "schema": "public",
+      "values": ["nochmal", "schwierig", "gut", "leicht"]
+    },
+    "public.vocab_direction": {
+      "name": "vocab_direction",
+      "schema": "public",
+      "values": ["vorwaerts", "rueckwaerts"]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

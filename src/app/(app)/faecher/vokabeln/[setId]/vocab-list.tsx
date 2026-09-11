@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
 import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
 import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
-import { prepareImageForUpload } from "@/lib/vocab/image";
+import { prepareImageForUpload } from "@/lib/image";
 
 import {
   addFromPaste,

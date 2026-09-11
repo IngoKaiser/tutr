@@ -29,7 +29,7 @@ vi.mock("./actions", () => ({
   updateItem: vi.fn(),
 }));
 
-vi.mock("@/lib/vocab/image", () => ({
+vi.mock("@/lib/image", () => ({
   prepareImageForUpload: vi.fn(async () => ({ base64: "AAA", mediaType: "image/jpeg" as const })),
 }));
 

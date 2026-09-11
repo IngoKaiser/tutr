@@ -5,6 +5,7 @@ import {
   pgEnum,
   pgTable,
   text,
+  timestamp,
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -96,6 +97,128 @@ export const tutorSession = pgTable(
   ],
 );
 
+// --- homework_task ---------------------------------------------------------
+// Hausaufgaben-Sitzung: die einzelnen Aufgaben (T-03, Konzept §4a).
+//
+// **Hier und nicht in einer eigenen Datei** (Stand bis T-03 PR 2: eigene
+// Datei `homework.ts`): `tutor_message` unten muss auf `homework_task`
+// verweisen können (welche Nachricht gehört zu welcher Aufgabe), und
+// `homework_task` selbst verweist auf `tutor_session` – zwei Dateien hätten
+// sich hier gegenseitig importiert. Drizzles `pgTable()` wertet seine
+// Fremdschlüssel-Spalten beim Einlesen der Datei aus, ein Kreisimport hätte
+// eine der beiden Tabellen mit einer noch nicht fertig definierten anderen
+// Tabelle arbeiten lassen. Eine Datei löst das strukturell, nicht nur zufällig.
+//
+// Eine Aufgabe hängt an einer `tutor_session` mit `entry_point =
+// 'hausaufgabe'` – das Gespräch ist schon da, hier kommt nur der Zustand je
+// Aufgabe dazu.
+//
+// **Der Zustand gehört der App, nicht dem Modell.** Das ist der Kern von
+// §4a und zugleich Bedingung 2 aus ADR 0011 D3: Wie viele Versuche
+// dokumentiert sind (`attempts`) und welche Hinweisstufe erreicht ist
+// (`hint_level`), entscheidet nicht das Gespräch, sondern diese Zeile. Der
+// Systemprompt bekommt daraus vorgegeben, was er sagen darf – „nie zwei
+// Stufen auf einmal" und „Lösung erst nach zwei Versuchen" sind damit
+// Rechenregeln, keine Bitten (`src/lib/tutor/hint-ladder.ts`).
+//
+// **RLS: nur das Kind** – anders als in ADR 0004 D4 ursprünglich vorgesehen.
+// Status, Versuche und Zeit sind Prozessdaten; ADR 0012 D3 hat sie dem Kind
+// zugeschlagen. Eltern bekommen keine Policy.
+
+/** Die Status aus §4a („Ansicht“): offen · in Arbeit · gelöst · Lösung gezeigt · übersprungen. */
+export const homeworkStatus = pgEnum("homework_status", [
+  "offen",
+  "in_arbeit",
+  "geloest",
+  "loesung_gezeigt",
+  "uebersprungen",
+]);
+
+export const homeworkTask = pgTable(
+  "homework_task",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    studentId: uuid("student_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    /** Reihenfolge im Foto – „eine Aufgabe nach der anderen“ (§4a Schritt 2). */
+    position: integer("position").notNull(),
+    /** Die Nummer, wie sie auf dem Blatt steht: „5a“, „Nr. 7“. Leer, wenn keine da war. */
+    label: text("label"),
+    /** Der Aufgabentext, wie Vision ihn gelesen hat. */
+    prompt: text("prompt").notNull(),
+    status: homeworkStatus("status").notNull().default("offen"),
+    /**
+     * Dokumentierte Versuche (§4a: „Versuch = Eingabe, nicht Klick“).
+     * „Weiß ich nicht" erhöht das hier **nicht** – siehe `zaehltAlsVersuch()`.
+     */
+    attempts: integer("attempts").notNull().default(0),
+    /**
+     * Erreichte Hinweisstufe, 0–4 (§4a Hinweisleiter). 0 = noch kein
+     * Hinweis. Steigt immer um genau eins, nie um zwei.
+     */
+    hintLevel: integer("hint_level").notNull().default(0),
+    /** Für den Zeitbedarf aus §4a („nach 20 Minuten an einer Aufgabe …“). */
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
+    foreignKey({
+      name: "homework_task_session_fk",
+      columns: [t.sessionId, t.studentId],
+      foreignColumns: [tutorSession.id, tutorSession.studentId],
+    }).onDelete("cascade"),
+    unique("homework_task_id_student_id_key").on(t.id, t.studentId),
+    unique("homework_task_session_position_key").on(t.sessionId, t.position),
+  ],
+);
+
+// --- tutor_session_summary -------------------------------------------------
+// Der Zweizeiler nach Abschluss einer Hausaufgaben-Session (T-03, §4a
+// „Ansicht"): „5 Aufgaben, 4 selbst gelöst, 1 mit Lösung – Ungleichungen
+// üben wir morgen."
+//
+// **War laut ADR 0004 D4 für Eltern gedacht, ist es nach ADR 0012 D3
+// nicht mehr.** „Eltern sehen, was gelernt wird – nicht, wie gut es
+// läuft" schließt auch den Zweizeiler ein: Er verrät über die Zahl
+// gezeigter Lösungen genau das Wie-gut, das ADR 0012 den Eltern entzieht.
+// CLAUDE.md führt die Tabelle deshalb ausdrücklich in der Kein-Zugriff-
+// Liste. Die Tabelle bleibt trotzdem – als Abschluss-Rückmeldung fürs
+// Kind selbst (`ladeHausaufgabenListe()` zeigt sie über der Aufgabenliste,
+// sobald jede Aufgabe abgeschlossen ist) und damit ein einmal erzeugter
+// Satz bei jedem erneuten Öffnen derselbe bleibt, statt bei jedem Laden neu
+// erfunden zu werden.
+//
+// Eine Zeile je Session (`unique` auf `session_id`) – `naechsterZug()`/
+// `zustandNachVersuchUrteil()` bestimmen den Zustand je Aufgabe, hier
+// zählt nur die fertige Bilanz (`lib/tutor/hausaufgabe-zusammenfassung.ts`
+// `bilanziere()`), kein Nacherzählen des Dialogs.
+//
+// **RLS: nur das Kind**, dieselbe Richtung wie `homework_task`
+// (`0080-homework.sql`).
+
+export const tutorSessionSummary = pgTable(
+  "tutor_session_summary",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    studentId: uuid("student_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    /** Der fertige Zweizeiler, schon als ein Satz – keine Einzelfelder, die die Oberfläche wieder zusammensetzen müsste. */
+    summary: text("summary").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade"),
+    foreignKey({
+      name: "tutor_session_summary_session_fk",
+      columns: [t.sessionId, t.studentId],
+      foreignColumns: [tutorSession.id, tutorSession.studentId],
+    }).onDelete("cascade"),
+    unique("tutor_session_summary_session_id_key").on(t.sessionId),
+  ],
+);
+
 // --- tutor_message -------------------------------------------------------
 
 export const tutorMessage = pgTable(
@@ -104,6 +227,14 @@ export const tutorMessage = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     studentId: uuid("student_id").notNull(),
     sessionId: uuid("session_id").notNull(),
+    /**
+     * Welcher Hausaufgabe diese Nachricht gehört (T-03 PR 2). `null` außerhalb
+     * einer Hausaufgaben-Session. Nötig, weil **mehrere** Aufgaben dieselbe
+     * `tutor_session` teilen (ein Foto, eine Liste, §4a Schritt 1) – ohne
+     * diese Spalte ließe sich der Verlauf einer einzelnen Aufgabe nicht vom
+     * Rest der Sitzung trennen.
+     */
+    taskId: uuid("task_id"),
     role: tutorMessageRole("role").notNull(),
     content: text("content").notNull(),
     /**
@@ -130,6 +261,11 @@ export const tutorMessage = pgTable(
       name: "tutor_message_session_fk",
       columns: [t.sessionId, t.studentId],
       foreignColumns: [tutorSession.id, tutorSession.studentId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "tutor_message_task_fk",
+      columns: [t.taskId, t.studentId],
+      foreignColumns: [homeworkTask.id, homeworkTask.studentId],
     }).onDelete("cascade"),
   ],
 );

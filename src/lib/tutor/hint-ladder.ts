@@ -173,6 +173,47 @@ export function folgeZustand(zustand: AufgabenZustand, zug: Zug): AufgabenZustan
 }
 
 /**
+ * Das einzige Urteil, das §4a dem Modell überlässt: War *dieser* geprüfte
+ * Versuch richtig? (T-03 PR 2, s. o. „Was das Modell entscheidet".)
+ *
+ * Kommt strukturiert aus einem eigenen, kleinen Modellaufruf
+ * (`ai/client.ts` `klassifiziereVersuch()`, `ai/schemas/versuch-urteil.ts`)
+ * – nie aus dem Fließtext der Tutor-Antwort geraten. Drei Werte, weil
+ * `darfLoesungWennFalsch` dem Modell erlaubt, die Lösung direkt zu zeigen,
+ * wenn dieser (zweite) Versuch auch danebenliegt.
+ */
+export type VersuchUrteil = "richtig" | "falsch" | "falsch_loesung_gezeigt";
+
+/**
+ * Wendet das Modell-Urteil auf einen `versuch_pruefen`-Zug an – die einzige
+ * Stelle, an der eine Modellantwort den Zustand ändert, und deshalb bewusst
+ * eng gefasst: nur für genau diesen Zugtyp, nur für dieses eine Urteil.
+ *
+ * `attempts` steigt in allen drei Fällen auf `zug.versuchNr` – der Versuch
+ * wurde dokumentiert, unabhängig vom Ausgang. Nur `status` unterscheidet
+ * sich:
+ * - `richtig` → `geloest`.
+ * - `falsch_loesung_gezeigt` → `loesung_gezeigt` (§4a Schritt 4: „nicht als
+ *   gelöst" – auch wenn der Weg am Ende richtig vorgerechnet wurde).
+ * - `falsch` → deckt sich mit `folgeZustand()`s eigenem `versuch_pruefen`-
+ *   Zweig, deshalb an ihn delegiert statt dupliziert.
+ */
+export function zustandNachVersuchUrteil(
+  zustand: AufgabenZustand,
+  zug: Extract<Zug, { art: "versuch_pruefen" }>,
+  urteil: VersuchUrteil,
+): AufgabenZustand {
+  const inArbeit = zustand.status === "offen" ? "in_arbeit" : zustand.status;
+  if (urteil === "richtig") {
+    return { ...zustand, status: "geloest", attempts: zug.versuchNr };
+  }
+  if (urteil === "falsch_loesung_gezeigt") {
+    return { ...zustand, status: "loesung_gezeigt", attempts: zug.versuchNr };
+  }
+  return { ...zustand, status: inArbeit, attempts: zug.versuchNr };
+}
+
+/**
  * Ist die Aufgabe abgeschlossen? Nur das Kind schließt sie ab („gelöst“,
  * „übersprungen“) – oder die gezeigte Lösung tut es.
  */
