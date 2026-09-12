@@ -2,7 +2,7 @@ import { classifyMultipleChoice, classifyTyped } from "./outcome";
 import type { Outcome } from "./session";
 
 /**
- * Offline-Antwortwarteschlange fürs Üben (F-09b, ADR 0010).
+ * Offline-Antwortwarteschlange fürs Üben (F-09b, ADR 0015).
  *
  * Zwei Teile mit unterschiedlichem Testweg, absichtlich in einer Datei
  * gehalten, weil sie zusammengehören:
@@ -15,7 +15,7 @@ import type { Outcome } from "./session";
  *    Rückfrage. Verifiziert stattdessen per E2E gegen einen echten Browser
  *    (`tests/e2e/practice.spec.ts`), wie schon der Service Worker in F-09a.
  *
- * **Warum keine `applyReview()`/FSRS-Vorschau, obwohl ADR 0010 das
+ * **Warum keine `applyReview()`/FSRS-Vorschau, obwohl ADR 0015 das
  * vorgesehen hatte:** `session.ts`s `advance()` konsumiert ausschließlich
  * den `Outcome` (richtig/fast/falsch) einer Antwort, nie den FSRS-Zustand –
  * der ist rein serverseitig und beeinflusst die laufende Session nicht.
@@ -24,7 +24,7 @@ import type { Outcome } from "./session";
  * vorbehalten, das den frischen `fsrs_state` erst beim echten Sync aus der
  * Datenbank liest – **eine Wahrheit über den Lernstand, nicht zwei.**
  *
- * **Sequenziell ist Pflicht** (ADR 0010 Entscheidung 2): `ts-fsrs` ist
+ * **Sequenziell ist Pflicht** (ADR 0015 Entscheidung 2): `ts-fsrs` ist
  * zustandsbehaftet, zwei Antworten auf dieselbe Karte hängen ursächlich
  * zusammen. `flushAnswerQueue()` bricht deshalb bei einem vorübergehenden
  * Fehlschlag (`"retry"`) ab, statt spätere Einträge vorzuziehen – der Rest
@@ -42,7 +42,7 @@ import type { Outcome } from "./session";
  * Versuch – `submitAnswer()` legt bei jedem Aufruf eine neue `review`-Zeile
  * an, ohne Idempotenz-Schlüssel). Beides selten genug (ein Absturz in einem
  * Millisekundenfenster), dass eine Migration dafür unverhältnismäßig wäre –
- * siehe ADR 0010, bewusste Entscheidung, nicht vergessener Rest.
+ * siehe ADR 0015, bewusste Entscheidung, nicht vergessener Rest.
  */
 
 export type QueuedAnswer = {
@@ -93,7 +93,7 @@ export function previewOutcome(
  * - `"ok"` – angenommen, aus der Warteschlange entfernen, weitermachen.
  * - `"retry"` – vorübergehend gescheitert (kein Netz, keine Kind-Rolle
  *   gerade aktiv) – **abbrechen**, damit spätere Einträge keine früheren
- *   überholen (FSRS ist zustandsbehaftet, ADR 0010).
+ *   überholen (FSRS ist zustandsbehaftet, ADR 0015).
  * - `"discard"` – wird nie mehr gelingen (die Karte existiert nicht mehr) –
  *   aus der Warteschlange entfernen, aber **weitermachen**: Ein einzelner
  *   verwaister Eintrag darf nicht alles Folgende für immer blockieren.

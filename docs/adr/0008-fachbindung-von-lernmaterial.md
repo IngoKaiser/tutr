@@ -240,6 +240,39 @@ Auswahl-Bildschirm**, sondern weniger sichtbare Auswahl als vorher, nicht
 mehr. Die zwei Platzhalter-Blöcke sind ersatzlos gestrichen, nicht durch neue
 Kacheln ersetzt.
 
+### Korrektur beim Zusammenführen: es waren zwei Umschalter, nicht einer
+
+Der Abschnitt oben wurde gegen einen **veralteten Stand** geschrieben. Beim
+Merge auf `main` zeigte sich, dass zwischenzeitlich V-06a, V-07, V-08 und
+V-09 gelandet waren – und dass `/ueben` sich in der Zwischenzeit in die
+**Gegenrichtung** entwickelt hatte:
+
+- **V-06a** hat den Richtungs-Umschalter verfeinert statt entfernt: Die
+  Beschriftung kommt jetzt aus `subject.language` (`EN → DE` statt fest
+  `FR → DE`), und ein Fach ohne Zielsprache zeigt ihn gar nicht erst.
+- **V-08** hat einen **zweiten** Umschalter danebengestellt (Antwortart:
+  Automatisch / Auswahl / Tippen) und den Lernstand auf den ganzen Wortschatz
+  umgestellt.
+
+Die Kritik „zu viele Knöpfe", die V-04 ausgelöst hat, galt damit der Seite
+**mit zwei** Umschaltern – nicht der mit einem, gegen die der erste Anlauf
+gebaut wurde. Die Verschlankung oben war also nicht falsch, aber gemessen an
+der echten Seite **unvollständig**.
+
+**Korrigierte Entscheidung:** Beide Umschalter verlassen den Alltagsfluss,
+und beide ziehen in den Set-Modus auf der Set-Seite um – dort ist eine
+gezielte Wahl ohnehin schon bewusst getroffen. `/ueben` zeigt je Fach nur
+noch Lernstand und „Loslegen"; Richtung mischt `loadSessionCards()` je
+Vokabel (V-06a/V-07), die Frageform leitet `modeForCardState()` aus dem
+FSRS-Zustand ab.
+
+**Was dabei ausdrücklich nicht passiert ist: Löschen von Funktionalität.**
+V-06as sprachabhängige Beschriftungen (`directionLabels()`) und V-08s
+erzwingbare Antwortart sind vollständig erhalten und im Set-Modus über
+`?richtung=` und `?art=` weiter erreichbar. Verschwunden ist nur ihre
+Position im Weg des täglichen Übens. Eine Verschlankung, die eine gerade
+bewusst gebaute Fähigkeit ersatzlos wegnimmt, wäre keine gewesen.
+
 ## Abgelehnte Alternative
 
 **Das Fach rein ableiten, ohne Spalte.** Wäre die reinere Lesart von ADR 0006 D7 und

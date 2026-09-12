@@ -103,6 +103,20 @@ test.describe("Vokabelverwaltung", () => {
     const dateifelder = page.locator('input[type="file"]');
     await expect(dateifelder).toHaveCount(2);
     await expect(page.locator('input[type="file"][capture]')).toHaveCount(1);
+
+    // V-10: erst sammeln, dann einlesen. Die Auswahl allein startet keinen
+    // Server-Aufruf (der Vision-Weg läuft hier ohnehin nicht) – sie legt eine
+    // Kachel an, die sich noch drehen und wegnehmen lässt.
+    await page.locator('input[type="file"]:not([capture])').setInputFiles({
+      name: "seite.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("nicht-wirklich-ein-jpeg"),
+    });
+    await expect(page.getByRole("button", { name: "Einlesen" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Bild 1 drehen" })).toBeVisible();
+    await page.getByRole("button", { name: "Bild 1 entfernen" }).click();
+    await expect(page.getByRole("button", { name: "Einlesen" })).toHaveCount(0);
+
     await page.getByRole("button", { name: "Abbrechen" }).click();
 
     // --- Einfügen: alle vier Fälle in einem Text --------------------------
@@ -142,18 +156,26 @@ test.describe("Vokabelverwaltung", () => {
 
     await expect(page.getByText("2 Zeilen solltest du prüfen.")).toBeVisible({ timeout: 10_000 });
 
-    // --- Löschen: eine Zeile, die gar keine Vokabel ist --------------------
+    // --- Löschen mit Rückgängig-Fenster (V-11) ---------------------------
+    // Der „Löschen"-Knopf im Bearbeiten-Zustand ist jetzt der Tastatur-/
+    // Rechnerweg; auf dem Handy geht es per Wischen. Die Zeile verschwindet
+    // sofort, die eigentliche Löschung läuft nach 5 s (oder beim Verlassen
+    // der Seite, siehe die Navigation gleich darunter).
     await page.getByRole("button", { name: new RegExp(GAMMA) }).click();
-    await page.getByRole("button", { name: "Das ist keine Vokabel – löschen" }).click();
+    await page.getByRole("button", { name: "Löschen" }).click();
     await expect(page.getByRole("button", { name: new RegExp(GAMMA) })).toHaveCount(0, {
       timeout: 10_000,
     });
+    await expect(page.getByRole("button", { name: "Rückgängig" })).toBeVisible();
 
     // --- Eine Ebene höher, ohne Umweg über die Fußleiste -------------------
     // Die Fußleiste kennt nur die fünf Bereiche; ohne diesen Link käme man aus
     // einer Unterseite nur über /faecher wieder heraus.
     const inhalt = page.getByRole("main");
-    await inhalt.getByRole("link", { name: "Vokabelsets" }).click();
+    // „Vokabeln", nicht „Vokabelsets" (T-18): Der Rückweg benennt die
+    // Zielseite so, wie sie oben heißt – vorher stand hier ein Name, den es
+    // auf der Seite dahinter gar nicht gab.
+    await inhalt.getByRole("link", { name: "Vokabeln" }).click();
     await expect(page.getByRole("link", { name: new RegExp(SET_TITLE) })).toBeVisible({
       timeout: 10_000,
     });
@@ -164,11 +186,14 @@ test.describe("Vokabelverwaltung", () => {
       timeout: 10_000,
     });
 
-    // --- Set löschen: die Vokabeln bleiben --------------------------------
+    // --- Set löschen, „Nur das Set": die Vokabeln bleiben (V-03a) --------
+    // Seit V-03d fragt das Löschen, weil alle drei Vokabeln in keinem
+    // anderen Set stecken. „Nur das Set" lässt sie stehen.
     await page.goto("/faecher/vokabeln");
     const row = page.getByRole("listitem").filter({ hasText: SET_TITLE });
     await row.getByRole("button", { name: "Löschen" }).click();
-    await row.getByRole("button", { name: "Ja, löschen" }).click();
+    await expect(row.getByText(/Vokabeln stecken in keinem anderen Set/)).toBeVisible();
+    await row.getByRole("button", { name: "Nur das Set" }).click();
     await expect(page.getByRole("link", { name: new RegExp(SET_TITLE) })).toHaveCount(0, {
       timeout: 10_000,
     });
@@ -176,5 +201,44 @@ test.describe("Vokabelverwaltung", () => {
     const [{ count: rest }] = await admin<{ count: string }[]>`
       select count(*)::text as count from vocab_item where term like ${PREFIX + "%"}`;
     expect(Number(rest)).toBe(3);
+
+    // --- „Ohne Set": die drei Waisen sind erreichbar (V-03d) ------------
+    const ohneSet = page.getByRole("link", { name: /Ohne Set/ }).first();
+    await expect(ohneSet).toBeVisible({ timeout: 10_000 });
+    await expect(ohneSet).toContainText("3 Vokabeln");
+    await ohneSet.click();
+
+    await expect(page.getByRole("heading", { name: "Ohne Set", level: 1 })).toBeVisible();
+    const inhaltOhneSet = page.getByRole("main");
+    await expect(inhaltOhneSet.locator("ul > li")).toHaveCount(3);
+
+    // Eine Waise vollständig löschen (kaskadiert auf Karten, Reviews). Seit
+    // V-11 mit Rückgängig-Fenster: Die Zeile geht sofort, die DB-Löschung
+    // erst, wenn das Fenster zu ist – hier warten wir, bis die Rückgängig-
+    // Leiste wieder verschwindet, bevor wir den Kaskaden-Effekt prüfen.
+    await page.getByRole("button", { name: new RegExp(ALPHA) }).click();
+    const loeschen = page.getByRole("button", { name: "Löschen" });
+    await expect(loeschen).toBeVisible();
+    await loeschen.click();
+
+    await expect(inhaltOhneSet.locator("ul > li")).toHaveCount(2, { timeout: 10_000 });
+    // Warten, bis das Rückgängig-Fenster zu ist – erst dann läuft die
+    // eigentliche (kaskadierende) Löschung.
+    await expect(page.getByRole("button", { name: "Rückgängig" })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    const db = admin;
+    await expect
+      .poll(
+        async () =>
+          Number(
+            (
+              await db<{ count: string }[]>`
+                select count(*)::text as count from vocab_item where term like ${PREFIX + "%"}`
+            )[0]!.count,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(2);
   });
 });

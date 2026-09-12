@@ -26,3 +26,21 @@ export const LANGUAGE_OPTIONS: readonly LanguageOption[] = [
 export function languageLabel(code: string): string {
   return LANGUAGE_OPTIONS.find((o) => o.code === code)?.label ?? code;
 }
+
+/**
+ * Beschriftung der beiden Übungsrichtungen aus der Zielsprache des Fachs
+ * (V-06a). `vorwaerts` ist Fremdwort → Deutsch (erkennen), `rueckwaerts`
+ * Deutsch → Fremdwort (produzieren) – kompakt als Sprachcodes, wie im
+ * Umschalter Platz ist: „EN → DE" / „DE → EN".
+ *
+ * `null` heißt: kein Sprachfach (`subject.language` leer). Dann gibt es keine
+ * Rückrichtung – Frage-Antwort-Fächer wie Geschichte kennen nur einen Weg –
+ * und der Umschalter erscheint gar nicht.
+ */
+export function directionLabels(
+  language: string | null,
+): { vorwaerts: string; rueckwaerts: string } | null {
+  if (!language) return null;
+  const code = language.toUpperCase();
+  return { vorwaerts: `${code} → DE`, rueckwaerts: `DE → ${code}` };
+}

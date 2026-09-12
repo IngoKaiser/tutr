@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /**
- * Service-Worker-Registrierung (F-09a, ADR 0010).
+ * Service-Worker-Registrierung (F-09a, ADR 0015).
  *
  * Nur in Produktion: `public/sw.js` entsteht ausschließlich im `postbuild`
  * (siehe `scripts/build-sw.mts`), gegen `next dev` existiert die Datei nie.

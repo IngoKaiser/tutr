@@ -9,7 +9,7 @@ import {
 } from "./answer-queue";
 
 /**
- * `flushAnswerQueue()` und `previewOutcome()` sind rein (F-09b, ADR 0010) –
+ * `flushAnswerQueue()` und `previewOutcome()` sind rein (F-09b, ADR 0015) –
  * getestet mit einem In-Memory-Fake statt echtem `indexedDB`. Die echte
  * `createIndexedDbAnswerQueue()` ist absichtlich nicht hier getestet: jsdom
  * kennt kein IndexedDB, ein Fake dafür wäre eine neue Abhängigkeit ohne

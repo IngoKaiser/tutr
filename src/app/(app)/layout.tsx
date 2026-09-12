@@ -42,8 +42,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!actor) redirect("/anmelden");
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="border-linie bg-flaeche border-b">
+    // **Fester Rahmen statt scrollendem Dokument** (T-07): Die Höhe ist der
+    // Bildschirm, gescrollt wird nur `main`. Das ist der Unterschied zwischen
+    // einer Website und einer App – und die Voraussetzung dafür, dass der
+    // Tutor-Composer per `sticky bottom-0` genau über der Fußleiste klebt,
+    // ohne deren Höhe kennen zu müssen. Vorher wanderte er beim Lesen einer
+    // langen Antwort aus dem Bild.
+    <div className="app-rahmen flex h-dvh flex-col">
+      <header className="border-linie bg-flaeche shrink-0 border-b">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-3">
           <span className="text-koenigsblau text-lg font-bold tracking-tight">tutr</span>
 
@@ -95,7 +101,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-5">{children}</main>
+      {/* `min-h-0` ist hier nicht kosmetisch: Ohne das weigert sich ein
+          Flex-Kind zu schrumpfen, `overflow-y-auto` liefe ins Leere und die
+          Seite scrollte wieder als Ganzes.
+
+          `container-type: size` macht `main` zum Größen-Container (T-12a):
+          Seiten können sich damit über `cqh` auf die **sichtbare** Höhe
+          beziehen, statt sie aus `100dvh` minus Kopf- und Fußleiste zu
+          schätzen. Genau eine Seite braucht das – der Tutor-Chat, der seine
+          drei Zonen (Kopfzeile, scrollende Nachrichten, festes Eingabefeld)
+          ohne `position: sticky` bauen muss; auf dem iPhone rutschte das
+          klebende Eingabefeld beim Scrollen mit nach oben.
+
+          Bewusst **keine** feste Höhe auf der Hülle: Damit würden die Kinder
+          einer Seite, die `flex flex-col` ist (also fast jeder), bei zu wenig
+          Platz gestaucht statt überzulaufen – aus einer scrollenden
+          Vokabelliste würde eine zusammengedrückte. Der Größen-Container
+          lässt alle anderen Seiten unangetastet. */}
+      <main className="[container-type:size] min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto w-full max-w-2xl px-4 py-5">{children}</div>
+      </main>
 
       <BottomNav />
     </div>

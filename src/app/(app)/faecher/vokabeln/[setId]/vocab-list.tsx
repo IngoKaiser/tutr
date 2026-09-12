@@ -4,7 +4,10 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
-import { prepareImageForUpload } from "@/lib/vocab/image";
+import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
+import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
+import { prepareImageForUpload } from "@/lib/image";
+import { directionLabels } from "@/lib/subjects/languages";
 
 import {
   addFromPaste,
@@ -37,25 +40,30 @@ export function VocabList({
   canManage: boolean;
   photoAvailable: boolean;
 }) {
-  const unsichereAnzahl = detail.items.filter((item) => item.unsicher).length;
+  const geloescht = useDeferredDelete<VocabRow>((id) => deleteItem(detail.id, id));
+  const sichtbar = detail.items.filter((item) => !geloescht.istEntfernt(item.id));
+  const unsichereAnzahl = sichtbar.filter((item) => item.unsicher).length;
 
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
         title={detail.title}
         trailing={detail.subjectName}
-        back={{ href: "/faecher/vokabeln", label: "Vokabelsets" }}
+        back={{ href: "/faecher/vokabeln", label: "Vokabeln" }}
       />
 
       {unsichereAnzahl > 0 ? (
         <Notice>
           {unsichereAnzahl === 1
             ? "1 Zeile solltest du prüfen."
-            : `${unsichereAnzahl} Zeilen solltest du prüfen.`}
+            : `${unsichereAnzahl} Zeilen solltest du prüfen.`}{" "}
+          Solange kommen sie im Üben nicht dran.
         </Notice>
       ) : null}
 
-      {canManage && detail.items.length > 0 ? <PracticeEntry setId={detail.id} /> : null}
+      {canManage && detail.items.length > 0 ? (
+        <PracticeEntry setId={detail.id} language={detail.subjectLanguage} />
+      ) : null}
 
       {canManage ? <AddArea setId={detail.id} photoAvailable={photoAvailable} /> : null}
 
@@ -64,12 +72,28 @@ export function VocabList({
       ) : (
         <Block>
           <ul className="flex flex-col gap-2">
-            {detail.items.map((item) => (
-              <VocabRowItem key={item.id} setId={detail.id} item={item} canManage={canManage} />
+            {sichtbar.map((item) => (
+              <VocabRowItem
+                key={item.id}
+                setId={detail.id}
+                item={item}
+                canManage={canManage}
+                onDelete={() => geloescht.entfernen(item)}
+              />
             ))}
           </ul>
         </Block>
       )}
+
+      {/* Außerhalb des Blocks: `sticky` braucht als Bezug den scrollenden
+          `main`-Bereich, nicht die Karte drumherum (V-12). */}
+      <UndoLoeschen
+        eintraege={geloescht.pending.map((e) => ({
+          id: e.id,
+          label: e.term.trim() || "Zeile",
+        }))}
+        onZurueck={(id) => geloescht.zuruecknehmen(id)}
+      />
     </div>
   );
 }
@@ -85,32 +109,76 @@ type FotoEintrag = {
   status: FotoStatus;
   fehler: string | null;
   ergebnis: AddSummary | null;
+  /** Handdrehung in Grad (0/90/180/270), aus dem ↻-Knopf – für Seiten, deren
+   *  EXIF-Orientierung fehlt oder falsch ist (V-10). */
+  rotation: number;
 };
 
 type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
 
 /**
+ * Antwortart der Runde (V-08, mit V-04 von `/ueben` hierher gezogen). `auto`
+ * lässt den FSRS-Zustand entscheiden (Multiple Choice bis `wiederholen`, dann
+ * Tippen – `modeForCardState`); die beiden anderen erzwingen eine Art für
+ * alle Karten. Für „das erste Level sitzt, ich will tippen", ohne auf FSRS zu
+ * warten.
+ */
+type AntwortWahl = "auto" | "mc" | "tippen";
+
+/**
  * „Dieses Set üben" (V-04, Set-Modus aus §6 M4): unabhängig von der
  * Fälligkeit, direkt aus diesem Set. Der Einstieg lebt bewusst hier, nicht
  * auf `/ueben` – wer diese Seite aufruft, hat das Set schon gewählt, das ist
- * die eine Entscheidung, die zählt. Die Richtungswahl steht deshalb auch nur
- * noch hier, nicht mehr im Alltagsfluss (ADR 0008 Nachtrag V-04).
+ * die eine Entscheidung, die zählt. **Die Richtungswahl steht deshalb nur
+ * noch hier**, nicht mehr im Alltagsfluss (ADR 0008 Nachtrag V-04): Auf
+ * `/ueben` mischt „Loslegen" immer, hier ist eine gezielte Wahl ohnehin
+ * schon bewusst.
+ *
+ * Ohne Zielsprache am Fach gibt es keine Rückrichtung (V-06a) – dann kein
+ * Umschalter, nur der Knopf. Dieselbe Regel wie im Fach-Block auf `/ueben`
+ * vor V-04, mit denselben Beschriftungen aus `directionLabels()`.
  *
  * Reiner Link mit Query-Parametern statt Server Action: `/ueben` lädt die
  * Karten serverseitig und startet die Session direkt – keine doppelte
  * Übungs-UI, die Session-Maschine (`ActiveCard`, `session.ts`) lebt an
  * genau einer Stelle.
  */
-function PracticeEntry({ setId }: { setId: string }) {
+function PracticeEntry({ setId, language }: { setId: string; language: string | null }) {
   const [direction, setDirection] = useState<DirectionChoice>("gemischt");
-  const href =
-    direction === "gemischt" ? `/ueben?set=${setId}` : `/ueben?set=${setId}&richtung=${direction}`;
+  const [antwort, setAntwort] = useState<AntwortWahl>("auto");
+  const labels = directionLabels(language);
+  const effektiveRichtung: DirectionChoice = labels ? direction : "gemischt";
+
+  const params = new URLSearchParams({ set: setId });
+  if (effektiveRichtung !== "gemischt") params.set("richtung", effektiveRichtung);
+  if (antwort !== "auto") params.set("art", antwort);
 
   return (
     <Block title="Üben">
-      <DirectionPicker value={direction} onChange={setDirection} />
+      {labels ? (
+        <SegmentedPicker
+          ariaLabel="Richtung"
+          value={direction}
+          onChange={setDirection}
+          options={[
+            { value: "gemischt", label: "Gemischt" },
+            { value: "vorwaerts", label: labels.vorwaerts },
+            { value: "rueckwaerts", label: labels.rueckwaerts },
+          ]}
+        />
+      ) : null}
+      <SegmentedPicker
+        ariaLabel="Antwortart"
+        value={antwort}
+        onChange={setAntwort}
+        options={[
+          { value: "auto", label: "Automatisch" },
+          { value: "mc", label: "Auswahl" },
+          { value: "tippen", label: "Tippen" },
+        ]}
+      />
       <Link
-        href={href}
+        href={`/ueben?${params.toString()}`}
         className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau flex w-full items-center justify-center rounded-[9px] border border-transparent px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
       >
         Dieses Set üben
@@ -119,25 +187,26 @@ function PracticeEntry({ setId }: { setId: string }) {
   );
 }
 
-function DirectionPicker({
+/** Segmentierter Umschalter (Richtung, Antwortart – V-02/V-08, mit V-04 von
+ *  `/ueben` hierher gezogen). */
+function SegmentedPicker<T extends string>({
+  ariaLabel,
   value,
   onChange,
+  options,
 }: {
-  value: DirectionChoice;
-  onChange: (value: DirectionChoice) => void;
+  ariaLabel: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: readonly { value: T; label: string }[];
 }) {
-  const OPTIONS: { value: DirectionChoice; label: string }[] = [
-    { value: "gemischt", label: "Gemischt" },
-    { value: "vorwaerts", label: "FR → DE" },
-    { value: "rueckwaerts", label: "DE → FR" },
-  ];
   return (
     <div
       role="radiogroup"
-      aria-label="Richtung"
+      aria-label={ariaLabel}
       className="border-linie-stark flex overflow-hidden rounded-md border"
     >
-      {OPTIONS.map((option) => (
+      {options.map((option) => (
         <button
           key={option.value}
           type="button"
@@ -221,33 +290,40 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
    * Direkt aufrufbar für „Nochmal" – dieselbe Funktion, kein eigener
    * Retry-Pfad, weil ein wiederholter Versuch fachlich derselbe Vorgang ist.
    */
-  async function verarbeiteFoto(id: string, file: File) {
-    aktualisiereFoto(id, { status: "verkleinert", fehler: null, ergebnis: null });
+  async function verarbeiteFoto(eintrag: FotoEintrag) {
+    aktualisiereFoto(eintrag.id, { status: "verkleinert", fehler: null, ergebnis: null });
     try {
-      const image = await prepareImageForUpload(file);
-      aktualisiereFoto(id, { status: "liest" });
+      const image = await prepareImageForUpload(eintrag.file, eintrag.rotation);
+      aktualisiereFoto(eintrag.id, { status: "liest" });
       const result = await addFromPhoto(setId, image);
 
       if (!result) {
-        aktualisiereFoto(id, { status: "fehler", fehler: "Dafür fehlt die Berechtigung." });
+        aktualisiereFoto(eintrag.id, { status: "fehler", fehler: "Dafür fehlt die Berechtigung." });
         return;
       }
       if (!result.ok) {
-        aktualisiereFoto(id, { status: "fehler", fehler: result.fehler });
+        aktualisiereFoto(eintrag.id, { status: "fehler", fehler: result.fehler });
         return;
       }
-      aktualisiereFoto(id, { status: "fertig", ergebnis: result.summary });
+      aktualisiereFoto(eintrag.id, { status: "fertig", ergebnis: result.summary });
     } catch {
-      aktualisiereFoto(id, {
+      aktualisiereFoto(eintrag.id, {
         status: "fehler",
         fehler: "Das Bild ließ sich nicht lesen. Versuch es noch einmal.",
       });
     }
   }
 
-  /** Neu ausgewählte Bilder nacheinander verarbeiten – ein Server-Aufruf je Bild (V-03b). */
-  async function verarbeiteNeueFotos(eintraege: FotoEintrag[]) {
-    for (const eintrag of eintraege) await verarbeiteFoto(eintrag.id, eintrag.file);
+  /**
+   * Erst sammeln, dann einlesen (V-10). Wie beim Laden aus der Mediathek:
+   * mehrere Bilder aufnehmen, einzeln wieder wegnehmen oder drehen, und den
+   * Server-Lauf selbst starten – nicht bei jeder Auswahl sofort. Verarbeitet
+   * werden nur die noch wartenden; ein Server-Aufruf je Bild (V-03b).
+   */
+  async function fotosEinlesen() {
+    for (const eintrag of fotos) {
+      if (eintrag.status === "wartet") await verarbeiteFoto(eintrag);
+    }
   }
 
   function fotosAusgewaehlt(files: File[]) {
@@ -259,9 +335,23 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
       status: "wartet",
       fehler: null,
       ergebnis: null,
+      rotation: 0,
     }));
     setFotos((prev) => [...prev, ...neu]);
-    void verarbeiteNeueFotos(neu);
+  }
+
+  /** Ein wartendes oder gescheitertes Bild wieder wegnehmen, bevor eingelesen wird. */
+  function fotoEntfernen(id: string) {
+    setFotos((prev) => {
+      const raus = prev.find((f) => f.id === id);
+      if (raus) URL.revokeObjectURL(raus.vorschauUrl);
+      return prev.filter((f) => f.id !== id);
+    });
+  }
+
+  /** Ein Bild um 90° weiterdrehen – für Seiten, deren Ausrichtung nicht stimmt. */
+  function fotoDrehen(id: string) {
+    setFotos((prev) => prev.map((f) => (f.id === id ? { ...f, rotation: f.rotation + 90 } : f)));
   }
 
   /**
@@ -288,6 +378,7 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
   }
 
   const verarbeitungLaeuft = fotos.some((f) => f.status === "verkleinert" || f.status === "liest");
+  const wartende = fotos.filter((f) => f.status === "wartet").length;
 
   if (mode === "geschlossen") {
     return (
@@ -310,9 +401,10 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
         {photoAvailable ? (
           <>
             <Notice>
-              Buchseite, Arbeitsblatt oder Vokabelheft. Mehrere Bilder auf einmal gehen – eine
-              Vokabelliste läuft oft über eine Doppelseite. Jedes Bild zählt für sich: Scheitert
-              eins, bleiben die anderen und lassen sich einzeln wiederholen. Die Fotos werden nicht
+              Buchseite, Arbeitsblatt oder Vokabelheft. Erst so viele Bilder aufnehmen oder laden,
+              wie du brauchst – eine Vokabelliste läuft oft über eine Doppelseite –, dann
+              „Einlesen“. Vorher lässt sich jedes Bild noch drehen oder wieder wegnehmen. Jedes Bild
+              zählt für sich: Scheitert eins, bleiben die anderen. Die Fotos werden nicht
               gespeichert.
             </Notice>
 
@@ -347,7 +439,11 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
             />
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => kameraRef.current?.click()} disabled={verarbeitungLaeuft}>
+              <Button
+                quiet
+                onClick={() => kameraRef.current?.click()}
+                disabled={verarbeitungLaeuft}
+              >
                 Kamera
               </Button>
               <Button
@@ -357,8 +453,17 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
               >
                 Bild auswählen
               </Button>
+              {wartende > 0 ? (
+                <Button onClick={() => void fotosEinlesen()} disabled={verarbeitungLaeuft}>
+                  {verarbeitungLaeuft
+                    ? "Wird eingelesen …"
+                    : wartende === 1
+                      ? "Einlesen"
+                      : `Einlesen (${wartende})`}
+                </Button>
+              ) : null}
               <Button quiet onClick={fotosSchliessen} disabled={verarbeitungLaeuft}>
-                {fotos.length > 0 ? "Fertig" : "Abbrechen"}
+                {fotos.some((f) => f.ergebnis !== null) ? "Fertig" : "Abbrechen"}
               </Button>
             </div>
 
@@ -369,7 +474,9 @@ export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailab
                     key={foto.id}
                     nummer={index + 1}
                     foto={foto}
-                    onNochmal={() => void verarbeiteFoto(foto.id, foto.file)}
+                    onNochmal={() => void verarbeiteFoto(foto)}
+                    onDrehen={() => fotoDrehen(foto.id)}
+                    onEntfernen={() => fotoEntfernen(foto.id)}
                   />
                 ))}
               </ul>
@@ -491,13 +598,20 @@ function FotoZeile({
   nummer,
   foto,
   onNochmal,
+  onDrehen,
+  onEntfernen,
 }: {
   nummer: number;
   foto: FotoEintrag;
   onNochmal: () => void;
+  onDrehen: () => void;
+  onEntfernen: () => void;
 }) {
   const istFehler = foto.status === "fehler";
   const istFertig = foto.status === "fertig";
+  // Vor dem Einlesen (oder nach einem Fehler) lässt sich das Bild noch
+  // drehen und wegnehmen – währenddessen und danach nicht mehr.
+  const bearbeitbar = foto.status === "wartet" || istFehler;
   return (
     <li
       className={`flex items-center gap-3 rounded-[9px] border px-3 py-2.5 ${
@@ -507,12 +621,15 @@ function FotoZeile({
       {/* Objekt-URL im Speicher des Tabs – dasselbe Bild, das an die
           Bilderkennung ging, nie das Original in voller Größe (`image.ts`
           verkleinert vor dem Hochladen, hier zeigt die Vorschau die
-          Originaldatei, weil das für eine Miniatur ohnehin reicht). */}
+          Originaldatei, weil das für eine Miniatur ohnehin reicht). Die
+          Drehung ist hier nur Vorschau; die echte Drehung passiert in
+          `prepareImageForUpload()`. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- Objekt-URL aus lokaler Datei, kein Next-Bildoptimierer nötig */}
       <img
         src={foto.vorschauUrl}
         alt=""
-        className="border-linie h-12 w-12 shrink-0 rounded-md border object-cover"
+        style={{ transform: `rotate(${foto.rotation}deg)` }}
+        className="border-linie h-12 w-12 shrink-0 rounded-md border object-cover transition-transform"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-tinte-leise text-[0.6875rem] font-semibold tracking-wide uppercase">
@@ -539,6 +656,26 @@ function FotoZeile({
           Nochmal
         </button>
       ) : null}
+      {bearbeitbar ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onDrehen}
+            aria-label={`Bild ${nummer} drehen`}
+            className="text-tinte-leise hover:text-koenigsblau rounded p-1 text-base leading-none"
+          >
+            <span aria-hidden="true">↻</span>
+          </button>
+          <button
+            type="button"
+            onClick={onEntfernen}
+            aria-label={`Bild ${nummer} entfernen`}
+            className="text-tinte-leise hover:text-offen rounded p-1 text-base leading-none"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -547,10 +684,13 @@ function VocabRowItem({
   setId,
   item,
   canManage,
+  onDelete,
 }: {
   setId: string;
   item: VocabRow;
   canManage: boolean;
+  /** Löschen mit Rückgängig-Fenster (V-11) – vom `useDeferredDelete` der Liste. */
+  onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState(item.term);
@@ -559,7 +699,7 @@ function VocabRowItem({
 
   if (!open) {
     return (
-      <li>
+      <SwipeRow onDelete={onDelete} disabled={!canManage}>
         <button
           type="button"
           onClick={() => canManage && setOpen(true)}
@@ -582,20 +722,22 @@ function VocabRowItem({
             <span className="text-offen shrink-0 text-[0.6875rem] font-semibold">prüfen</span>
           ) : null}
         </button>
-      </li>
+      </SwipeRow>
     );
   }
 
+  /**
+   * Speichert – und **bestätigt damit zugleich** (V-13). `updateItem()`
+   * setzt `confirmed_at` unabhängig davon, ob sich Wort oder Übersetzung
+   * geändert haben: Die Felder stehen vorausgefüllt da, also heißt „Speichern"
+   * auf eine unveränderte Zeile bereits „passt so". Ein eigener zweiter Knopf
+   * dafür (`confirmItem()`) tat exakt dasselbe wie dieser hier – entfernt,
+   * nachdem das beim Testen als verwirrende Dopplung auffiel.
+   */
   function save() {
     startTransition(async () => {
       await updateItem(setId, item.id, term, translation);
       setOpen(false);
-    });
-  }
-
-  function remove() {
-    startTransition(async () => {
-      await deleteItem(setId, item.id);
     });
   }
 
@@ -622,11 +764,14 @@ function VocabRowItem({
         </Button>
         <button
           type="button"
-          onClick={remove}
+          onClick={() => {
+            setOpen(false);
+            onDelete();
+          }}
           disabled={pending}
           className="text-tinte-leise hover:text-offen ml-auto text-xs font-medium disabled:opacity-50"
         >
-          Das ist keine Vokabel – löschen
+          Löschen
         </button>
       </div>
     </li>

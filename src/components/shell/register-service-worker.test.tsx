@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RegisterServiceWorker } from "./register-service-worker";
 
 /**
- * F-09a (ADR 0010): Registrierung nur in Produktion, in Entwicklung aktiv
+ * F-09a (ADR 0015): Registrierung nur in Produktion, in Entwicklung aktiv
  * abräumen – kein E2E dafür, `public/sw.js` entsteht erst im `postbuild`
  * (siehe scripts/build-sw.mts), gegen `next dev` gibt es die Datei nie. Der
  * echte Registrierungs-/Precache-/Offline-Weg ist von Hand gegen einen

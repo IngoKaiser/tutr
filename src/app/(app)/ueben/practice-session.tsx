@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { Lernrhythmus } from "@/components/shell/lernrhythmus";
 import { Block, Button, Notice, PageHeader, Stack } from "@/components/shell/primitives";
 import {
   createIndexedDbAnswerQueue,
@@ -31,22 +32,29 @@ import {
 
 type Phase = "wahl" | "uebung" | "fertig";
 
+/** Ein bereits fertig geladener Set-Modus-Einstieg (V-04), von `page.tsx` aus
+ *  `?set=` gelesen – startet die Session direkt, ohne über „wahl" zu laufen. */
+export type InitialSetSession = {
+  label: string;
+  cards: SessionCardContent[];
+};
+
 /**
  * Eine Warteschlange fürs ganze Browser-Fenster, nicht je Komponente – sie
  * überlebt einen Neu-Mount von `PracticeSession` (z. B. nach „Zur
- * Übersicht") und sogar einen Neuladen der Seite, weil sie in IndexedDB
- * liegt (F-09b, ADR 0010). Das Erzeugen selbst rührt `indexedDB` noch nicht
- * an – das passiert erst in `openDb()`, beim ersten echten Aufruf.
+ * Übersicht") und sogar ein Neuladen der Seite, weil sie in IndexedDB liegt
+ * (F-09b, ADR 0015). Das Erzeugen selbst rührt `indexedDB` noch nicht an –
+ * das passiert erst in `openDb()`, beim ersten echten Aufruf.
  */
 const answerQueueStore = createIndexedDbAnswerQueue();
 
 /**
  * Eine wartende Antwort nachliefern – derselbe `submitAnswer()`-Aufruf wie
- * im Online-Fall, kein zweiter Schreibweg (ADR 0010 Entscheidung 2).
+ * im Online-Fall, kein zweiter Schreibweg (ADR 0015 Entscheidung 2).
  * Übersetzt dessen drei Ausgänge (F-09c) in einen `DeliveryResult`:
- * `not_authorized` ist vorübergehend (`"retry"`, ADR 0010 – die
- * Reihenfolge muss stehen bleiben), `not_found` ist endgültig (`"discard"`
- * – eine gelöschte Karte kommt nicht zurück, egal wie oft man es versucht).
+ * `not_authorized` ist vorübergehend (`"retry"` – die Reihenfolge muss
+ * stehen bleiben), `not_found` ist endgültig (`"discard"` – eine gelöschte
+ * Karte kommt nicht zurück, egal wie oft man es versucht).
  * `navigator.onLine === false` scheitert ohne Versuch, statt auf einen
  * Netzwerk-Timeout zu warten.
  */
@@ -66,13 +74,6 @@ async function submitQueuedAnswer(answer: QueuedAnswer): Promise<DeliveryResult>
     return "retry";
   }
 }
-
-/** Ein bereits fertig geladener Set-Modus-Einstieg (V-04), von `page.tsx` aus
- *  `?set=` gelesen – startet die Session direkt, ohne über „wahl" zu laufen. */
-export type InitialSetSession = {
-  label: string;
-  cards: SessionCardContent[];
-};
 
 /**
  * Übungssession (V-02, fachgebunden seit V-06). Ein Client-Baustein statt
@@ -106,19 +107,17 @@ export type InitialSetSession = {
  * merkt sich das nur für den Rückweg: „Zur Übersicht" muss dann `?set=` aus
  * der URL nehmen, sonst startete ein Neuladen dieselbe Session erneut.
  *
- * **Offline** (F-09b, ADR 0010): Bricht `submitAnswer()` ab (kein Netz, ein
+ * **Offline** (F-09b, ADR 0015): Bricht `submitAnswer()` ab (kein Netz, ein
  * Fangportal), landet die Antwort in `@/lib/vocab/answer-queue`s
  * IndexedDB-Warteschlange, die Rückmeldung kommt trotzdem echt – dieselbe
  * Klassifikation, die der Server nutzen würde, nur noch nicht persistiert.
  * Bei Rückkehr ins Netz (oder beim nächsten Laden dieser Seite) liefert
- * `flushAnswerQueue()` die Warteschlange sequenziell nach, über genau
- * denselben `submitAnswer()`-Aufruf – keine zweite Wahrheit über den
- * FSRS-Zustand, nur zeitversetzt.
+ * `flushAnswerQueue()` sequenziell nach, über genau denselben
+ * `submitAnswer()`-Aufruf – keine zweite Wahrheit über den FSRS-Zustand.
  *
  * `pendingCount`/`discardedCount` (F-09c) leben hier, nicht in `ActiveCard`:
  * Die Warteschlange ist sitzungsübergreifend, die Anzeige soll es auch sein
- * – „1 Antwort wartet" darf auch auf der Übersicht stehen, nicht nur
- * während der Karte, die sie ausgelöst hat.
+ * – „1 Antwort wartet" darf auch auf der Übersicht stehen.
  */
 export function PracticeSession({
   bySubject,
@@ -157,9 +156,9 @@ export function PracticeSession({
 
   /**
    * Wartende Antworten nachliefern und die Anzeige danach auffrischen.
-   * Ausgelöst dreifach (F-09c): einmal hier fürs Laden der Seite, beim
-   * `online`-Ereignis, und direkt nach jedem neuen Eintrag (siehe
-   * `ActiveCard`s `onQueued`-Prop) – kein Warten auf den nächsten der drei.
+   * Ausgelöst dreifach (F-09c): beim Laden der Seite, beim `online`-Ereignis,
+   * und direkt nach jedem neuen Eintrag (siehe `ActiveCard`s `onQueued`) –
+   * kein Warten auf den jeweils nächsten der drei.
    */
   const trySync = useCallback(() => {
     void flushAnswerQueue(answerQueueStore, submitQueuedAnswer).then((result) => {
@@ -256,7 +255,7 @@ export function PracticeSession({
         {setLoadFailed ? (
           <Notice>
             Dieses Set ließ sich gerade nicht laden – vielleicht wurde es in der Zwischenzeit
-            gelöscht oder ist leer.
+            gelöscht, ist leer, oder alle Zeilen darin warten noch auf eine Prüfung.
           </Notice>
         ) : null}
         {bySubject === null ? (
@@ -280,6 +279,7 @@ export function PracticeSession({
                 onStart={startSession}
               />
             ))}
+            <Lernrhythmus />
           </>
         )}
       </div>
@@ -325,9 +325,16 @@ function PendingAnswersNotice({
  * Ein Fach, für sich ladend. `subject.total` ist immer > 0 – nur Fächer mit
  * fälligen Karten stehen überhaupt in `bySubject` (siehe `loadDueBySubject()`).
  *
- * Keine Richtungswahl mehr hier (V-04, ADR 0008 Nachtrag): „Loslegen" mischt
- * immer beide Richtungen. Wer gezielt eine Richtung oder ein einzelnes Set
- * will, geht über die Set-Seite (Set-Modus).
+ * **Keine Umschalter mehr** (V-04, ADR 0008 Nachtrag): „Loslegen" trifft
+ * keine Vorentscheidung. Die Richtung mischt `loadSessionCards()` ohnehin je
+ * Vokabel (V-06a/V-07), und die Antwortart leitet `modeForCardState()` aus
+ * dem FSRS-Zustand ab – beides ist eine bessere Antwort, als ein Kind sie vor
+ * der ersten Karte treffen könnte. Wer doch gezielt wählen will, geht über
+ * den Set-Modus auf der Set-Seite, wo die Wahl ohnehin schon bewusst ist.
+ *
+ * Der Umschalter für die Antwortart aus V-08 ist damit von `/ueben`
+ * verschwunden, nicht seine Logik: `SessionCardContent.mode` bleibt
+ * überschreibbar, der Set-Modus kann ihn später wieder anbieten.
  */
 function SubjectBlock({
   subject,
@@ -355,10 +362,14 @@ function SubjectBlock({
 
   return (
     <Block title={subject.subjectName} trailing={`${subject.total} fällig`}>
+      {/* Lernstand über den ganzen Wortschatz, nicht nur die heute Fälligen
+          (V-08) – sonst stünde in „Sitzt" fast immer 0. */}
       <Stack
-        confident={subject.wiederholen}
-        practicing={subject.neu}
-        again={subject.erneutLernen}
+        items={[
+          { count: subject.neu, name: "Neu", tone: "leise" },
+          { count: subject.amUeben, name: "Am Üben", tone: "koenigsblau" },
+          { count: subject.sitzt, name: "Sitzt", tone: "sicher" },
+        ]}
       />
       {canStart ? (
         <>
@@ -447,10 +458,11 @@ function ActiveCard({
   const expected = content.direction === "vorwaerts" ? content.translation : content.term;
 
   /**
-   * Online zuerst, Warteschlange als Rückfall (F-09b, ADR 0010). Eine schon
-   * wartende Warteschlange erzwingt den Rückfall auch dann, wenn `navigator.
-   * onLine` gerade wieder `true` ist: `ts-fsrs` ist zustandsbehaftet, eine
-   * neue Antwort dürfte eine ältere, noch nicht zugestellte, nie überholen.
+   * Online zuerst, Warteschlange als Rückfall (F-09b, ADR 0015). Eine schon
+   * wartende Warteschlange erzwingt den Rückfall auch dann, wenn
+   * `navigator.onLine` gerade wieder `true` ist: `ts-fsrs` ist
+   * zustandsbehaftet, eine neue Antwort dürfte eine ältere, noch nicht
+   * zugestellte, nie überholen.
    */
   function submit(given: string) {
     if (!content) return;
@@ -468,9 +480,7 @@ function ActiveCard({
             responseMs,
           });
           // Keine Kind-Rolle (mehr) aktiv oder keine DB – kein Offline-Fall,
-          // nicht in die Warteschlange nehmen (F-09c: `not_found` bräuchte
-          // hier ohnehin keine Sonderbehandlung, die Karte stünde gar nicht
-          // erst zur Auswahl, wäre sie schon gelöscht).
+          // nicht in die Warteschlange nehmen.
           if (result.status !== "ok") return;
           setReveal({ outcome: result.outcome, given, mode: content.mode, pending: false });
           return;

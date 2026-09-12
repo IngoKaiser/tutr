@@ -1,10 +1,10 @@
 /**
- * Baut public/sw.js aus src/sw.ts (F-09a, ADR 0010).
+ * Baut public/sw.js aus src/sw.ts (F-09a, ADR 0015).
  *
  * Läuft als `postbuild`, nie davor: Das Vorcache-Manifest zeigt auf
  * `.next/static`, das erst nach `next build` existiert. Zwei Schritte:
  * `tsc` kompiliert `sw.ts` (keine npm-Importe darin, also kein Bundler
- * nötig – siehe ADR 0010 Nachtrag), danach injiziert `@serwist/build` das
+ * nötig – siehe ADR 0015 Nachtrag), danach injiziert `@serwist/build` das
  * Vorcache-Manifest in die kompilierte Datei und schreibt sie nach
  * `public/sw.js`.
  */
@@ -27,7 +27,7 @@ if (!existsSync(nextStaticDir) || !existsSync(buildIdFile)) {
 
 const buildId = readFileSync(buildIdFile, "utf8").trim();
 
-// tsc statt eines Bundlers – sw.ts hat keine npm-Importe (ADR 0010 Nachtrag).
+// tsc statt eines Bundlers – sw.ts hat keine npm-Importe (ADR 0015 Nachtrag).
 const tmpDir = mkdtempSync(path.join(tmpdir(), "tutr-sw-"));
 try {
   execFileSync("tsc", ["--project", "tsconfig.sw.json", "--outDir", tmpDir], {
@@ -53,7 +53,9 @@ try {
   });
 
   for (const warning of warnings) console.warn(warning);
-  console.log(`Service Worker gebaut: ${count} Dateien, ${(size / 1024).toFixed(0)} KB vorgecacht.`);
+  console.log(
+    `Service Worker gebaut: ${count} Dateien, ${(size / 1024).toFixed(0)} KB vorgecacht.`,
+  );
 } finally {
   rmSync(tmpDir, { recursive: true, force: true });
 }

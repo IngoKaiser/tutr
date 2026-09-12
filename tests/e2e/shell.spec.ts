@@ -44,6 +44,103 @@ test("Alle fünf Bereiche stehen jederzeit zur Wahl", async ({ page }) => {
   await expect(links).toHaveCount(5);
 });
 
+/**
+ * Die Regel aus `primitives.tsx`: **Jede Seite unterhalb eines
+ * Fußleisten-Bereichs trägt einen Rückweg** – und er benennt die Zielseite so,
+ * wie sie oben heißt. Dreimal vergessen worden (zuletzt bei den Einstellungen,
+ * T-18), deshalb steht sie jetzt auch als Test da.
+ *
+ * Hier nur die Seiten, die ohne Testdaten erreichbar sind; die tieferen
+ * (Vokabelset, Gespräch, Aufgabe) prüfen ihre eigenen Specs.
+ */
+const UNTERSEITEN = [
+  { path: "/faecher/vokabeln", titel: "Vokabeln", zurueck: "Fächer" },
+  // Das Archiv (T-19c): `/tutor` zeigt nur die letzten sechs Gespräche.
+  { path: "/tutor/gespraeche", titel: "Alle Gespräche", zurueck: "Tutor" },
+  // Kein Fußleisten-Bereich, hängt im Kopfbereich – und stand deshalb lange
+  // ganz ohne Ausgang da (T-18).
+  { path: "/einstellungen", titel: "Einstellungen", zurueck: "Heute" },
+] as const;
+
+for (const seite of UNTERSEITEN) {
+  test(`${seite.titel} führt zurück zu „${seite.zurueck}“`, async ({ page }) => {
+    await page.goto(seite.path);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(seite.titel);
+
+    const zurueck = page.getByRole("main").getByRole("link", { name: seite.zurueck });
+    await expect(zurueck).toBeVisible();
+    await zurueck.click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(seite.zurueck);
+  });
+}
+
+/**
+ * Content-Security-Policy (S-03a).
+ *
+ * Zwei Dinge, die nur zusammen etwas aussagen: dass die Kopfzeile **da** ist
+ * und richtig aussieht – und dass die App unter ihr noch läuft. Das Zweite
+ * ist das eigentlich Wichtige: Eine zu strenge CSP bricht nicht laut, sie
+ * lässt die Seite nur stumm ohne JavaScript stehen.
+ *
+ * Geprüft wird gegen `next dev`, wie der Rest dieser Suite. Der Unterschied
+ * zur Produktion ist genau ein Eintrag (`'unsafe-eval'`, den React beim
+ * Entwickeln für seine Fehler-Stacks braucht) – `nonce` und `strict-dynamic`,
+ * auf die es hier ankommt, sind dieselben. Gegen den echten Produktionsbau
+ * läuft die Suite erst mit F-10.
+ */
+test("Jede Seite trägt eine Content-Security-Policy mit frischem nonce", async ({ page }) => {
+  const ersteAntwort = await page.goto("/heute");
+  const csp = ersteAntwort?.headers()["content-security-policy"] ?? "";
+
+  expect(csp).toMatch(/script-src [^;]*'nonce-[A-Za-z0-9+/=]+'/);
+  expect(csp).toContain("'strict-dynamic'");
+  // Der ganze Zweck der Übung: Ein eingeschleustes <script> hat kein nonce.
+  expect(csp).not.toMatch(/script-src [^;]*'unsafe-inline'/);
+  expect(csp).toContain("frame-ancestors 'none'");
+  expect(csp).toContain("object-src 'none'");
+  expect(csp).toContain("base-uri 'self'");
+  // Der Modellaufruf läuft auf dem Server (ADR 0010 D1) – stünde Anthropic
+  // hier, wäre das ein falsches Versprechen über den Bau der App.
+  expect(csp).not.toContain("anthropic");
+
+  // Jede Anfrage bekommt ein eigenes nonce – ein wiederverwendetes wäre
+  // ratbar und hübe die Kopfzeile auf.
+  const zweiteAntwort = await page.goto("/faecher");
+  expect(zweiteAntwort?.headers()["content-security-policy"]).not.toBe(csp);
+});
+
+test("Unter der CSP läuft die App weiter – auch vor der Anmeldung", async ({ page }) => {
+  const verstoesse: string[] = [];
+  page.on("console", (nachricht) => {
+    const text = nachricht.text();
+    if (/Content Security Policy|Refused to (load|execute|apply)/i.test(text)) {
+      verstoesse.push(text);
+    }
+  });
+
+  // `/anmelden` und `/registrieren` sind der wunde Punkt: Sie kamen ohne
+  // Anmeldung aus und wurden deshalb statisch vorgerendert – eine
+  // vorgerenderte Seite hat kein nonce, ihre Skripte liefen unter dieser
+  // Kopfzeile gar nicht mehr. Seit S-03a rendern sie dynamisch.
+  for (const pfad of ["/heute", "/tutor", "/anmelden", "/registrieren"]) {
+    await page.goto(pfad);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  }
+
+  // **Der eigentliche Beweis, dass JavaScript läuft**: ein Klick auf einen
+  // `next/link` navigiert clientseitig. Bleibt die Überschrift stehen, ist
+  // die Seite tot – und genau so hat sich `upgrade-insecure-requests`
+  // gezeigt: WebKit nimmt `http://localhost` nicht von der https-Aufwertung
+  // aus, holte sich für jedes `/_next/static/...` einen TLS-Fehler und ließ
+  // die Seite ohne ein einziges Skript stehen. Zwanzig rote Tests, alle im
+  // `[mobile]`-Projekt, keiner in `[desktop]` – Chrome nimmt localhost aus.
+  await page.goto("/faecher/vokabeln");
+  await page.getByRole("main").getByRole("link", { name: "Fächer" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Fächer");
+
+  expect(verstoesse).toEqual([]);
+});
+
 test("Manifest ist gültig und startet auf Heute", async ({ request }) => {
   const res = await request.get("/manifest.webmanifest");
   expect(res.ok()).toBe(true);

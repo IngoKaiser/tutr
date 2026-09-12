@@ -11,6 +11,9 @@ import { anthropicConfigured, databaseConfigured } from "@/lib/env";
 import { newCardColumns } from "@/lib/vocab/fsrs";
 import { parsePastedVocabulary } from "@/lib/vocab/paste";
 import { classifyPhotoImportError, extractedRowsToPastedRows } from "@/lib/vocab/photo";
+import { sortForReview, withDerivedUnsicher, type VocabRow } from "@/lib/vocab/review-list";
+
+export type { VocabRow };
 
 /**
  * Die Vokabelliste eines Sets (V-03a, ADR 0007 D2–D4).
@@ -42,78 +45,39 @@ async function requireStudentActor(): Promise<Actor | null> {
   return actor?.role === "student" ? actor : null;
 }
 
-export type VocabRow = {
-  id: string;
-  term: string;
-  translation: string;
-  unsicher: boolean;
-};
-
 export type SetDetail = {
   id: string;
   title: string;
   subjectName: string;
+  /** Zielsprache des Fachs (V-06a) – steuert die Richtungsbeschriftung im
+   *  Set-Modus (V-04). `null` bei Fächern ohne Rückrichtung. */
+  subjectLanguage: string | null;
   items: VocabRow[];
 };
-
-/** Unsichere Zeilen zuerst (ADR 0007 D2 – „dahin gehört der Blick"), sonst alphabetisch. */
-function sortForReview(items: VocabRow[]): VocabRow[] {
-  return [...items].sort((a, b) => {
-    if (a.unsicher !== b.unsicher) return a.unsicher ? -1 : 1;
-    return a.term.localeCompare(b.term, "de");
-  });
-}
-
-/**
- * Die drei Gründe aus ADR 0007 D2, warum eine Zeile „prüfen" trägt.
- *
- * Zwei davon werden hier **abgeleitet** (ADR 0006 D7): ein leeres Feld und
- * dasselbe Wort mit verschiedenen Übersetzungen im Set. Der dritte –
- * niedrige Konfidenz der Erkennung – kommt als gespeicherte Spalte dazu:
- * Er ist eine Tatsache aus dem Moment des Imports, die sich später aus der
- * Zeile nicht mehr ablesen lässt („la trousse / das Fed" sieht vollständig
- * aus). Gefunden beim Testen von V-03b gegen die echte Bilderkennung.
- */
-function withDerivedUnsicher(
-  rows: { id: string; term: string; translation: string; recognition_uncertain: boolean }[],
-): VocabRow[] {
-  const termCounts = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const key = row.term.trim().toLowerCase();
-    const translations = termCounts.get(key) ?? new Set();
-    translations.add(row.translation.trim().toLowerCase());
-    termCounts.set(key, translations);
-  }
-  return rows.map(({ recognition_uncertain, ...row }) => {
-    const key = row.term.trim().toLowerCase();
-    const leer = row.term.trim() === "" || row.translation.trim() === "";
-    const uneinig = (termCounts.get(key)?.size ?? 0) > 1;
-    return { ...row, unsicher: leer || uneinig || recognition_uncertain };
-  });
-}
 
 export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
   const actor = await requireActor();
   if (!actor) return null;
 
-  type Row = { title: string; subject_name: string };
+  type Row = { title: string; subject_name: string; subject_language: string | null };
   type ItemRow = {
     id: string;
     term: string;
     translation: string;
     recognition_uncertain: boolean;
+    confirmed_at: string | null;
   };
 
   return withActor(actor, async (tx) => {
     const [set] = await tx.execute<Row>(
-      sql`select vs.title, s.name as subject_name
+      sql`select vs.title, s.name as subject_name, s.language as subject_language
           from vocab_set vs join subject s on s.id = vs.subject_id
           where vs.id = ${setId}`,
     );
     if (!set) return null;
 
     const items = await tx.execute<ItemRow>(
-      sql`select vi.id, vi.term, vi.translation, vi.recognition_uncertain
+      sql`select vi.id, vi.term, vi.translation, vi.recognition_uncertain, vi.confirmed_at
           from vocab_set_item vsi
           join vocab_item vi on vi.id = vsi.vocab_item_id
           where vsi.vocab_set_id = ${setId}`,
@@ -123,6 +87,7 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
       id: setId,
       title: set.title,
       subjectName: set.subject_name,
+      subjectLanguage: set.subject_language,
       items: sortForReview(withDerivedUnsicher(items)),
     };
   });
@@ -349,7 +314,15 @@ export async function addFromPhoto(
     // auftrat, und ein zur Hälfte gescheiterter Import ließ sich im
     // Nachhinein nicht mehr erklären.
     const { fehler, ursache } = classifyPhotoImportError(problem);
-    console.error(`Foto-Import gescheitert (Set ${setId}): ${ursache}`);
+    // `setId` kommt roh aus der Anfrage, `ursache` kann bei einem
+    // unerwarteten Fehler `error.message` enthalten – beides ungeprüft in
+    // ein Serverlog zu schreiben, ließe einen Zeilenumbruch darin eine
+    // gefälschte Logzeile einschleusen (CodeQL `js/log-injection`).
+    // `JSON.stringify()`: CodeQLs `LogInjectionQuery.qll` erkennt als
+    // Schranke entweder `String#replace(/\n/g, "")` wörtlich in genau dieser
+    // Form oder `JSON.stringify()` – Letzteres escaped zusätzlich
+    // Anführungszeichen und andere Steuerzeichen, nicht nur Zeilenumbrüche.
+    console.error(JSON.stringify(`Foto-Import gescheitert (Set ${setId}): ${ursache}`));
     return { ok: false, fehler };
   }
 
@@ -398,11 +371,18 @@ export async function updateItem(
     tx.execute(
       // `recognition_uncertain` fällt beim Bearbeiten weg: Wer die Zeile
       // aufgeklappt und gespeichert hat, hat daraufgeschaut – und genau das
-      // war der Zweck der Markierung (V-03b, ADR 0007 D2). Der Lernstand
-      // bleibt davon unberührt, `card`/`review` fasst diese Abfrage nicht an.
+      // war der Zweck der Markierung (V-03b, ADR 0007 D2). Seit V-09 setzt
+      // dasselbe Speichern auch `confirmed_at`: Es beantwortet die Frage
+      // „stimmt das?" – ohne das bliebe eine korrigierte Doppel-Zeile
+      // (`pasar`) weiter markiert und vom Üben ausgeschlossen (V-09). Die
+      // Felder stehen vorausgefüllt da: Auch ohne inhaltliche Änderung heißt
+      // „Speichern" auf eine unveränderte Zeile bereits „passt so" – ein
+      // eigener zweiter Knopf dafür tat exakt dasselbe und ist wieder raus
+      // (V-13). Der Lernstand bleibt unberührt, `card`/`review` fasst diese
+      // Abfrage nicht an.
       sql`update vocab_item
           set term = ${term.trim()}, translation = ${translation.trim()},
-              recognition_uncertain = false
+              recognition_uncertain = false, confirmed_at = now()
           where id = ${itemId}`,
     ),
   );

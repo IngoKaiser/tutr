@@ -1,4 +1,4 @@
-# ADR 0010: Offline-Vokabelsessions ohne Server-Bruch
+# ADR 0015: Offline-Vokabelsessions ohne Server-Bruch
 
 Status: **akzeptiert** · Datum: 2026-09-12 · Bezug: docs/konzept.md §11, §6 M4 (V-02/V-04) · Ticket: F-09
 
@@ -129,7 +129,7 @@ gegebenAt` in einer IndexedDB-Warteschlange. Bei Rückkehr ruft der Client dense
   Server Action auf, keine neue Schreib-Route, keine neue Policy nötig.
 - Widerspricht CLAUDE.mds wörtlicher Nennung von `@serwist/next` – siehe Option C oben.
   Diese Zeile in CLAUDE.md sollte bei Umsetzung auf „Serwist, Build entkoppelt vom
-  Next-Bundler (ADR 0010)" präzisiert werden.
+  Next-Bundler (ADR 0015)" präzisiert werden.
 
 ## Abgelehnte Alternativen
 

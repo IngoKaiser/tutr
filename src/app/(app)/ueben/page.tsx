@@ -20,11 +20,13 @@ export const metadata = { title: "Üben · tutr" };
  * fälligen Karten steht „Französisch · 12 fällig" direkt neben dem Knopf,
  * der es übt.
  *
- * **Set-Modus (V-04):** `?set=<id>&richtung=<...>` kommt von „Dieses Set
- * üben" auf der Set-Seite (`/faecher/vokabeln/[setId]`) – der Einstieg lebt
- * dort, nicht hier (ADR 0008 Nachtrag V-04). Diese Seite lädt die Karten
- * dafür serverseitig und übergibt sie fertig an `PracticeSession`, die dann
- * direkt in der Übung startet, ohne die Fach-Übersicht dazwischen.
+ * **Set-Modus (V-04):** `?set=<id>&richtung=<...>&art=<...>` kommt von
+ * „Dieses Set üben" auf der Set-Seite (`/faecher/vokabeln/[setId]`) – der
+ * Einstieg lebt dort, nicht hier (ADR 0008 Nachtrag V-04), und mit ihm die
+ * beiden Umschalter für Richtung (V-06a) und Antwortart (V-08), die mit V-04
+ * aus dem Alltagsfluss verschwunden sind. Diese Seite lädt die Karten dafür
+ * serverseitig und übergibt sie fertig an `PracticeSession`, die dann direkt
+ * in der Übung startet, ohne die Fach-Übersicht dazwischen.
  *
  * `loadDueBySubject()` prüft `databaseConfigured()` selbst und liefert dann
  * `null` – dieselbe Absicherung wie bei `/einstellungen` (F-06b): die
@@ -37,14 +39,17 @@ export const metadata = { title: "Üben · tutr" };
 export default async function PracticePage({
   searchParams,
 }: {
-  searchParams: Promise<{ set?: string; richtung?: string }>;
+  searchParams: Promise<{ set?: string; richtung?: string; art?: string }>;
 }) {
   const { actor } = await loginStatus();
   if (!actor) redirect("/anmelden");
 
-  const { set, richtung } = await searchParams;
+  const { set, richtung, art } = await searchParams;
   const direction: Direction | null =
     richtung === "vorwaerts" || richtung === "rueckwaerts" ? richtung : null;
+  // Alles außer „mc"/„tippen" heißt automatisch – der FSRS-Zustand entscheidet
+  // dann wie im Alltagsfluss (`modeForCardState()`).
+  const forcedMode = art === "mc" || art === "tippen" ? art : null;
 
   const [bySubject, setSession] = await Promise.all([
     loadDueBySubject(),
@@ -52,7 +57,15 @@ export default async function PracticePage({
   ]);
 
   const initialSession: InitialSetSession | null = setSession
-    ? { label: setSession.setTitle, cards: setSession.cards }
+    ? {
+        label: setSession.setTitle,
+        // Eine erzwungene Antwortart ist kein Umgehen der Prüfung, nur eine
+        // andere Frageform für dieselbe Karte (V-08): `submitAnswer()`
+        // bewertet weiterhin nach dem übergebenen `mode`.
+        cards: forcedMode
+          ? setSession.cards.map((karte) => ({ ...karte, mode: forcedMode }))
+          : setSession.cards,
+      }
     : null;
 
   return (

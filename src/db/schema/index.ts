@@ -3,6 +3,8 @@ export * from "./student";
 export * from "./parent";
 export * from "./auth";
 export * from "./curriculum";
+export * from "./calendar";
+export * from "./tutor";
 export * from "./textbook";
 export * from "./school-profile";
 export * from "./vocab";

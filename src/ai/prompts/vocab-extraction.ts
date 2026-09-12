@@ -39,7 +39,9 @@ export function vocabExtractionSystemPrompt({ subjectName }: VocabExtractionCont
     '- Fehlt die Übersetzung auf dem Bild oder ist sie unleserlich, lass "translation" leer und setze "confidence" auf "niedrig".',
     '- Eine leere oder unvollständige Zeile mit "niedrig" ist richtig. Eine erfundene Zeile mit "hoch" ist ein Fehler.',
     "",
-    "Nimm nur Vokabeln auf. Seitenzahlen, Überschriften, Kapitelnummern, Grammatikerklärungen und Beispielsätze ohne Übersetzung gehören nicht in die Liste.",
+    "Nimm nur Vokabeln auf. Seitenzahlen, Überschriften, Kapitelnummern und Grammatikerklärungen gehören nicht in die Liste.",
+    'Ein ganzer Satz ist keine Vokabelzeile – auch nicht mit Übersetzung daneben. Nimm einzelne Wörter und feste Wendungen (z. B. "sich wehtun", "in den Urlaub fahren"). Ein Beispielsatz wie "Ich habe mir am Fuß weh getan." gehört nicht in die Liste; das Wort, das er zeigt, schon.',
+    "Steht neben einer Vokabel ein Synonym oder ein Verweis (oft mit „=“ oder in Klammern), ist das keine eigene Zeile.",
     "",
     'Handschrift ist erwartbar schlechter lesbar als Druck. Das ist kein Grund, weniger Zeilen zurückzugeben – es ist der Grund für "niedrig".',
   ].join("\n");

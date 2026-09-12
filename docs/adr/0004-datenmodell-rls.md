@@ -120,6 +120,13 @@ Ein Insert mit fachfremdem Thema scheitert an der Datenbank. Der Test in P-01 pr
 
 ## D4 · Eltern-/Kind-Sicht: Zusammenfassung als eigene Tabelle
 
+> **Die Richtung der Elternzeilen ist durch [ADR 0012](0012-eltern-sehen-was-nicht-wie-gut.md)
+> (10.9.2026) neu geschnitten:** Eltern sehen, _was_ gelernt wird, nicht _wie gut_ es läuft.
+> `card`, `review`, `objective_mastery`, `homework_task` und `tutor_session_summary` haben
+> danach **keine** Elternzeile mehr. Die Begründung für die Trennung selbst (eigene Tabelle
+> statt Spalte) gilt unverändert – nur die Frage, wer die zweite Tabelle lesen darf, ist
+> anders beantwortet. Die Matrix unten bitte nicht ohne ADR 0012 lesen.
+
 Postgres kennt keine spaltenweise Sichtbarkeit innerhalb einer Policy. Statt einer `zusammenfassung`-Spalte auf `tutor_session` gibt es deshalb:
 
 - `tutor_session` + `tutor_message` – Policy: nur `role='student'` und `student_id = app.student_id()`. Für Eltern existiert **keine** Policy, also kein Zugriff.

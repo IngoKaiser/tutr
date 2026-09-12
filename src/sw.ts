@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 /**
- * Service Worker (F-09a, ADR 0010).
+ * Service Worker (F-09a, ADR 0015).
  *
  * Handgeschrieben, nicht über `serwist`s Laufzeitklasse – die schmale
  * Aufgabe hier (App-Shell vorcachen, damit ein Neuladen während der Übung
@@ -62,7 +62,7 @@ self.addEventListener("activate", (event) => {
  * API-Antworten) geht unverändert übers Netz – dieser Service Worker
  * entscheidet nicht, ob eine Antwort aktuell ist, er hält nur die
  * Shell verfügbar. Die Offline-Antwortwarteschlange fürs eigentliche Üben
- * (F-09b) ist bewusst kein Service-Worker-Feature, siehe ADR 0010.
+ * (F-09b) ist bewusst kein Service-Worker-Feature, siehe ADR 0015.
  */
 self.addEventListener("fetch", (event) => {
   const { request } = event;

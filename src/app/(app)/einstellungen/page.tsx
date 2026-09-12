@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { Block, Notice, PageHeader } from "@/components/shell/primitives";
+import { Auslastungsbalken, Block, Notice, PageHeader } from "@/components/shell/primitives";
+import { FENSTER_LABEL } from "@/lib/ai/rate-limit";
 import { loginStatus } from "@/lib/auth/actor";
 
 import {
@@ -8,6 +9,7 @@ import {
   deleteMyAccount,
   deleteMyParentAccount,
   loadActiveSchoolYearLabel,
+  loadAuslastung,
   loadDevices,
   loadOwnFirstName,
 } from "./actions";
@@ -17,6 +19,16 @@ import { DeviceRow } from "./device-row";
 import { RecoveryLink } from "./recovery-link";
 
 export const metadata = { title: "Einstellungen · tutr" };
+
+/**
+ * Der Rückweg (T-18). Die Einstellungen sind **kein** Fußleisten-Bereich –
+ * sie hängen im Kopfbereich und standen deshalb lange ganz ohne Ausgang da:
+ * Wer hier landete, kam nur über die Fußleiste wieder heraus. „Heute" ist
+ * das Ziel, weil die App dort startet (`manifest`), nicht weil man
+ * zwangsläufig von dort kam – ein echter Link auf die Elternseite, kein
+ * Browser-Zurück (siehe `PageHeader`).
+ */
+const HEUTE = { href: "/heute", label: "Heute" };
 
 /**
  * Kindliste, Geräteliste des gerade gewählten Kindes, Löschen (F-06b, F-06e).
@@ -49,7 +61,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Einstellungen" trailing={currentStudent?.firstName} />
+      <PageHeader title="Einstellungen" trailing={currentStudent?.firstName} back={HEUTE} />
 
       <div className="flex flex-col gap-3">
         <Block title="Kinder">
@@ -148,19 +160,40 @@ export default async function SettingsPage() {
   );
 }
 
-/** Nur-Lese-Zeile plus die einzige Aktion, die ein Kind hier sonst braucht (F-06e, F-16a). */
+/**
+ * Nur-Lese-Zeilen plus die einzige Aktion, die ein Kind hier sonst braucht
+ * (F-06e, F-16a) – und, seit S-03d, die volle Fortschrittsanzeige: nur das
+ * Kind sieht `ai_usage`, dieselbe Richtung wie beim Tutor selbst.
+ */
 async function StudentSettings() {
-  const [firstName, schoolYearLabel] = await Promise.all([
+  const [firstName, schoolYearLabel, auslastung] = await Promise.all([
     loadOwnFirstName(),
     loadActiveSchoolYearLabel(),
+    loadAuslastung(),
   ]);
 
   return (
     <>
-      <PageHeader title="Einstellungen" trailing={firstName ?? undefined} />
+      <PageHeader title="Einstellungen" trailing={firstName ?? undefined} back={HEUTE} />
       {schoolYearLabel ? (
         <Block title="Schuljahr" trailing={schoolYearLabel}>
           <Notice>Deine Fächer legst du unter „Fächer&quot; an.</Notice>
+        </Block>
+      ) : null}
+      {auslastung ? (
+        <Block title="Tutor-Nutzung">
+          <Notice>
+            Wie viel du den Tutor gerade nutzt – Fragen und Fotos zusammen. Ist eine Leiste voll,
+            macht der Tutor kurz Pause; deine Vokabeln, Karten und der Prüfungskalender laufen immer
+            weiter.
+          </Notice>
+          {/* Nur Tag und Woche (S-03e): Der Stundendeckel bleibt als Schutz
+              im Code, ist aber kein Zeitraum, in dem jemand plant – und er
+              meldet sich von selbst, wenn er greift. */}
+          <div className="flex flex-col gap-3">
+            <Auslastungsbalken anteil={auslastung.tag} label={FENSTER_LABEL.tag} />
+            <Auslastungsbalken anteil={auslastung.woche} label={FENSTER_LABEL.woche} />
+          </div>
         </Block>
       ) : null}
       <Block title="Konto löschen">
