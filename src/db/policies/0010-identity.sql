@@ -27,13 +27,29 @@ create policy student_create_self on student
   for insert to tutr_app
   with check (id = app.student_id() and app.actor_role() = 'student');
 
--- Profilpflege durch das Elternteil. Das Kind darf sein Profil noch nicht
--- ändern – das kommt mit F-06c und einer eng geschnittenen eigenen Policy.
+-- Profilpflege durch das Elternteil.
 drop policy if exists student_update_parent on student;
 create policy student_update_parent on student
   for update to tutr_app
   using (id = app.student_id() and app.actor_role() = 'parent')
   with check (id = app.student_id() and app.actor_role() = 'parent');
+
+-- Profilpflege durch das Kind selbst (F-06c). Bewusst dieselbe Reichweite
+-- wie oben – eine ganze Zeile, keine Spaltenliste: Postgres kennt keine
+-- spaltenweise Sichtbarkeit innerhalb einer Policy (README, „Spaltenweite
+-- Enge lebt in der Server Action, nicht in der Policy"), ein Versuch,
+-- `recovery_token_hash` o. Ä. hier
+-- auszusparen, wäre entweder ein Trigger (den es in diesem Projekt bewusst
+-- nirgends gibt) oder eine zweite Tabelle nur für diese zwei Spalten. Die
+-- Enge auf Vorname/Jahrgang/Klasse, die das Ticket verlangt, liegt deshalb
+-- in der Server Action (`updateOwnProfile()`): Nur diese drei Felder
+-- erscheinen je im `SET`. Das war schon vorgezeichnet, siehe der Kommentar
+-- bei `app.redeem_recovery_token()` in 0000-setup.sql.
+drop policy if exists student_update_self on student;
+create policy student_update_self on student
+  for update to tutr_app
+  using (id = app.student_id() and app.actor_role() = 'student')
+  with check (id = app.student_id() and app.actor_role() = 'student');
 
 -- Die Kindliste vor der Auswahl: Nach dem Magic Link steht die Auth-ID fest,
 -- ein Kind aber noch nicht. Deshalb über die Anmeldeschleuse statt über einen

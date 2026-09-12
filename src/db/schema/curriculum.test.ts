@@ -300,5 +300,70 @@ describe.skipIf(!testDbAvailable())(
       );
       expect(rows).toHaveLength(0);
     });
+
+    // --- ADR 0009 D3, Nachtrag F-16b: die Übungsschlange kennt nur Fächer
+    // des aktiven Jahres. `A.mathe` bekommt in dieser Datei absichtlich nie
+    // eine school_year_subject-Zeile (anders als A.franzoesisch oben) – das
+    // macht es zum Fach, das „dieses Jahr nicht läuft".
+
+    test("Karten eines Fachs ohne school_year_subject bleiben beim Üben still (ADR 0009 D3)", async () => {
+      const vokabel = "cccccccc-0000-4000-8000-000000000006";
+      const karte = "cccccccc-0000-4000-8000-000000000007";
+      await admin.client`
+        insert into vocab_item (id, student_id, subject_id, term, translation)
+        values (${vokabel}, ${A.studentId}, ${A.mathe}, 'x', 'y')`;
+      await admin.client`
+        insert into card (id, student_id, vocab_item_id, direction, due_at, fsrs_state)
+        values (${karte}, ${A.studentId}, ${vokabel}, 'vorwaerts', now() - interval '1 day', '{}'::jsonb)`;
+
+      try {
+        // Dieselbe Bedingung wie in `loadDueBySubject()`/`loadSessionCards()`
+        // (`src/app/(app)/ueben/actions.ts`): fällig ist nur, was zu einem
+        // Fach des aktiven Jahres gehört.
+        const faellig = await runWithActor(app.db, student(A.studentId), (tx) =>
+          tx.execute<{ n: string }>(sql`
+            select count(*)::text as n
+            from card c
+            join vocab_item vi on vi.id = c.vocab_item_id
+            join school_year_subject sys on sys.subject_id = vi.subject_id
+            join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
+            where c.due_at <= now() and vi.subject_id = ${A.mathe}`),
+        );
+        expect(faellig[0]?.n).toBe("0");
+
+        // Gegenprobe: Ohne den Jahres-Join wäre die Karte fällig – der Fund
+        // liegt also wirklich am Join, nicht an den Fixture-Daten.
+        const ohneJahresFilter = await runWithActor(app.db, student(A.studentId), (tx) =>
+          tx.execute<{ n: string }>(sql`
+            select count(*)::text as n from card
+            where due_at <= now() and vocab_item_id = ${vokabel}`),
+        );
+        expect(ohneJahresFilter[0]?.n).toBe("1");
+      } finally {
+        await admin.client`delete from card where id = ${karte}`;
+        await admin.client`delete from vocab_item where id = ${vokabel}`;
+      }
+    });
+
+    // --- F-16b: ein neues Schuljahr eröffnen (`startNewSchoolYear()`).
+    // Nutzt B statt A, weil dieser Test B.schuljahr dauerhaft archiviert –
+    // A wird von Tests weiter oben noch als 'aktiv' vorausgesetzt.
+
+    test("Ein neues Schuljahr archiviert das alte in derselben Transaktion (F-16b)", async () => {
+      await runWithActor(app.db, student(B.studentId), async (tx) => {
+        await tx.execute(
+          sql`update school_year set status = 'archiviert' where id = ${B.schuljahr}`,
+        );
+        await tx.execute(sql`
+          insert into school_year (student_id, label, grade_level, start_date, end_date, status)
+          values (${B.studentId}, '2027/28', 9, '2027-08-01', '2028-07-31', 'aktiv')`);
+      });
+
+      const rows = await admin.client<{ label: string; status: string }[]>`
+        select label, status from school_year where student_id = ${B.studentId} order by start_date`;
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toMatchObject({ label: "2026/27", status: "archiviert" });
+      expect(rows[1]).toMatchObject({ label: "2027/28", status: "aktiv" });
+    });
   },
 );

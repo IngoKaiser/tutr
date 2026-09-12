@@ -6,7 +6,7 @@ Status: **akzeptiert** · Datum: 2026-09-09 · Bezug: docs/konzept.md §9, §11
 [ADR 0006](0006-student-als-mandant.md) D2 auf `student_id` umgestellten Fassung) und
 schärft [ADR 0004](0004-datenmodell-rls.md) D6. Setzt
 [ADR 0008](0008-fachbindung-von-lernmaterial.md) fort.
-Tickets: F-16a (jetzt), F-16b (später).
+Tickets: F-16a, F-16b (Nachtrag 12.9.2026: enger geschnitten, F-16c ausgelagert).
 
 ## Kontext
 
@@ -210,6 +210,38 @@ beschreiben (ADR 0004 D7, kuratiert-oder-eigen) – nur die Zuordnungstabelle hi
 
 Kein Widerspruch zu ADR 0012: Eltern verlieren keinen Einblick, der Stoffplan (worunter das
 Lehrwerk fällt) bleibt für sie sichtbar und schreibbar.
+
+## Nachtrag (F-16b, 12.9.2026): enger geschnitten als hier vorgezeichnet
+
+F-16b sollte laut den „Konsequenzen" oben Jahr-Umschalten, Historie, den automatischen
+Sommer-Assistenten **und** `vocab_set.school_year_id` in einem Ticket bringen. Beim Bauen
+zwei Korrekturen:
+
+**`vocab_set.school_year_id` gab es schon.** F-16a hat die Spalte samt Backfill mitgebaut
+(siehe Nachtrag dort) – der Satz oben war zum Schreibzeitpunkt von ADR 0009 noch richtig,
+ist es seit F-16a nicht mehr.
+
+**Kein globaler „angeschautes Jahr"-Umschalter.** Konzept §9 nennt „Meine Schuljahre"
+ausdrücklich **read-only**. Ein Umschalter, der auch Schreibpfade umbiegt (Fächer anlegen,
+Sets anlegen im gerade angeschauten statt im aktiven Jahr), widerspräche dem und wäre ein
+Einfallstor: aus Versehen ein Set im archivierten Vorjahr anzulegen. Gebaut wurde
+stattdessen `startNewSchoolYear()` (archiviert das aktive Jahr, eröffnet in derselben
+Transaktion ein neues – Fächer werden bewusst **nicht** mitkopiert, D2 sagt „leere
+Fächerliste" schon vor) und eine reine Lese-Seite `/einstellungen/schuljahre`. Die aktive
+Zeile ändert sich nie durchs Ansehen der Historie.
+
+**Der automatische Sommer-Assistent ist herausgelöst (F-16c).** Der Zeitpunkt-Trigger
+(„nahe Schuljahresende") lässt sich vor Sommer 2027 nicht gegen echte Nutzung prüfen, und
+der geführte Abgleich „neue/weggefallene Fächer" wäre nur eine UX-Schicht über dem, was
+`/faecher` schon kann (D2: neues Jahr → leere Liste → Kind wählt neu). Der manuelle Weg
+(F-16b) deckt die Funktion vollständig ab, nur ohne die proaktive Erinnerung.
+
+**Die D3-Lücke aus den „Konsequenzen" oben war noch offen** – `loadDueBySubject()` und
+`loadSessionCards()` filterten bislang nicht auf die Fächer des aktiven Jahres. Solange es
+nur ein Jahr je Kind gab, war das ein No-op und fiel nicht auf; seit F-16b tatsächlich ein
+zweites Jahr entstehen kann, muss ein aus dem Jahr entferntes Fach beim Üben wirklich still
+bleiben. Beide Funktionen bekamen den in D3 beschriebenen Join gegen `school_year_subject`
+nachgetragen.
 
 ## Abgelehnte Alternative: `subject.school_year_id`
 

@@ -15,6 +15,7 @@ import { databaseConfigured } from "@/lib/env";
 import { deletionEmail } from "@/lib/mail/deletion";
 import { issueRecoveryToken } from "@/lib/auth/recovery";
 import { sendMail } from "@/lib/mail/resend";
+import { nextSchoolYearWindow } from "@/lib/school-year/rollover";
 
 /**
  * Geräteliste des gerade gewählten Kindes (F-06b).
@@ -51,6 +52,12 @@ type SessionRow = {
 
 export type DeviceList = { credentials: CredentialRow[]; sessions: SessionRow[] };
 
+async function requireActor() {
+  if (!databaseConfigured()) return null;
+  const { actor } = await loginStatus();
+  return actor;
+}
+
 async function requireParentActor() {
   if (!databaseConfigured()) return null;
   const { actor } = await loginStatus();
@@ -78,6 +85,83 @@ export async function loadOwnFirstName(): Promise<string | null> {
   return rows[0]?.first_name ?? null;
 }
 
+export type OwnProfile = { firstName: string; gradeLevel: number; className: string | null };
+
+/** Das eigene Profil zum Bearbeiten (F-06c) – dieselben drei Felder, die `updateOwnProfile()` schreiben darf. */
+export async function loadOwnProfile(): Promise<OwnProfile | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+
+  const rows = await withActor(actor, (tx) =>
+    tx.execute<{ first_name: string; grade_level: number; class_name: string | null }>(
+      sql`select first_name, grade_level, class_name from student where id = ${actor.studentId}`,
+    ),
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return { firstName: row.first_name, gradeLevel: row.grade_level, className: row.class_name };
+}
+
+export type ProfileUpdateResult = { status: "ok" } | { status: "error"; message: string };
+
+/**
+ * Grenzen wie bei `validateProfile()` in `registrieren/actions.ts` (Vorname,
+ * Jahrgang) – hier eigenständig, weil die Klasse dort gar nicht abgefragt
+ * wird (F-06, Nachtrag) und die beiden Formulare sonst nichts teilen.
+ */
+function validateProfileInput(input: {
+  firstName: string;
+  gradeLevel: number;
+  className: string;
+}): OwnProfile | string {
+  const firstName = input.firstName.trim();
+  const className = input.className.trim();
+
+  if (firstName.length < 2) return "Bitte trag deinen Vornamen ein.";
+  if (firstName.length > 40) return "Der Vorname ist zu lang.";
+  if (!Number.isInteger(input.gradeLevel) || input.gradeLevel < 1 || input.gradeLevel > 13) {
+    return "Bitte wähl deinen Jahrgang.";
+  }
+  if (className.length > 20) return "Die Klasse ist zu lang.";
+
+  return {
+    firstName,
+    gradeLevel: input.gradeLevel,
+    className: className.length ? className : null,
+  };
+}
+
+/**
+ * Kind ändert sein eigenes Profil (F-06c). Nur diese drei Felder – die
+ * Policy `student_update_self` erlaubt zwar die ganze Zeile (Postgres kennt
+ * keine spaltenweise Sichtbarkeit, siehe die Policy-Datei), aber genau diese
+ * Enge stellt diese Funktion her: `parentEmail`, die Wiederherstellungs- und
+ * Zeitstempelspalten erscheinen hier nie im `SET`.
+ */
+export async function updateOwnProfile(input: {
+  firstName: string;
+  gradeLevel: number;
+  className: string;
+}): Promise<ProfileUpdateResult> {
+  const actor = await requireStudentActor();
+  if (!actor) return { status: "error", message: "Nicht angemeldet." };
+
+  const validated = validateProfileInput(input);
+  if (typeof validated === "string") return { status: "error", message: validated };
+
+  await withActor(actor, (tx) =>
+    tx.execute(
+      sql`update student
+          set first_name = ${validated.firstName},
+              grade_level = ${validated.gradeLevel},
+              class_name = ${validated.className}
+          where id = ${actor.studentId}`,
+    ),
+  );
+  revalidatePath("/einstellungen");
+  return { status: "ok" };
+}
+
 /**
  * Das Label des aktiven Schuljahres, nur zum Anzeigen (F-16a, ADR 0009).
  *
@@ -97,6 +181,146 @@ export async function loadActiveSchoolYearLabel(): Promise<string | null> {
     ),
   );
   return rows[0]?.label ?? null;
+}
+
+export type ActiveSchoolYear = {
+  label: string;
+  gradeLevel: number;
+  className: string | null;
+  startDate: string;
+};
+
+/** Wie `loadActiveSchoolYearLabel()`, nur mit den Feldern, die der Vorschlag fürs nächste Jahr braucht (F-16b). */
+export async function loadActiveSchoolYear(): Promise<ActiveSchoolYear | null> {
+  const actor = await requireActor();
+  if (!actor) return null;
+
+  const rows = await withActor(actor, (tx) =>
+    tx.execute<{
+      label: string;
+      grade_level: number;
+      class_name: string | null;
+      start_date: string;
+    }>(
+      sql`select label, grade_level, class_name, start_date
+          from school_year where student_id = ${actor.studentId} and status = 'aktiv'`,
+    ),
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    label: row.label,
+    gradeLevel: row.grade_level,
+    className: row.class_name,
+    startDate: row.start_date,
+  };
+}
+
+export type SchoolYearRow = {
+  id: string;
+  label: string;
+  gradeLevel: number;
+  className: string | null;
+  status: "geplant" | "aktiv" | "archiviert";
+};
+
+/**
+ * Alle Schuljahre des Kindes, neueste zuerst (F-16b). „Meine Schuljahre" ist
+ * laut Konzept §9 read-only – diese Funktion liest nur, geschrieben wird
+ * ausschließlich über `startNewSchoolYear()`.
+ */
+export async function loadSchoolYearHistory(): Promise<SchoolYearRow[] | null> {
+  const actor = await requireActor();
+  if (!actor) return null;
+
+  const rows = await withActor(actor, (tx) =>
+    tx.execute<{
+      id: string;
+      label: string;
+      grade_level: number;
+      class_name: string | null;
+      status: "geplant" | "aktiv" | "archiviert";
+    }>(
+      sql`select id, label, grade_level, class_name, status
+          from school_year
+          where student_id = ${actor.studentId}
+          order by start_date desc`,
+    ),
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    gradeLevel: r.grade_level,
+    className: r.class_name,
+    status: r.status,
+  }));
+}
+
+/** Die Fächer und Vokabelsets eines (auch vergangenen) Schuljahres – für die Historie-Ansicht. */
+export async function loadSchoolYearDetail(schoolYearId: string): Promise<{
+  subjects: { id: string; name: string }[];
+  vocabSets: { id: string; title: string }[];
+} | null> {
+  const actor = await requireActor();
+  if (!actor) return null;
+
+  return withActor(actor, async (tx) => {
+    const subjects = await tx.execute<{ id: string; name: string }>(
+      sql`select s.id, s.name
+          from subject s
+          join school_year_subject sys on sys.subject_id = s.id
+          where sys.school_year_id = ${schoolYearId}
+          order by s.name`,
+    );
+    const vocabSets = await tx.execute<{ id: string; title: string }>(
+      sql`select id, title from vocab_set where school_year_id = ${schoolYearId} order by title`,
+    );
+    return { subjects, vocabSets };
+  });
+}
+
+export type StartSchoolYearResult = { status: "ok" } | { status: "error"; message: string };
+
+/**
+ * Eröffnet ein neues Schuljahr (F-16b, §9 Sommer-Assistent – nur der manuelle
+ * Teil, siehe `rollover.ts`): archiviert das aktive Jahr, legt in derselben
+ * Transaktion das neue aktive an. Fächer/Lehrwerke werden **nicht**
+ * mitkopiert (ADR 0009 D2: „neues Jahr heißt leere Fächerliste") – das Kind
+ * wählt unter „Fächer" neu, wie beim allerersten Schuljahr auch.
+ */
+export async function startNewSchoolYear(input: {
+  gradeLevel: number;
+  className: string;
+}): Promise<StartSchoolYearResult> {
+  const actor = await requireActor();
+  if (!actor) return { status: "error", message: "Nicht angemeldet." };
+
+  const className = input.className.trim();
+  if (!Number.isInteger(input.gradeLevel) || input.gradeLevel < 1 || input.gradeLevel > 13) {
+    return { status: "error", message: "Bitte einen gültigen Jahrgang wählen." };
+  }
+  if (className.length > 20) return { status: "error", message: "Die Klasse ist zu lang." };
+
+  return withActor(actor, async (tx) => {
+    const [current] = await tx.execute<{ id: string; start_date: string }>(
+      sql`select id, start_date from school_year
+          where student_id = ${actor.studentId} and status = 'aktiv'`,
+    );
+    if (!current) {
+      return { status: "error", message: "Kein aktives Schuljahr gefunden." };
+    }
+
+    const { label, startDate, endDate } = nextSchoolYearWindow(current.start_date);
+
+    await tx.execute(sql`update school_year set status = 'archiviert' where id = ${current.id}`);
+    await tx.execute(
+      sql`insert into school_year (student_id, label, grade_level, class_name, start_date, end_date, status)
+          values (${actor.studentId}, ${label}, ${input.gradeLevel}, ${className || null}, ${startDate}, ${endDate}, 'aktiv')`,
+    );
+
+    revalidatePath("/einstellungen");
+    return { status: "ok" };
+  });
 }
 
 /**
