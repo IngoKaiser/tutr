@@ -4,6 +4,27 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Fixed
+
+- **V-14: Antwortprüfung beim Tippen verlangte Klammerzusätze und Auslassungspunkte
+  originalgetreu.** `evaluateAnswer()` (`src/lib/vocab/answer.ts`) toleriert Tippfehler,
+  fehlenden Artikel und ignorierte Akzente – aber bei mehrteiligen Lehrwerkseinträgen wie
+  „to get up (Am.)“ oder „sich freuen … auf“ scheiterte das Kind am originalgetreuen
+  Abtippen von Klammerzusatz oder Auslassungspunkten, nicht an der Vokabel selbst. Neuer
+  Normalisierungsschritt `stripNotations()` entfernt Klammerinhalte und Auslassungspunkte
+  vor dem Vergleich, genau wie Phase6 und Quizlet es im Schreibmodus tun; zählt als
+  `richtig`, nicht als eigene `fast`-Stufe. Bewusst in Kauf genommen: bedeutungsunterscheidende
+  Klammern („Schloss (Gebäude)“ vs. „Schloss (Verschluss)“) werden nicht erkannt. Multiple
+  Choice ist nicht betroffen (exakter Label-Vergleich). **Nachtrag nach Abgleich gegen die
+  echten Produktiv-Vokabeln:** zwei weitere Notationen derselben Problemklasse ergänzt –
+  Genus-/Numerus-Suffix per Komma statt Klammer, wörterbuchüblich bei spanischen Adjektiven
+  (`"gracioso, -a"`), und eng geschriebene Schrägstrich-Paare ohne Leerzeichen
+  (`"el/la guía"`, `"Amerikaner/in"`). Bewusst unangetastet bleiben echte Komma-Listen
+  mehrerer vollständig gültiger Übersetzungen (`"akzeptabel, hinnehmbar"`) und locker
+  geschriebene Schrägstrich-Alternativen mit Leerzeichen (`"der Reiseführer / die
+Reiseführerin"`) – das ist ein anderes, hier nicht gelöstes Problem (mehrere richtige
+  Antworten statt einer optionalen Notation)
+
 ### Added
 
 - **F-06c, F-15, F-16b: Profil bearbeiten, Avatar-Menü, Schuljahr eröffnen.**
