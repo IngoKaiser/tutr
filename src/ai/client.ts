@@ -24,6 +24,16 @@ import {
   type HomeworkExtractionContext,
 } from "./prompts/homework-extraction";
 import {
+  textbookExtractionSystemPrompt,
+  textbookExtractionUserPrompt,
+  type TextbookExtractionContext,
+} from "./prompts/textbook-extraction";
+import {
+  textbookSuggestionSystemPrompt,
+  textbookSuggestionUserPrompt,
+  type TextbookSuggestionContext,
+} from "./prompts/textbook-suggestion";
+import {
   versuchUrteilSystemPrompt,
   versuchUrteilUserPrompt,
   type VersuchUrteilContext,
@@ -40,6 +50,8 @@ import {
   type HausaufgabenZusammenfassung,
 } from "./schemas/hausaufgabe-zusammenfassung";
 import { homeworkExtractionSchema, type HomeworkExtraction } from "./schemas/homework-extraction";
+import { textbookExtractionSchema, type TextbookExtraction } from "./schemas/textbook-extraction";
+import { textbookSuggestionSchema, type TextbookSuggestion } from "./schemas/textbook-suggestion";
 import { versuchUrteilSchema, type VersuchUrteil } from "./schemas/versuch-urteil";
 import { vocabExtractionSchema, type VocabExtraction } from "./schemas/vocab-extraction";
 
@@ -67,6 +79,13 @@ const VISION_MODEL = "claude-sonnet-5";
 
 /** CLAUDE.md: „Sonnet für Tutor". Eine Konstante, damit ein Wechsel eine Zeile ist. */
 const TUTOR_MODEL = "claude-sonnet-5";
+
+/**
+ * CLAUDE.md: „Sonnet für … Generierung" (L-01, „Claude sucht das Lehrwerk").
+ * Dieselbe Sonnet-ID wie `VISION_MODEL`, eigene Konstante: Kein Foto hier,
+ * sondern das Websuche-Tool.
+ */
+const LEHRWERK_SUCHE_MODEL = "claude-sonnet-5";
 
 /**
  * CLAUDE.md: „Haiku für Klassifikation" (T-03 PR 2). Nur für
@@ -241,6 +260,99 @@ export async function extractCalendarFromImage(
     extraction: message.parsed_output,
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
+  };
+}
+
+/** Erkannte Kapitel plus die verbrauchten Token – wie bei `extractHomeworkFromImage()`. */
+export type TextbookExtractionResult = {
+  extraction: TextbookExtraction;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+/**
+ * Ein Foto eines Inhaltsverzeichnisses → Lehrwerk-Titel + Kapitel (L-01,
+ * §7/§10 „Foto vom Inhaltsverzeichnis (zuverlässig)").
+ *
+ * Derselbe Weg wie `extractHomeworkFromImage()`/`extractCalendarFromImage()`.
+ */
+export async function extractTextbookFromImage(
+  image: InlineImage,
+  context: TextbookExtractionContext,
+): Promise<TextbookExtractionResult> {
+  const message = await anthropic().messages.parse({
+    model: VISION_MODEL,
+    // Ein Inhaltsverzeichnis kann 20+ Kapitel tragen, ein zu knappes Limit
+    // schneidet die Liste stumm ab.
+    max_tokens: 4000,
+    system: textbookExtractionSystemPrompt(context),
+    output_config: { format: zodOutputFormat(textbookExtractionSchema) },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: image.mediaType, data: image.base64 },
+          },
+          { type: "text", text: textbookExtractionUserPrompt() },
+        ],
+      },
+    ],
+  });
+
+  if (!message.parsed_output) {
+    throw new Error("Die Bilderkennung hat keine verwertbare Antwort geliefert.");
+  }
+  return {
+    extraction: message.parsed_output,
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  };
+}
+
+/** Vorschlag plus verbrauchte Token **und** Websuchen – letztere kosten zusätzlich (`lib/ai/rate-limit.ts`). */
+export type TextbookSuggestionResult = {
+  suggestion: TextbookSuggestion;
+  inputTokens: number;
+  outputTokens: number;
+  searchRequests: number;
+};
+
+/**
+ * „Claude sucht das Lehrwerk im Internet" (L-01, §7/§10 „Claudes Vorwissen
+ * (markiert)"): ein ungefährer Titel + Fach rein, ein Vorschlag mit Quellen
+ * raus – **kein** Foto, deshalb `LEHRWERK_SUCHE_MODEL` statt `VISION_MODEL`
+ * (dieselbe Sonnet-ID, eigene Konstante wie überall in dieser Datei).
+ *
+ * Websuche (`web_search_20260209`) ist ein serverseitiges Tool: Claude sucht
+ * und liest Seiten selbst, alles in diesem einen Aufruf – kein eigener
+ * Round-Trip nötig. `max_uses: 3` deckelt die Kosten pro Aufruf (0,01 $ je
+ * Suche). Kombinierbar mit `output_config.format` – nur Citations und
+ * Prefill sind laut Anthropic-Doku dazu inkompatibel, Tools nicht; gegen die
+ * echte API geprüft, nicht nur aus der Doku übernommen (wie beim
+ * `output_config`-Fund oben).
+ */
+export async function suggestTextbookViaWebSearch(
+  context: TextbookSuggestionContext,
+): Promise<TextbookSuggestionResult> {
+  const message = await anthropic().messages.parse({
+    model: LEHRWERK_SUCHE_MODEL,
+    max_tokens: 4000,
+    system: textbookSuggestionSystemPrompt(context),
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
+    output_config: { format: zodOutputFormat(textbookSuggestionSchema) },
+    messages: [{ role: "user", content: textbookSuggestionUserPrompt() }],
+  });
+
+  if (!message.parsed_output) {
+    throw new Error("Die Suche hat keine verwertbare Antwort geliefert.");
+  }
+  return {
+    suggestion: message.parsed_output,
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+    searchRequests: message.usage.server_tool_use?.web_search_requests ?? 0,
   };
 }
 

@@ -10,12 +10,14 @@ Baut auf: ADR 0001 (Stack), ADR 0002 (Familienmodell), ADR 0003 (API-Keys)
 > eigen braucht zwei Policies) und D8 (Bezeichner englisch, Werte deutsch). Der Text unten
 > steht bewusst so, wie er beschlossen wurde.
 >
-> **Weiter geändert durch [ADR 0009](0009-schuljahr-als-sichtfenster.md) (9.9.2026):** Die
-> Matrix-Zeile `school_year, subject, school_year_textbook` galt „Eltern lesen + schreiben,
-> Kind liest". `school_year` und `subject` sind jetzt **beide Rollen lesen + schreiben** –
-> ein Kind ohne Elternkonto (ADR 0006 D1) kam sonst nie zu einem Fach. Die neue Tabelle
-> `school_year_subject` folgt derselben Richtung. `school_year_textbook` bleibt unverändert
-> bei „Eltern lesen + schreiben, Kind liest".
+> **Weiter geändert durch [ADR 0009](0009-schuljahr-als-sichtfenster.md) (9.9.2026, Nachtrag
+> 12.9.2026):** Die Matrix-Zeile `school_year, subject, school_year_textbook` galt „Eltern
+> lesen + schreiben, Kind liest". `school_year` und `subject` sind jetzt **beide Rollen lesen
+>
+> - schreiben** – ein Kind ohne Elternkonto (ADR 0006 D1) kam sonst nie zu einem Fach. Die
+>   neue Tabelle `school_year_subject` folgt derselben Richtung. `school_year_textbook` blieb
+>   zunächst unverändert, ist aber mit L-01 (12.9.2026) aus demselben Grund nachgezogen: **beide
+>   Rollen lesen + schreiben.**
 
 ## Kontext
 

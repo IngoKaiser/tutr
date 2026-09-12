@@ -304,6 +304,12 @@ export const aiUsage = pgTable(
      */
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
+    /**
+     * Anzahl Websuchen (L-01, „Claude sucht das Lehrwerk"): eigener Posten,
+     * weil das Websuche-Tool zusätzlich zu den Tokens 0,01 $ je Suche kostet
+     * (`lib/ai/rate-limit.ts`). `0` für jeden Aufruf ohne das Tool.
+     */
+    searchRequests: integer("search_requests").notNull().default(0),
     ...timestamps,
   },
   (t) => [foreignKey({ columns: [t.studentId], foreignColumns: [student.id] }).onDelete("cascade")],

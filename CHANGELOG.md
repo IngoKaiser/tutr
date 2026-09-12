@@ -6,6 +6,18 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **L-01: Lehrwerk pro Fach erfassen.** Neue Route `/faecher/lehrwerk/[subjectId]`
+  (Einstiegspunkt von `/faecher` aus, kein neuer Einstellungen-Zwischenschritt): ein
+  vorhandenes (kuratiertes oder eigenes) Lehrwerk ohne KI zuordnen, oder neu erfassen über
+  Foto vom Inhaltsverzeichnis (`extractTextbookFromImage()`, Vision) oder Websuche
+  (`suggestTextbookViaWebSearch()`, Claude-API-Tool `web_search_20260209` + Structured
+  Output in einem Aufruf, Ergebnis mit Quellen und als Vorschlag markiert). Beide Wege
+  münden in dieselbe editierbare Kapitelliste – deckt Handeingabe vollständig ab, ein
+  eigener „manuell"-Weg entfiel deshalb. `school_year_textbook_student` von `for select`
+  auf `for all` (ADR 0009 D1 nachträglich angewendet, Nachtrag dort) – ein Kind ordnet sein
+  Lehrwerk jetzt ohne Elternkonto zu. `ai_usage.search_requests` neu, Kostendeckel um
+  0,01 $/Websuche erweitert.
+
 - **K-04: Datei-Import Klausurplan (CSV/XLSX/ICS), ohne Modellaufruf.** Kein eigener
   Review-Screen (ADR 0016): `csvToDrafts()`/`xlsxToDrafts()`/`icsToDrafts()`
   (`src/lib/calendar/`) liefern dieselbe `CalendarImportDraft[]`-Form wie K-03 und landen

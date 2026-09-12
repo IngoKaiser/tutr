@@ -59,7 +59,10 @@ create policy school_profile_write on school_profile
 
 -- --- school_year_textbook -------------------------------------------------
 -- Kein Referenzdatum, sondern eine Entscheidung für dieses Kind: normales
--- Muster, Eltern schreiben, Kind liest.
+-- Muster, seit L-01 beide Rollen schreibend (ADR 0009 D1 nachträglich auf
+-- diese Tabelle angewendet, siehe Nachtrag dort vom 12.9.2026) – vorher las
+-- das Kind hier nur, ADR 0006 D1 „funktioniert ohne Elternkonto" verlangt
+-- aber auch für das Lehrwerk das eigenständige Erfassen.
 alter table school_year_textbook enable row level security;
 
 drop policy if exists school_year_textbook_parent on school_year_textbook;
@@ -70,5 +73,6 @@ create policy school_year_textbook_parent on school_year_textbook
 
 drop policy if exists school_year_textbook_student on school_year_textbook;
 create policy school_year_textbook_student on school_year_textbook
-  for select to tutr_app
-  using (student_id = app.student_id() and app.actor_role() = 'student');
+  for all to tutr_app
+  using (student_id = app.student_id() and app.actor_role() = 'student')
+  with check (student_id = app.student_id() and app.actor_role() = 'student');

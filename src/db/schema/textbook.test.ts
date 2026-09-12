@@ -167,7 +167,7 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
     expect(row!.federal_state).toBe("Hamburg");
   });
 
-  test("school_year_textbook: Elternteil ordnet zu, Kind liest nur", async () => {
+  test("school_year_textbook: Elternteil ordnet zu, Kind liest und ändert auch selbst (L-01, ADR 0009 D1 erweitert)", async () => {
     await runWithActor(app.db, parent(A.studentId), (tx) =>
       tx.execute(sql`
         insert into school_year_textbook (student_id, school_year_id, subject_id, textbook_id)
@@ -179,13 +179,25 @@ describe.skipIf(!testDbAvailable())("RLS: Referenzdaten (kuratiert oder eigen)",
     );
     expect(gelesen.map((r) => r.textbook_id)).toEqual([KURATIERT.lehrwerk]);
 
+    // Seit L-01 darf das Kind die Zuordnung auch selbst ändern – anders als
+    // vorher wirkt dieses Update jetzt tatsächlich.
     await runWithActor(app.db, student(A.studentId), (tx) =>
       tx.execute(sql`
-        update school_year_textbook set textbook_id = ${A.eigenesLehrwerk}`),
+        update school_year_textbook set textbook_id = ${A.eigenesLehrwerk}
+        where school_year_id = ${A.schuljahr}`),
     );
     const [row] = await admin.client<{ textbook_id: string }[]>`
       select textbook_id from school_year_textbook where school_year_id = ${A.schuljahr}`;
-    expect(row!.textbook_id).toBe(KURATIERT.lehrwerk);
+    expect(row!.textbook_id).toBe(A.eigenesLehrwerk);
+  });
+
+  test("school_year_textbook: ein Kind ordnet nichts einem fremden Kind zu", async () => {
+    const error = await runWithActor(app.db, student(A.studentId), (tx) =>
+      tx.execute(sql`
+        insert into school_year_textbook (student_id, school_year_id, subject_id, textbook_id)
+        values (${B.studentId}, ${A.schuljahr}, ${A.franzoesisch}, ${A.eigenesLehrwerk})`),
+    ).catch((err: unknown) => err);
+    expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
   test("Pro Schuljahr und Fach nur ein Lehrwerk", async () => {
