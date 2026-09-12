@@ -125,3 +125,40 @@ Lerneffekt: Abrufen ohne Rückmeldung verschenkt den größeren Teil der Wirkung
 **Zeitbudget als Wochenziel.** („180 Minuten diese Woche.") Klingt milder als ein Tagesziel, ist
 aber dasselbe mit längerer Frist – und erzeugt zusätzlich den Sonntagabend, an dem alles
 nachgeholt wird. Genau das, was verteiltes Üben verhindern soll.
+
+## Nachtrag (12. 9. 2026): Es gibt keine Zielnote
+
+D4 und D5 nehmen der Probeprüfung die Ziffer. Beim Durchsprechen fiel auf, dass ein Rest
+derselben Mechanik unangetastet blieb: die **Zielnote pro Prüfung**, die §15 von Astra übernimmt
+(„mit Fortschrittsbalken und Markierung") und die §8 als `CalendarEvent.zielnote?` vorsieht.
+
+Sie entfällt ersatzlos. `calendar_event` bekommt **kein** `target_grade`.
+
+**Warum:** Realistisch gibt es nur zwei Fälle, und in beiden trägt das Feld nichts. Wer in einem
+Fach ehrgeizig ist, zielt auf 1 oder 2 – das einzutippen fügt nichts hinzu. Wer sich schwertut,
+dessen Ziel heißt „keine 5" oder „besser als letztes Mal"; niemand trägt freiwillig eine 3 ein,
+weil das wie ein Eingeständnis wirkt, bevor gelernt wurde. Der Zweck des Feldes ist bei Astra
+auch kein pädagogischer, sondern ein darstellerischer: Ein Fortschrittsbalken braucht ein oberes
+Ende. Genau diese Darstellung verwirft D4 bereits – die Zielnote ist der Rest einer Mechanik,
+deren Anzeige schon gestrichen ist.
+
+**Der Bedarf dahinter bleibt und wird anders getragen.** Die berechtigte Frage ist nicht „welche
+Note willst du", sondern **„wie viel ist genug?"** – ohne Antwort darauf ist „Sicherheit 62 %"
+bedeutungslos, und 100 % wären Überlernen. Drei Dinge, die es ohnehin gibt, beantworten sie
+besser:
+
+1. **Das Niveau je Lernziel** (`grundlegend` = Mindestanforderung = Note 4 · `regel` · `erhoeht`,
+   §3 und T-05). Feiner und ehrlicher als eine Note je Arbeit: „bei den Grundlagen sicher, beim
+   erhöhten Niveau noch nicht" statt „auf Kurs für eine 3".
+2. **Vollständigkeit statt Höhe.** Das Ziel vor einer Arbeit ist, dass kein Lernziel offen ist.
+   „4 von 6 sitzen" trägt sein Ziel schon in sich – 6 von 6, ohne Eingabefeld.
+3. **Der Vergleich mit dem letzten Mal** (D4, Richtung statt Zustand) als Motivationsanker.
+
+Wo eine Absichtserklärung sinnvoll ist, betrifft sie ohnehin nicht den Termin, sondern das Fach:
+_wie weit will sie hier gehen?_ Das steht in §3 schon („Startniveau kommt aus der Mastery, ist
+aber jederzeit von ihr wählbar"), ändert sich selten und steuert wirklich etwas – Aufgabenniveau
+und Fordern-Angebote.
+
+**Abweichung von der Spec:** §15 („Übernehmen") und §8 (`CalendarEvent.zielnote?`) nennen die
+Zielnote. Beide bleiben unverändert, dieser Nachtrag ist die dokumentierte Abweichung. Betroffen
+ist P-01, dessen Titel „Zielnote + Fortschritt (Sicherheit vs. Ziel)" entsprechend gekürzt wird.

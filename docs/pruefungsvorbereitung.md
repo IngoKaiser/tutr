@@ -82,7 +82,7 @@ und als solche unit-testbar – wie `upcoming.ts` bei K-01.
              fehlt                    fehlt        fehlt                    fehlt
 
  ✔ = existiert und wird befüllt   ✱ = existiert im Schema, kein Weg hinein
- An `calendar_event` fehlen außerdem `target_grade` und `result`.
+ An `calendar_event` fehlt außerdem `result` (die Note aus der echten Arbeit).
 ```
 
 `topic` und `learning_objective` stehen seit F-04c im Schema, werden aber von **keiner**
@@ -142,10 +142,10 @@ an das tatsächliche Heft und an die tatsächliche Note. Der Vorsprung liegt als
 | #   | Lücke                                                                                                                                         | Ticket            |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
 | 1   | **Kein Weg zu einem Thema.** `topic`/`learning_objective` ohne Oberfläche – blockiert alles Weitere                                           | **P-00**          |
-| 2   | **Mastery ist eine Idee, keine Tabelle.** Ohne sie kein „Sicherheit vs. Zielnote", keine Priorität im Plan, kein Fördern/Fordern              | **P-02**          |
+| 2   | **Mastery ist eine Idee, keine Tabelle.** Ohne sie kein Stand je Lernziel, keine Priorität im Plan, kein Fördern/Fordern                      | **P-02**          |
 | 3   | **Der Lernplan hat keine Rechenregel** – und die Blocker werden im Import verworfen                                                           | **P-03**          |
 | 4   | **Die Probeprüfung fehlt** – der am besten belegte Mechanismus ist der am weitesten entfernte                                                 | **P-04**          |
-| 5   | **Die zurückgegebene Arbeit fällt aus dem System.** Kein `result`, keine `target_grade`, kein Ticket                                          | **P-05**          |
+| 5   | **Die zurückgegebene Arbeit fällt aus dem System.** Kein `result` am Event, kein Ticket                                                       | **P-05**          |
 | 6   | **„Mix" mischt das Falsche.** Heute Kartenarten (V-04), gemeint waren Themen                                                                  | in **P-04**/V-04b |
 | 7   | **Niemand misst, ob sie sich richtig einschätzt.** `review` ohne `self_assessment`, T-04 offen                                                | **P-06**          |
 | 8   | **Freies Abrufen kommt nicht vor.** Karten prüfen Einzelfakten, nicht Zusammenhänge                                                           | **T-20**          |
@@ -161,9 +161,11 @@ Diese drei gehören dem Menschen, nicht dem nächsten Ticket:
    Note kommt aus der echten Arbeit – nur dort. Weicht von §6 M6 ab, also ADR-würdig.
 2. **Zeitbudget pro Tag** (§14 Frage 3, seit v2 offen). Der Lernplan kann ohne Zahl nicht rechnen.
    Vorschlag: eine Frage an sie („Wie viel Zeit hast du heute?"), Vorgabewert 20 Minuten.
-3. **Zielnote** (§15, von Astra übernommen): als von ihr gewähltes Ziel in Ordnung – aber als
-   täglicher Balken „so weit liegst du zurück" erzeugt sie Druck ohne Handlung. Vorschlag: Zielnote
-   speichern, aber nur auf der Prüfungsseite zeigen, nie auf „Heute".
+3. ~~**Zielnote** (§15, von Astra übernommen)~~ — **entschieden: sie entfällt.** Niemand trägt
+   freiwillig eine 3 als Ziel ein, und der Fortschrittsbalken, für den das Feld gedacht war, ist mit
+   [ADR 0018](adr/0018-rueckmeldung-ohne-urteil.md) D4 ohnehin gestrichen. Die berechtigte Frage
+   dahinter – „wie viel ist genug?“ – beantworten das Niveau je Lernziel, die Vollständigkeit
+   („4 von 6 Lernzielen sitzen“) und der Vergleich mit der letzten Probe. Nachtrag in ADR 0018.
 
 ## 8. Was daraus weiterführt
 

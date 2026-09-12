@@ -6,6 +6,16 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **Doku: Pilotfach Englisch, Zielnote gestrichen.** §14 Frage 1 beantwortet – die Tiefe
+  (P-00 Themen/Lernziele, M-01/M-02 Material, P-01 Prüfungsseite) wird an **Englisch** erprobt;
+  die Französischarbeit am 25. 9. läuft unverändert über den fertigen Vokabelweg. Und die
+  **Zielnote entfällt ersatzlos** (Nachtrag in ADR 0018, Abweichung von §15 und §8): Wer
+  ehrgeizig ist, zielt auf 1 oder 2 – das einzutippen fügt nichts hinzu; wer sich schwertut,
+  trägt keine 3 ein. Das Feld existierte für einen Fortschrittsbalken, dessen Anzeige ADR 0018 D4
+  ohnehin gestrichen hat. „Wie viel ist genug?“ beantworten stattdessen das Niveau je Lernziel,
+  die Vollständigkeit („4 von 6 Lernzielen sitzen“) und der Vergleich mit der letzten Probe.
+  `calendar_event` bekommt damit nur `result`, kein `target_grade`; P-01 und P-05 nachgezogen.
+
 - **Doku: Standard-Notenschlüssel, drei ADR-Nachträge, drei fehlende Tickets.** Aufräumrunde
   nach ADR 0017–0019. **K-05** wird zum kuratierten Schulprofil und bringt neben Ferien und
   Halbjahresgrenze den **Notenschlüssel** mit: Vorbelegung 92/81/67/50/30 % (IHK-Schlüssel),
