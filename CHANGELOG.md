@@ -6,6 +6,19 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **K-04: Datei-Import Klausurplan (CSV/XLSX/ICS), ohne Modellaufruf.** Kein eigener
+  Review-Screen (ADR 0016): `csvToDrafts()`/`xlsxToDrafts()`/`icsToDrafts()`
+  (`src/lib/calendar/`) liefern dieselbe `CalendarImportDraft[]`-Form wie K-03 und landen
+  im bestehenden Review-Screen, der jetzt mit einer Kanalwahl (Foto/Datei) beginnt. Fach
+  und Art erkennt `row-import.ts` ohne KI: `resolveSubjectGuess()` findet den vollen
+  Fachnamen oder ein eindeutiges Präfix („Eng" → „Englisch", ADR 0016 D4 – benannt, nie
+  geraten), `classifyEventType()` eine schmale Schlüsselwortliste (Blocker zuerst,
+  Unbekanntes ehrlich „sonstiges"). CSV/XLSX teilen sich eine Kopfzeilen-Zuordnung
+  (tolerant gegenüber Umlauten/Groß-Kleinschreibung); ICS sucht dieselben Wörter im
+  `SUMMARY`-Freitext. `exceljs` neu als Dependency (XLSX ist ein ZIP/XML-Binärformat).
+  Datei-Import braucht keinen `ANTHROPIC_API_KEY` – die neue E2E-Suite
+  (`klausurplan-datei-import.spec.ts`) läuft deshalb komplett in CI, anders als K-03
+
 - **K-03: Klausurplan per Foto einlesen, mit Review-Screen.** Neue Route
   `/pruefungen/einlesen`: Fotos sammeln und einlesen wie bei der Hausaufgabe (V-10), dann auf
   derselben Seite eine Entwurfsliste statt eines zweiten URL-Schritts – es gibt zwischendurch
@@ -69,6 +82,21 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Fixed
 
+- **Kalender-Import: Gruppen-Einrichtung reagierte nicht auf „Weiter".** Gefunden beim
+  eigenen Testen des Nutzers. `speichereEigeneGruppen()` und `uebernehmen()` schrieben ein
+  rohes JS-Array über den rohen `sql`-Tag in eine `text[]`-Spalte (`own_groups`/
+  `calendar_event.groups`) – die zugrunde liegende `postgres`-Bibliothek erkennt das nicht
+  als Postgres-Array, hängt die Elemente stattdessen mit `Array.prototype.toString()`
+  aneinander, und Postgres lehnt das Ergebnis als „malformed array literal" ab. Die
+  Ablehnung kam nie in der Oberfläche an (`void gruppenEinrichtungSpeichern()` fing sie
+  nicht ab) – der Knopf schien einfach nichts zu tun. Neuer Helfer `pgTextArray()`
+  (`src/db/sql-array.ts`, `ARRAY[$1, …]::text[]` statt eines selbst gebauten Literals) an
+  beiden Stellen, dazu eine sichtbare Fehlermeldung und ein Ladezustand am Knopf. Per
+  DB-Test gegen die echte Testdatenbank nachgewiesen (schlug vor der Korrektur reproduzierbar fehl)
+- **Prüfungen: „Neuer Termin" nutzte nicht die volle Seitenbreite.** Ebenfalls beim eigenen
+  Testen gefunden. Das Formular stand als `Block` ohne `w-full` in derselben
+  `flex flex-wrap`-Zeile wie der „Klausurplan einlesen"-Link (für zwei schmale Knöpfe
+  gedacht) und blieb deshalb so schmal wie sein Inhalt
 - `src/proxy.ts`s Ausnahmeliste leitete `/sw.js` auf `/anmelden` um (fehlte neben
   `manifest.webmanifest`/`robots.txt`) – eine Weiterleitung statt einer echten Antwort lässt
   `navigator.serviceWorker.register()` scheitern. Unsichtbar in der Entwicklung

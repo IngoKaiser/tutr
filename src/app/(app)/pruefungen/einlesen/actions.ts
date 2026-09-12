@@ -5,9 +5,13 @@ import { revalidatePath } from "next/cache";
 
 import { extractCalendarFromImage, type InlineImage } from "@/ai/client";
 import { withActor, type Actor } from "@/db/actor";
+import { pgTextArray } from "@/db/sql-array";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { loginStatus } from "@/lib/auth/actor";
 import { classifyPhotoImportError } from "@/lib/vocab/photo";
+import { csvToDrafts } from "@/lib/calendar/csv-import";
+import { icsToDrafts } from "@/lib/calendar/ics-import";
+import { xlsxToDrafts } from "@/lib/calendar/xlsx-import";
 import { EVENT_TYPE_OPTIONS, type CalendarEventType } from "@/lib/calendar/upcoming";
 import { extractedEventsToDrafts } from "@/lib/calendar/from-extraction";
 import type { CalendarImportDraft } from "@/lib/calendar/import-draft";
@@ -82,6 +86,58 @@ export async function fotoZuKlausurplan(image: InlineImage): Promise<FotoErgebni
   }
 }
 
+const MAX_DATEIGROESSE = 3 * 1024 * 1024; // 3 MB – ein Klausurplan-Export wiegt Kilobyte, nicht Megabyte
+
+export type DateiErgebnis =
+  { ok: true; drafts: CalendarImportDraft[]; fehler: string[] } | { ok: false; fehler: string };
+
+/**
+ * Datei-Import Klausurplan (K-04, ADR 0016 D4). Kein Modellaufruf, deshalb
+ * auch kein Rate-Limit (das schützt nur Vision-/Tutor-Kosten) – dafür ein
+ * schlichter Größendeckel gegen versehentlich falsche Uploads.
+ *
+ * `base64` trägt XLSX (Binärformat), `text` trägt CSV/ICS – der Client
+ * entscheidet anhand der Dateiendung, was er schickt.
+ */
+export async function dateiZuKlausurplan(input: {
+  name: string;
+  text?: string;
+  base64?: string;
+}): Promise<DateiErgebnis | null> {
+  const actor = await requireActor();
+  if (!actor) return null;
+
+  const endung = input.name.toLowerCase().split(".").pop() ?? "";
+  const groesse = input.base64
+    ? Math.floor((input.base64.length * 3) / 4)
+    : (input.text?.length ?? 0);
+  if (groesse > MAX_DATEIGROESSE) {
+    return { ok: false, fehler: "Die Datei ist zu groß (mehr als 3 MB)." };
+  }
+
+  const faecher = await withActor(actor, (tx) => ladeFaecherFuerZuordnung(tx));
+  const namen = faecher.map((f) => f.name);
+
+  if (endung === "xlsx") {
+    if (!input.base64) return { ok: false, fehler: "Die Datei kam nicht vollständig an." };
+    const { drafts, fehler } = await xlsxToDrafts(Buffer.from(input.base64, "base64"), namen);
+    if (drafts.length === 0 && fehler.length > 0) return { ok: false, fehler: fehler[0]! };
+    return { ok: true, drafts, fehler };
+  }
+  if (!input.text) return { ok: false, fehler: "Die Datei kam nicht vollständig an." };
+  if (endung === "csv") {
+    const { drafts, fehler } = csvToDrafts(input.text, namen);
+    if (drafts.length === 0 && fehler.length > 0) return { ok: false, fehler: fehler[0]! };
+    return { ok: true, drafts, fehler };
+  }
+  if (endung === "ics" || endung === "ical") {
+    const { drafts, fehler } = icsToDrafts(input.text, namen);
+    if (drafts.length === 0 && fehler.length > 0) return { ok: false, fehler: fehler[0]! };
+    return { ok: true, drafts, fehler };
+  }
+  return { ok: false, fehler: "Diese Datei kennt tutr nicht – erlaubt sind CSV, XLSX und ICS." };
+}
+
 export type ReviewKontext = {
   schoolYearId: string;
   subjects: FachOption[];
@@ -152,9 +208,13 @@ export async function speichereEigeneGruppen(tokens: string[]): Promise<boolean>
   const actor = await requireActor();
   if (!actor) return false;
 
+  // `pgTextArray()`, nicht `${tokens}` direkt – ein rohes JS-Array wird von
+  // der `postgres`-Bibliothek beim rohen `sql`-Tag nicht als Postgres-Array
+  // erkannt und scheitert an Postgres als „malformed array literal" (Fund
+  // 12.9.2026, siehe `sql-array.ts`).
   await withActor(actor, (tx) =>
     tx.execute(sql`
-      update school_year set own_groups = ${tokens}
+      update school_year set own_groups = ${pgTextArray(tokens)}
       where student_id = ${actor.studentId} and status = 'aktiv'`),
   );
   return true;
@@ -186,14 +246,18 @@ function gueltigesDatum(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m! - 1 && dt.getUTCDate() === d;
 }
 
+/** Woher der Import kam – bestimmt `calendar_event.source` (K-02a/K-03/K-04, ADR 0016 D8). */
+export type ImportQuelle = "bild" | "datei";
+
 /**
- * Übernimmt die im Review-Screen bestätigten Zeilen (K-03, ADR 0016 D2):
- * neue Termine anlegen (`source: 'bild'`, mit `groups`), verschobene Termine
- * auf ihr neues Datum bringen. Läuft in **einer** Transaktion – entweder
- * beides oder nichts, sonst könnte ein halb übernommener Import verwirrender
- * sein als gar keiner.
+ * Übernimmt die im Review-Screen bestätigten Zeilen (K-03/K-04, ADR 0016 D2):
+ * neue Termine anlegen (mit `groups`/`source`), verschobene Termine auf ihr
+ * neues Datum bringen. Läuft in **einer** Transaktion – entweder beides oder
+ * nichts, sonst könnte ein halb übernommener Import verwirrender sein als
+ * gar keiner.
  */
 export async function uebernehmen(input: {
+  quelle: ImportQuelle;
   neu: NeuerImportEintrag[];
   verschoben: VerschobenerImportEintrag[];
 }): Promise<UebernehmenErgebnis | null> {
@@ -220,13 +284,15 @@ export async function uebernehmen(input: {
 
     try {
       for (const eintrag of input.neu) {
-        const groups = eintrag.groups.length > 0 ? eintrag.groups : null;
+        // `pgTextArray()` statt `${eintrag.groups}` direkt – sonst dieselbe
+        // Falle wie bei `speichereEigeneGruppen()` (siehe `sql-array.ts`).
+        const groups = eintrag.groups.length > 0 ? pgTextArray(eintrag.groups) : sql`null`;
         await tx.execute(sql`
           insert into calendar_event
             (student_id, school_year_id, subject_id, type, title, date, groups, source)
           values
             (${actor.studentId}, ${schoolYear.id}, ${eintrag.subjectId}, ${eintrag.type},
-             ${eintrag.title.trim()}, ${eintrag.date}, ${groups}, 'bild')`);
+             ${eintrag.title.trim()}, ${eintrag.date}, ${groups}, ${input.quelle})`);
       }
       for (const eintrag of input.verschoben) {
         await tx.execute(sql`

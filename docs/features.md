@@ -79,7 +79,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Termin von Hand anlegen, Liste (4 Wochen / später / Historie), bearbeiten, absagen | ✅    | K-01    |
 |                          | Themen an einen Termin hängen, Countdown, Prüfungsseite                            | 🌑    | P-01    |
 |                          | Klausurplan per Foto einlesen (Review, Gruppenfilter, Re-Import)                   | ✅    | K-03    |
-|                          | Datei-Import CSV/XLSX (SchulDock) + ICS                                            | 🌑    | K-04    |
+|                          | Datei-Import CSV/XLSX (SchulDock) + ICS, kein Modellaufruf                         | ✅    | K-04    |
 | **Tutor & Hausaufgaben** |                                                                                    | 🌓    |         |
 |                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                      | ✅    | T-01a   |
 |                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen“, Streaming             | ✅    | T-02    |

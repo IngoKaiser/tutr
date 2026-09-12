@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { runWithActor, type Actor } from "../actor";
+import { pgTextArray } from "../sql-array";
 import { connectAsAppRole, connectAsMigrationRole, loadTestEnv, testDbAvailable } from "../test-db";
 
 /**
@@ -122,6 +123,35 @@ describe.skipIf(!testDbAvailable())(
       const [gesetzt] = await admin.client<{ own_groups: string[] }[]>`
       select own_groups from school_year where id = ${A.schuljahr}`;
       expect(gesetzt?.own_groups).toEqual(["8.5", "8.5 Eng", "8.5 Mat"]);
+    });
+
+    test("own_groups über pgTextArray() (wie speichereEigeneGruppen()): kein 'malformed array literal'", async () => {
+      // Anders als der Test darüber – der schreibt ein Postgres-Literal
+      // direkt in den SQL-Text. Hier steht die Werteliste wie in der
+      // Anwendung in einer JS-Variable und geht über den gebundenen
+      // Parameter (Fund 12.9.2026, `sql-array.ts`): ein rohes `${array}`
+      // scheitert genau daran, ein Token mit Leerzeichen ("8.5 Mat") deckt
+      // das auf.
+      const tokens = ["8.5", "8.5 Eng", "8.5 Mat"];
+      await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`
+        update school_year set own_groups = ${pgTextArray(tokens)}
+        where id = ${A.schuljahr}`),
+      );
+      const [gesetzt] = await admin.client<{ own_groups: string[] }[]>`
+      select own_groups from school_year where id = ${A.schuljahr}`;
+      expect(gesetzt?.own_groups).toEqual(tokens);
+
+      // Leere Liste → `{}`, nicht NULL (unterscheidet „nichts ausgewählt"
+      // von „noch nie eingerichtet").
+      await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`
+        update school_year set own_groups = ${pgTextArray([])}
+        where id = ${A.schuljahr}`),
+      );
+      const [leer] = await admin.client<{ own_groups: string[] }[]>`
+      select own_groups from school_year where id = ${A.schuljahr}`;
+      expect(leer?.own_groups).toEqual([]);
     });
 
     test("Elternteil sieht Fächer und Schuljahr, ändert aber kein Thema", async () => {
