@@ -61,3 +61,34 @@ export function matchesOwnGroups(rawGroups: string[], ownGroups: string[]): bool
     .map(normalizeToken)
     .some((token) => eigene.has(token));
 }
+
+/**
+ * Ersteinrichtung von `school_year.own_groups` (K-03, ADR 0016 D3): Aus allen
+ * im Import gesehenen Gruppentokens diejenigen vorschlagen, die zur eigenen
+ * Klasse passen – als Vorauswahl für die Checkliste, nicht als Entscheidung.
+ * Ein Token passt, wenn es mit der Klasse beginnt (`"8.5"` → `"8.5"`,
+ * `"8.5 Eng"`, aber nicht `"8.51"` oder `"18.5"`).
+ *
+ * Ohne bekannte Klasse (`className: null`, sehr alte Konten vor F-16a) bleibt
+ * die Vorauswahl leer – raten wäre hier schlechter als eine leere Liste, die
+ * das Kind bewusst befüllt.
+ */
+export function suggestOwnGroups(seenTokens: string[], className: string | null): string[] {
+  if (!className) return [];
+  const eigeneKlasse = normalizeToken(className);
+
+  // Auf dem normalisierten Token entdoppeln, aber die zuerst gesehene
+  // Schreibweise behalten – zwei Fotos derselben Zeile sollen nicht zwei
+  // unterschiedlich geschriebene Kästchen in der Checkliste ergeben.
+  const distinct = new Map<string, string>();
+  for (const raw of seenTokens) {
+    const getrimmt = raw.trim();
+    if (getrimmt.length === 0) continue;
+    const key = normalizeToken(getrimmt);
+    if (!distinct.has(key)) distinct.set(key, getrimmt);
+  }
+
+  return [...distinct.entries()]
+    .filter(([key]) => key === eigeneKlasse || key.startsWith(`${eigeneKlasse} `))
+    .map(([, original]) => original);
+}
