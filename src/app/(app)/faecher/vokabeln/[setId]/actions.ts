@@ -49,6 +49,9 @@ export type SetDetail = {
   id: string;
   title: string;
   subjectName: string;
+  /** Zielsprache des Fachs (V-06a) – steuert die Richtungsbeschriftung im
+   *  Set-Modus (V-04). `null` bei Fächern ohne Rückrichtung. */
+  subjectLanguage: string | null;
   items: VocabRow[];
 };
 
@@ -56,7 +59,7 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
   const actor = await requireActor();
   if (!actor) return null;
 
-  type Row = { title: string; subject_name: string };
+  type Row = { title: string; subject_name: string; subject_language: string | null };
   type ItemRow = {
     id: string;
     term: string;
@@ -67,7 +70,7 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
 
   return withActor(actor, async (tx) => {
     const [set] = await tx.execute<Row>(
-      sql`select vs.title, s.name as subject_name
+      sql`select vs.title, s.name as subject_name, s.language as subject_language
           from vocab_set vs join subject s on s.id = vs.subject_id
           where vs.id = ${setId}`,
     );
@@ -84,6 +87,7 @@ export async function loadSetDetail(setId: string): Promise<SetDetail | null> {
       id: setId,
       title: set.title,
       subjectName: set.subject_name,
+      subjectLanguage: set.subject_language,
       items: sortForReview(withDerivedUnsicher(items)),
     };
   });

@@ -148,7 +148,15 @@ export const config = {
   // JavaScript erwartet, und meldet „Refused to execute script". Gefunden
   // von der Produktions-Suite; im Entwicklungsserver war es unsichtbar,
   // weil der Actor-Bypass die Weiterleitung nie auslöst.
+  //
+  // `sw.js` aus demselben Grund wie `robots.txt` (F-09a): Eine Weiterleitung
+  // statt der Datei lässt `navigator.serviceWorker.register()` scheitern –
+  // ein Service Worker muss mit einer echten JS-Antwort von genau der
+  // Skript-URL antworten, keine Weiterleitung. Gegen einen echten
+  // `next start` gefunden, in der Entwicklung unsichtbar (derselbe
+  // Dev-Actor-Bypass). Die CSP fehlt ihm dadurch – richtig so: Eine
+  // JS-Datei trägt kein HTML, und der Service Worker lädt nichts nach.
   matcher: [
-    "/((?!_next/static|_next/image|_vercel|favicon.ico|icon-.*\\.png|manifest.webmanifest|robots.txt).*)",
+    "/((?!_next/static|_next/image|_vercel|favicon.ico|icon-.*\\.png|manifest.webmanifest|robots.txt|sw.js).*)",
   ],
 };

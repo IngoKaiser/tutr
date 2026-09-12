@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
 import { SwipeRow, UndoLoeschen } from "@/components/shell/swipe-row";
 import { useDeferredDelete } from "@/components/shell/use-deferred-delete";
 import { prepareImageForUpload } from "@/lib/image";
+import { directionLabels } from "@/lib/subjects/languages";
 
 import {
   addFromPaste,
@@ -59,6 +61,10 @@ export function VocabList({
         </Notice>
       ) : null}
 
+      {canManage && detail.items.length > 0 ? (
+        <PracticeEntry setId={detail.id} language={detail.subjectLanguage} />
+      ) : null}
+
       {canManage ? <AddArea setId={detail.id} photoAvailable={photoAvailable} /> : null}
 
       {detail.items.length === 0 ? (
@@ -107,6 +113,118 @@ type FotoEintrag = {
    *  EXIF-Orientierung fehlt oder falsch ist (V-10). */
   rotation: number;
 };
+
+type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
+
+/**
+ * Antwortart der Runde (V-08, mit V-04 von `/ueben` hierher gezogen). `auto`
+ * lässt den FSRS-Zustand entscheiden (Multiple Choice bis `wiederholen`, dann
+ * Tippen – `modeForCardState`); die beiden anderen erzwingen eine Art für
+ * alle Karten. Für „das erste Level sitzt, ich will tippen", ohne auf FSRS zu
+ * warten.
+ */
+type AntwortWahl = "auto" | "mc" | "tippen";
+
+/**
+ * „Dieses Set üben" (V-04, Set-Modus aus §6 M4): unabhängig von der
+ * Fälligkeit, direkt aus diesem Set. Der Einstieg lebt bewusst hier, nicht
+ * auf `/ueben` – wer diese Seite aufruft, hat das Set schon gewählt, das ist
+ * die eine Entscheidung, die zählt. **Die Richtungswahl steht deshalb nur
+ * noch hier**, nicht mehr im Alltagsfluss (ADR 0008 Nachtrag V-04): Auf
+ * `/ueben` mischt „Loslegen" immer, hier ist eine gezielte Wahl ohnehin
+ * schon bewusst.
+ *
+ * Ohne Zielsprache am Fach gibt es keine Rückrichtung (V-06a) – dann kein
+ * Umschalter, nur der Knopf. Dieselbe Regel wie im Fach-Block auf `/ueben`
+ * vor V-04, mit denselben Beschriftungen aus `directionLabels()`.
+ *
+ * Reiner Link mit Query-Parametern statt Server Action: `/ueben` lädt die
+ * Karten serverseitig und startet die Session direkt – keine doppelte
+ * Übungs-UI, die Session-Maschine (`ActiveCard`, `session.ts`) lebt an
+ * genau einer Stelle.
+ */
+function PracticeEntry({ setId, language }: { setId: string; language: string | null }) {
+  const [direction, setDirection] = useState<DirectionChoice>("gemischt");
+  const [antwort, setAntwort] = useState<AntwortWahl>("auto");
+  const labels = directionLabels(language);
+  const effektiveRichtung: DirectionChoice = labels ? direction : "gemischt";
+
+  const params = new URLSearchParams({ set: setId });
+  if (effektiveRichtung !== "gemischt") params.set("richtung", effektiveRichtung);
+  if (antwort !== "auto") params.set("art", antwort);
+
+  return (
+    <Block title="Üben">
+      {labels ? (
+        <SegmentedPicker
+          ariaLabel="Richtung"
+          value={direction}
+          onChange={setDirection}
+          options={[
+            { value: "gemischt", label: "Gemischt" },
+            { value: "vorwaerts", label: labels.vorwaerts },
+            { value: "rueckwaerts", label: labels.rueckwaerts },
+          ]}
+        />
+      ) : null}
+      <SegmentedPicker
+        ariaLabel="Antwortart"
+        value={antwort}
+        onChange={setAntwort}
+        options={[
+          { value: "auto", label: "Automatisch" },
+          { value: "mc", label: "Auswahl" },
+          { value: "tippen", label: "Tippen" },
+        ]}
+      />
+      <Link
+        href={`/ueben?${params.toString()}`}
+        className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau flex w-full items-center justify-center rounded-[9px] border border-transparent px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        Dieses Set üben
+      </Link>
+    </Block>
+  );
+}
+
+/** Segmentierter Umschalter (Richtung, Antwortart – V-02/V-08, mit V-04 von
+ *  `/ueben` hierher gezogen). */
+function SegmentedPicker<T extends string>({
+  ariaLabel,
+  value,
+  onChange,
+  options,
+}: {
+  ariaLabel: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: readonly { value: T; label: string }[];
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      className="border-linie-stark flex overflow-hidden rounded-md border"
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          aria-checked={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={`flex-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            value === option.value
+              ? "bg-koenigsblau text-auf-koenigsblau"
+              : "text-tinte-weich hover:text-tinte bg-transparent"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** Exportiert nur für den Komponententest der Foto-Galerie (V-03c). */
 export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boolean }) {

@@ -191,6 +191,88 @@ Stand, das Cookie-Fallback-Kind) ebenfalls auf `/\d+ fällig/` passte. Seit D3 z
 ganz ohne fällige Karten gar keinen Block mehr – der Fehlgriff wurde dadurch sichtbar und
 im Test behoben (auf das tatsächliche Setzen des Cookies warten, nicht nur auf den Klick).
 
+## Nachtrag beim Bauen (V-04)
+
+D3 hatte offen gelassen, ob V-04 (Modi) den Verzicht auf einen eigenen
+Auswahl-Bildschirm neu stellen darf, falls mehr Fächer gleichzeitig fällig
+werden. Beim Bauen kam eine andere Frage zuerst: Von den fünf Modi aus §6 M4
+(Set-Modus, Fällig heute, Prüfungsmodus, Schwachstellen, Mix) drohten vier
+als zusätzliche, gleichrangige Buttons auf `/ueben` zu landen – oben auf die
+schon bestehende Richtungswahl und die beiden Platzhalter-Blöcke. Genau das
+wurde beim eigenen Testen als überladen empfunden, bevor überhaupt Code dafür
+entstand.
+
+**Entscheidung: so wenig Modi wie möglich werden zu sichtbaren Auswahlen.**
+
+- **Fällig heute** und **Mix** waren beim genauen Hinsehen bereits fertig:
+  „Fällig heute (setübergreifend)" ist der bestehende Alltagsfluss seit V-06,
+  „Mix" (Kartenarten mischen, nicht Fächer – siehe D3 oben) ist seit V-02
+  automatisch, weil `modeForCardState()` den Modus aus dem FSRS-Zustand der
+  Karte ableitet, nie aus einer Wahl des Kindes. Für beide entstand kein
+  neuer Code, nur der Wegfall der „Kommt mit V-04"-Platzhalter, die das
+  ehrlich gesagt hatten.
+- **Schwachstellen** wird keine eigene Kachel. `loadSessionCards()` füllt
+  eine zu kleine Fach-Session (unter `MIN_SESSION_SIZE`) mit den Karten mit
+  den meisten Fehlschlägen auf, auch wenn sie noch nicht fällig sind – eine
+  zusätzliche Quelle für dieselbe Session, keine zweite Wahrheit über
+  Fälligkeit und kein Knopf, den das Kind drücken müsste. „Fehler als Daten"
+  (Konzept §3) galt schon vorher als Prinzip; hier wird es zur Standard-
+  Reihenfolge statt zu einer Option.
+- **Set-Modus** bekommt einen Einstieg, aber nicht auf `/ueben`: „Dieses Set
+  üben" steht auf der Set-Seite (`/faecher/vokabeln/[setId]`), wo das Set
+  ohnehin schon verwaltet wird. Wer dorthin navigiert, hat die eine
+  Entscheidung, die zählt, längst getroffen – ein zweiter Weg zum selben Ziel
+  auf `/ueben` hätte nur verdoppelt. Die Richtungswahl (FR→DE/DE→FR/gemischt)
+  zieht mit um: Sie stand vorher auf `/ueben` neben „Loslegen", jetzt nur
+  noch hier, wo eine gezielte Übung ohnehin schon eine bewusste Wahl ist.
+  `/ueben` selbst mischt beim alltäglichen „Loslegen" immer beide Richtungen.
+- **Prüfungsmodus** (Sets der nächsten Arbeit) bleibt unentschieden liegen –
+  nicht als Kürzung, sondern weil ihm die Grundlage fehlt: K-01 (der
+  Kalender) existiert noch nicht, und ohne echte Termine gibt es keine
+  „nächste Arbeit", aus der sich Sets ableiten ließen. Ein Behelf ohne
+  Kalender (z. B. ein manuelles Prüfungs-Flag an `vocab_set`) wäre Schema für
+  eine Übergangslösung, die K-01 vermutlich wieder verwirft – bewusst nicht
+  gebaut. Bleibt ein Folgepunkt hinter K-01 (siehe `docs/PLAN.md`).
+
+Damit bleibt `/ueben` bei seiner eigentlichen Frage – was ist heute dran –,
+und die Antwort auf D3s offene Frage ist: **kein zusätzlicher
+Auswahl-Bildschirm**, sondern weniger sichtbare Auswahl als vorher, nicht
+mehr. Die zwei Platzhalter-Blöcke sind ersatzlos gestrichen, nicht durch neue
+Kacheln ersetzt.
+
+### Korrektur beim Zusammenführen: es waren zwei Umschalter, nicht einer
+
+Der Abschnitt oben wurde gegen einen **veralteten Stand** geschrieben. Beim
+Merge auf `main` zeigte sich, dass zwischenzeitlich V-06a, V-07, V-08 und
+V-09 gelandet waren – und dass `/ueben` sich in der Zwischenzeit in die
+**Gegenrichtung** entwickelt hatte:
+
+- **V-06a** hat den Richtungs-Umschalter verfeinert statt entfernt: Die
+  Beschriftung kommt jetzt aus `subject.language` (`EN → DE` statt fest
+  `FR → DE`), und ein Fach ohne Zielsprache zeigt ihn gar nicht erst.
+- **V-08** hat einen **zweiten** Umschalter danebengestellt (Antwortart:
+  Automatisch / Auswahl / Tippen) und den Lernstand auf den ganzen Wortschatz
+  umgestellt.
+
+Die Kritik „zu viele Knöpfe", die V-04 ausgelöst hat, galt damit der Seite
+**mit zwei** Umschaltern – nicht der mit einem, gegen die der erste Anlauf
+gebaut wurde. Die Verschlankung oben war also nicht falsch, aber gemessen an
+der echten Seite **unvollständig**.
+
+**Korrigierte Entscheidung:** Beide Umschalter verlassen den Alltagsfluss,
+und beide ziehen in den Set-Modus auf der Set-Seite um – dort ist eine
+gezielte Wahl ohnehin schon bewusst getroffen. `/ueben` zeigt je Fach nur
+noch Lernstand und „Loslegen"; Richtung mischt `loadSessionCards()` je
+Vokabel (V-06a/V-07), die Frageform leitet `modeForCardState()` aus dem
+FSRS-Zustand ab.
+
+**Was dabei ausdrücklich nicht passiert ist: Löschen von Funktionalität.**
+V-06as sprachabhängige Beschriftungen (`directionLabels()`) und V-08s
+erzwingbare Antwortart sind vollständig erhalten und im Set-Modus über
+`?richtung=` und `?art=` weiter erreichbar. Verschwunden ist nur ihre
+Position im Weg des täglichen Übens. Eine Verschlankung, die eine gerade
+bewusst gebaute Fähigkeit ersatzlos wegnimmt, wäre keine gewesen.
+
 ## Abgelehnte Alternative
 
 **Das Fach rein ableiten, ohne Spalte.** Wäre die reinere Lesart von ADR 0006 D7 und

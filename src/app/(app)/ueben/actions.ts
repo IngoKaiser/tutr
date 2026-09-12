@@ -167,81 +167,192 @@ export type SessionCardContent = {
   translation: string;
 };
 
+type CardRow = {
+  card_id: string;
+  vocab_item_id: string;
+  direction: Direction;
+  state: CardStateValue;
+  term: string;
+  translation: string;
+};
+
+function toSessionCard(r: CardRow): SessionCardContent {
+  return {
+    cardId: r.card_id,
+    vocabItemId: r.vocab_item_id,
+    direction: r.direction,
+    mode: modeForCardState(r.state),
+    term: r.term,
+    translation: r.translation,
+  };
+}
+
+/**
+ * Mindestgröße einer Fach-Session (V-04) – erste Schätzung, wie die
+ * Zeitschwellen aus V-02. Reichen die fälligen Karten allein nicht, füllt
+ * `loadSessionCards()` mit den Karten mit den meisten Fehlschlägen auf.
+ */
+const MIN_SESSION_SIZE = 10;
+
 /**
  * Fällige Karten für eine Session, inhaltlich angereichert. Läuft immer in
- * genau einem Fach (V-06, ADR 0008 D3) – `subjectId` ist deshalb Pflicht,
- * nicht optional wie `direction`. Der Vorrat ist dadurch von selbst
+ * genau einem Fach (V-06, ADR 0008 D3) – der Vorrat ist dadurch von selbst
  * einsprachig: `buildMultipleChoiceOptions()` zieht die Falschantworten aus
  * genau diesen Karten, eine eigene Fach-Regel dort ist nicht nötig.
  *
- * `direction` filtert zusätzlich nach ADR 0007 D5 – `null` heißt gemischt
- * (die Voreinstellung). **Gemischt liefert je Vokabel genau eine Karte**
- * (V-06a), und **welche, entscheidet `random()`** (V-07). Beide Karten sind
- * ohnehin fällig (`due_at <= now()`), die Reihenfolge dazwischen trägt kein
- * Signal.
+ * **Immer gemischt, ohne Richtungsparameter** (V-04, ADR 0015 Nachtrag): Der
+ * Alltagsfluss auf `/ueben` trifft keine Vorentscheidung mehr. Wer gezielt
+ * eine Richtung will, geht über den Set-Modus (`loadSetSessionCards()`) –
+ * dort ist die Wahl ohnehin schon bewusst. Der vorherige
+ * `direction`-Parameter hatte nach dem Wegfall der Umschalter nur noch
+ * `null`-Aufrufer.
  *
- * Vorher stand hier `order by … c.due_at asc, c.direction asc`. Zwei Gründe,
- * warum das „Gemischt" faktisch auf Fremdwort → Deutsch festnagelte: Die
- * beiden Karten einer Vokabel haben in der Praxis **nie** exakt dasselbe
- * `due_at` (millisekundengenau, gegen die Produktiv-DB geprüft), also
- * entschied immer schon `due_at` – und wo es doch zum Gleichstand kam, sortiert
- * Postgres das `pgEnum` `vocab_direction` nach Deklarationsreihenfolge
- * (`["vorwaerts", "rueckwaerts"]`), nicht alphabetisch. `random()` als
- * einziger Sortierschlüssel nach der `distinct on`-Spalte mischt die
- * Richtungen jetzt wirklich; über eine Reihe hinweg kommt jede etwa gleich oft.
+ * **Gemischt liefert je Vokabel genau eine Karte** (V-06a), und **welche,
+ * entscheidet `random()`** (V-07). Beide Karten sind ohnehin fällig
+ * (`due_at <= now()`), die Reihenfolge dazwischen trägt kein Signal. Vorher
+ * stand hier `order by … c.due_at asc, c.direction asc`, was „Gemischt"
+ * faktisch auf Fremdwort → Deutsch festnagelte: Die beiden Karten einer
+ * Vokabel haben in der Praxis **nie** exakt dasselbe `due_at`
+ * (millisekundengenau, gegen die Produktiv-DB geprüft), also entschied immer
+ * schon `due_at` – und wo es doch zum Gleichstand kam, sortiert Postgres das
+ * `pgEnum` `vocab_direction` nach Deklarationsreihenfolge, nicht alphabetisch.
  *
  * **Zu prüfende Vokabeln bleiben draußen** (V-09, `practiceReadySql`): Eine
  * Zeile, bei der noch offen ist, ob sie stimmt, abzufragen hieße, dem Kind
  * womöglich Falsches als richtig zu bestätigen. Erst akzeptieren,
  * korrigieren oder wegwerfen – dann üben.
+ *
+ * **Schwachstellen fließen unsichtbar ein** (V-04, „Schwachstellen" aus §6
+ * M4 ohne eigenen Button): Reichen die fälligen Karten nicht bis
+ * `MIN_SESSION_SIZE`, holt die Session zusätzlich Karten desselben Fachs
+ * dazu, die noch nicht fällig sind, aber am häufigsten schon einmal
+ * gescheitert sind (`fsrs_state.lapses`, absteigend, dann die instabilsten
+ * zuerst). FSRS entscheidet weiterhin, *wann* eine Karte reif ist – dies ist
+ * nur eine zusätzliche Quelle für dieselbe Session, keine zweite Wahrheit
+ * über Fälligkeit. `practiceReadySql` gilt hier genauso.
  */
-export async function loadSessionCards(
-  subjectId: string,
-  direction: Direction | null,
-): Promise<SessionCardContent[] | null> {
+export async function loadSessionCards(subjectId: string): Promise<SessionCardContent[] | null> {
   const actor = await requireStudentActor();
   if (!actor) return null;
 
-  type Row = {
-    card_id: string;
-    vocab_item_id: string;
-    direction: Direction;
-    state: CardStateValue;
-    term: string;
-    translation: string;
-  };
-
   return withActor(actor, async (tx) => {
-    const rows = await tx.execute<Row>(
-      direction
-        ? sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
-              from card c join vocab_item vi on vi.id = c.vocab_item_id
-              where c.due_at <= now() and c.direction = ${direction} and vi.subject_id = ${subjectId}
-                and ${practiceReadySql}
-              order by c.due_at`
-        : sql`select card_id, vocab_item_id, direction, state, term, translation from (
-                select distinct on (c.vocab_item_id)
-                  c.id as card_id, c.vocab_item_id, c.direction, c.state,
-                  vi.term, vi.translation, c.due_at
-                from card c join vocab_item vi on vi.id = c.vocab_item_id
-                where c.due_at <= now() and vi.subject_id = ${subjectId}
-                  and ${practiceReadySql}
-                order by c.vocab_item_id, random()
-              ) gewaehlt
-              order by due_at`,
+    const due = await tx.execute<CardRow>(
+      sql`select card_id, vocab_item_id, direction, state, term, translation from (
+            select distinct on (c.vocab_item_id)
+              c.id as card_id, c.vocab_item_id, c.direction, c.state,
+              vi.term, vi.translation, c.due_at
+            from card c join vocab_item vi on vi.id = c.vocab_item_id
+            where c.due_at <= now() and vi.subject_id = ${subjectId}
+              and ${practiceReadySql}
+            order by c.vocab_item_id, random()
+          ) gewaehlt
+          order by due_at`,
     );
-    return rows.map((r) => ({
-      cardId: r.card_id,
-      vocabItemId: r.vocab_item_id,
-      direction: r.direction,
-      mode: modeForCardState(r.state),
-      term: r.term,
-      translation: r.translation,
-    }));
+
+    const missing = MIN_SESSION_SIZE - due.length;
+    const topUp =
+      missing > 0
+        ? await tx.execute<CardRow>(
+            sql`select card_id, vocab_item_id, direction, state, term, translation from (
+                  select distinct on (c.vocab_item_id)
+                    c.id as card_id, c.vocab_item_id, c.direction, c.state,
+                    vi.term, vi.translation,
+                    (c.fsrs_state ->> 'lapses')::int as lapses,
+                    (c.fsrs_state ->> 'stability')::float as stability
+                  from card c join vocab_item vi on vi.id = c.vocab_item_id
+                  where c.due_at > now() and vi.subject_id = ${subjectId}
+                    and ${practiceReadySql}
+                  order by c.vocab_item_id, random()
+                ) gewaehlt
+                order by lapses desc, stability asc
+                limit ${missing}`,
+          )
+        : [];
+
+    return [...due, ...topUp].map(toSessionCard);
   });
 }
 
-export type AnswerResult = { outcome: Outcome };
+export type SetSessionInfo = {
+  setTitle: string;
+  subjectName: string;
+  cards: SessionCardContent[];
+};
+
+/**
+ * Ein Set gezielt üben, unabhängig von der Fälligkeit (V-04, „Set-Modus" aus
+ * §6 M4). Der Einstieg lebt bewusst auf der Set-Seite
+ * (`/faecher/vokabeln/[setId]`), nicht auf `/ueben` – wer hierher kommt, hat
+ * das Set schon ausgewählt (ADR 0015 Nachtrag V-04). `direction` bleibt hier
+ * wählbar (`null` = gemischt, dann je Vokabel eine zufällige Richtung wie im
+ * Alltagsfluss), anders als auf `/ueben`.
+ *
+ * `practiceReadySql` gilt auch hier (V-09) – ein Set gezielt zu üben ist kein
+ * Grund, ungeprüfte Zeilen abzufragen.
+ *
+ * `null`, wenn das Set nicht (mehr) existiert oder keine übbaren Karten in
+ * der gewählten Richtung hat – dieselbe Ehrlichkeit wie bei
+ * `loadSessionCards()`.
+ */
+export async function loadSetSessionCards(
+  setId: string,
+  direction: Direction | null,
+): Promise<SetSessionInfo | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+
+  type SetRow = { title: string; subject_name: string };
+
+  return withActor(actor, async (tx) => {
+    const [set] = await tx.execute<SetRow>(
+      sql`select vs.title, s.name as subject_name
+          from vocab_set vs join subject s on s.id = vs.subject_id
+          where vs.id = ${setId}`,
+    );
+    if (!set) return null;
+
+    const rows = await tx.execute<CardRow>(
+      direction
+        ? sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
+              from vocab_set_item vsi
+              join vocab_item vi on vi.id = vsi.vocab_item_id
+              join card c on c.vocab_item_id = vi.id
+              where vsi.vocab_set_id = ${setId} and c.direction = ${direction}
+                and ${practiceReadySql}`
+        : sql`select distinct on (c.vocab_item_id)
+                c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
+              from vocab_set_item vsi
+              join vocab_item vi on vi.id = vsi.vocab_item_id
+              join card c on c.vocab_item_id = vi.id
+              where vsi.vocab_set_id = ${setId}
+                and ${practiceReadySql}
+              order by c.vocab_item_id, random()`,
+    );
+    if (rows.length === 0) return null;
+
+    return {
+      setTitle: set.title,
+      subjectName: set.subject_name,
+      cards: rows.map(toSessionCard),
+    };
+  });
+}
+
+/**
+ * Drei Ausgänge statt eines bloßen `null` (F-09c) – `null` verschluckte bis
+ * hierhin zwei ganz verschiedene Fälle: „im Moment nicht möglich, später
+ * vielleicht wieder" und „wird nie mehr möglich sein". Die Offline-
+ * Warteschlange (`flushAnswerQueue()`) muss beide unterscheiden können:
+ * Ersteres bricht den weiteren Sync ab (Reihenfolge wahren), Zweiteres darf
+ * den Eintrag verwerfen und mit dem Rest weitermachen – sonst blockiert eine
+ * einzige inzwischen gelöschte Karte die gesamte Warteschlange für immer.
+ */
+export type AnswerResult =
+  | { status: "ok"; outcome: Outcome }
+  /** Keine Kind-Rolle (mehr) aktiv, oder keine Datenbank – kann sich ändern. */
+  | { status: "not_authorized" }
+  /** Karte oder Vokabel existiert nicht mehr – wird sich nicht mehr ändern. */
+  | { status: "not_found" };
 
 /**
  * Eine Antwort einreichen. `given` ist die getippte oder angeklickte
@@ -257,23 +368,23 @@ export async function submitAnswer(input: {
   mode: "mc" | "tippen";
   given: string;
   responseMs: number;
-}): Promise<AnswerResult | null> {
+}): Promise<AnswerResult> {
   const actor = await requireStudentActor();
-  if (!actor || actor.role !== "student") return null;
+  if (!actor || actor.role !== "student") return { status: "not_authorized" };
 
   type CardRow = { fsrs_state: unknown; direction: Direction; vocab_item_id: string };
   type VocabRow = { term: string; translation: string };
 
-  const result = await withActor(actor, async (tx) => {
+  return withActor(actor, async (tx): Promise<AnswerResult> => {
     const [card] = await tx.execute<CardRow>(
       sql`select fsrs_state, direction, vocab_item_id from card where id = ${input.cardId}`,
     );
-    if (!card) return null;
+    if (!card) return { status: "not_found" };
 
     const [vocab] = await tx.execute<VocabRow>(
       sql`select term, translation from vocab_item where id = ${card.vocab_item_id}`,
     );
-    if (!vocab) return null;
+    if (!vocab) return { status: "not_found" };
 
     // Karte zeigt term→translation oder translation→term, je nach Richtung.
     const expected = card.direction === "vorwaerts" ? vocab.translation : vocab.term;
@@ -299,10 +410,8 @@ export async function submitAnswer(input: {
           values (${actor.studentId}, ${input.cardId}, ${applied.rating}, ${input.responseMs})`,
     );
 
-    return { outcome };
+    return { status: "ok", outcome };
   });
-
-  return result;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Übungssession (V-02, §6 M4).
@@ -38,7 +38,7 @@ test.describe("Übungssession", () => {
     await expect(kindSelect).toHaveValue(miaId!);
   });
 
-  test("zeigt echte Zahlen je Fach statt der Attrappe, und V-04-Blöcke sagen ehrlich, dass sie fehlen", async ({
+  test("zeigt echte Zahlen je Fach, ohne Platzhalter und ohne Umschalter (V-04)", async ({
     page,
   }) => {
     await page.goto("/ueben");
@@ -48,7 +48,14 @@ test.describe("Übungssession", () => {
     // V-06a: gezählt wird die Vokabel, nicht die Karte. Der Seed hat zwölf
     // Vokabeln mit je zwei Karten – die Kachel zeigt 12, nicht 24.
     await expect(page.getByText("12 fällig")).toBeVisible();
-    await expect(page.getByText("Kommt mit V-04.")).toHaveCount(2);
+    // V-04: Prüfungsmodus/Schwachstellen sind keine eigenen Kacheln mehr –
+    // Schwachstellen fließen unsichtbar in die Session ein, Prüfungsmodus
+    // bleibt hinter K-01 zurückgestellt.
+    await expect(page.getByText("Kommt mit V-04.")).toHaveCount(0);
+    // V-04: Auch die beiden Umschalter sind weg – „Loslegen" trifft keine
+    // Vorentscheidung mehr. Sie stehen jetzt im Set-Modus auf der Set-Seite.
+    await expect(page.getByRole("radiogroup", { name: "Richtung" })).toHaveCount(0);
+    await expect(page.getByRole("radiogroup", { name: "Antwortart" })).toHaveCount(0);
 
     // V-08: Lernstand über den ganzen Wortschatz, nicht nur die Fälligen –
     // die drei Kacheln heißen jetzt „Neu / Am Üben / Sitzt". Exakte Zahlen
@@ -62,7 +69,7 @@ test.describe("Übungssession", () => {
     }
   });
 
-  test("die Antwortart lässt sich auf Tippen zwingen, auch wenn die Karte neu ist (V-08)", async ({
+  test("Set-Modus: beide Umschalter stehen auf der Set-Seite, Antwortart wirkt (V-04, V-06a, V-08)", async ({
     page,
     browserName,
   }) => {
@@ -76,50 +83,31 @@ test.describe("Übungssession", () => {
     await kindButton.click();
     await expect(kindButton).toHaveAttribute("aria-pressed", "true");
 
-    await page.goto("/ueben");
-    const nichtsFaellig = await page
-      .getByText("Nichts fällig. Schau später wieder vorbei.")
-      .count();
-    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
+    // Der Einstieg lebt auf der Set-Seite (V-04) – über die echte Navigation,
+    // nicht per direktem `goto`.
+    await page.goto("/faecher/vokabeln");
+    await page.getByRole("link", { name: /Unité 3/ }).click();
+    await expect(page).toHaveURL(/\/faecher\/vokabeln\/.+/);
 
-    // Alle Seed-Karten sind 'neu' → ohne Umschalter käme Multiple Choice
-    // (modeForCardState()). „Tippen" erzwingt das Eingabefeld trotzdem.
-    await page
-      .getByRole("radiogroup", { name: "Antwortart" })
-      .getByRole("radio", { name: "Tippen" })
-      .click();
-    await page.getByRole("button", { name: "Loslegen" }).click();
-
-    await expect(page.locator("input[autocomplete='off']")).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator("button.text-left")).toHaveCount(0);
-  });
-
-  test("Richtungsumschalter beschriftet sich aus der Fachsprache (V-06a)", async ({
-    page,
-    browserName,
-  }) => {
-    test.skip(
-      browserName !== "chromium",
-      "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
-    );
-    await page.goto("/heute");
-    const kindButton = page.getByRole("button", { name: "Kind" });
-    await kindButton.click();
-    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
-
-    await page.goto("/ueben");
-    const nichtsFaellig = await page
-      .getByText("Nichts fällig. Schau später wieder vorbei.")
-      .count();
-    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
-
-    // Französisch (`language: 'fr'` im Seed) → „FR → DE" / „DE → FR",
-    // nicht mehr fest getippt. Ein Frage-Antwort-Fach ohne Sprache hätte
-    // hier gar keinen Umschalter.
+    // Richtung beschriftet sich weiterhin aus der Fachsprache (V-06a) –
+    // Französisch (`language: 'fr'` im Seed) → „FR → DE" / „DE → FR". Ein
+    // Frage-Antwort-Fach ohne Sprache hätte hier gar keinen Umschalter.
     const richtung = page.getByRole("radiogroup", { name: "Richtung" });
     await expect(richtung.getByRole("radio", { name: "Gemischt" })).toBeVisible();
     await expect(richtung.getByRole("radio", { name: "FR → DE" })).toBeVisible();
     await expect(richtung.getByRole("radio", { name: "DE → FR" })).toBeVisible();
+
+    // Alle Seed-Karten sind 'neu' → ohne Umschalter käme Multiple Choice
+    // (modeForCardState()). „Tippen" erzwingt das Eingabefeld trotzdem (V-08).
+    await page
+      .getByRole("radiogroup", { name: "Antwortart" })
+      .getByRole("radio", { name: "Tippen" })
+      .click();
+    await page.getByRole("link", { name: "Dieses Set üben" }).click();
+
+    await expect(page).toHaveURL(/\/ueben\?set=.*art=tippen/);
+    await expect(page.locator("input[autocomplete='off']")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("button.text-left")).toHaveCount(0);
   });
 
   test("eine Karte beantworten zeigt eine Rückmeldung, 'Weiter' bringt sichtbar weiter", async ({
@@ -212,6 +200,57 @@ test.describe("Übungssession", () => {
     await expect(page.getByRole("button", { name: "Loslegen" })).toBeVisible();
   });
 
+  test("offline beantwortet landet in der Warteschlange, sichtbares Signal, Sync bei Rückkehr (F-09b/F-09c)", async ({
+    page,
+    context,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
+    );
+
+    await page.goto("/heute");
+    const kindButton = page.getByRole("button", { name: "Kind" });
+    await kindButton.click();
+    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
+
+    await page.goto("/ueben");
+    const nichtsFaellig = await page
+      .getByText("Nichts fällig. Schau später wieder vorbei.")
+      .count();
+    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
+
+    await page.getByRole("button", { name: "Loslegen" }).click();
+    const options = page.locator("button.text-left");
+    await expect(options.first()).toBeVisible({ timeout: 10_000 });
+
+    // Offline, bevor überhaupt geantwortet wird – `submitAnswer()` darf gar
+    // nicht erst versucht werden (kein Warten auf einen Timeout), sondern
+    // muss sofort in die Warteschlange gehen.
+    await context.setOffline(true);
+    await options.first().click();
+
+    // Die Rückmeldung kommt trotzdem sofort und ist keine Notlösung –
+    // dieselbe Klassifikation, die der Server nutzen würde (`previewOutcome()`).
+    const weiter = page.getByRole("button", { name: "Weiter" });
+    await expect(weiter).toBeVisible({ timeout: 10_000 });
+
+    // In der Warteschlange gelandet, nicht stillschweigend verloren – und
+    // sichtbar als ruhiges Signal, nicht nur intern in IndexedDB (F-09c).
+    expect(await countPendingAnswers(page)).toBe(1);
+    await expect(page.getByText("Wird synchronisiert, sobald wieder Netz da ist.")).toBeVisible();
+    await expect(page.getByText("1 Antwort wartet auf Synchronisierung.")).toBeVisible();
+
+    await weiter.click();
+    await context.setOffline(false);
+
+    // Der `online`-Listener liefert nach – abwarten, bis die Warteschlange
+    // leer ist, statt eine feste Zeit zu raten. Das Signal verschwindet mit ihr.
+    await expect.poll(() => countPendingAnswers(page), { timeout: 10_000 }).toBe(0);
+    await expect(page.getByText(/Antwort(en)? wartet? auf Synchronisierung/)).toHaveCount(0);
+  });
+
   test("ein Elternteil sieht die Zahlen, aber keinen Startknopf", async ({ page }) => {
     // Ohne Kind-Rollenwechsel bleibt der Actor Elternteil (Standard des Bypasses).
     await page.goto("/ueben");
@@ -220,3 +259,35 @@ test.describe("Übungssession", () => {
     await expect(page.getByText(/hier siehst du nur den Stand/)).toBeVisible();
   });
 });
+
+/**
+ * Zählt die Einträge in der Offline-Warteschlange direkt in IndexedDB
+ * (F-09b) – Name und Objektspeicher wie in `src/lib/vocab/answer-queue.ts`.
+ * Dieselbe `onupgradeneeded`-Fallback-Erstellung wie dort: Läuft der Test,
+ * bevor die App die Datenbank selbst angelegt hat, entsteht sie hier leer
+ * statt den Test mit einer fehlenden Datenbank scheitern zu lassen.
+ */
+async function countPendingAnswers(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open("tutr-offline", 1);
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore("pending-answers", { keyPath: "id" });
+        };
+        request.onsuccess = () => {
+          const db = request.result;
+          const zaehler = db
+            .transaction("pending-answers", "readonly")
+            .objectStore("pending-answers")
+            .count();
+          zaehler.onsuccess = () => {
+            db.close();
+            resolve(zaehler.result);
+          };
+          zaehler.onerror = () => reject(zaehler.error);
+        };
+        request.onerror = () => reject(request.error);
+      }),
+  );
+}

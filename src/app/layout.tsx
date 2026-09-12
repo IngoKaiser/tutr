@@ -2,6 +2,8 @@ import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Newsreader } from "next/font/google";
 
+import { RegisterServiceWorker } from "@/components/shell/register-service-worker";
+
 import "./globals.css";
 
 /**
@@ -73,6 +75,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="font-sans antialiased">
         {children}
         <Analytics />
+        <RegisterServiceWorker />
       </body>
     </html>
   );

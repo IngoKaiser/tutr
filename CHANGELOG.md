@@ -4,6 +4,42 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Added
+
+- **F-09a/b/c: Offline-Vokabelsessions.** Ein Service Worker cacht die App-Shell vor
+  (`.next/static`-Chunks), und Antworten, die ohne Netz gegeben werden, landen in einer
+  IndexedDB-Warteschlange statt zu scheitern – die Rückmeldung kommt trotzdem sofort und
+  ehrlich, über dieselbe Klassifikation, die der Server nutzen würde. Bei Rückkehr ins Netz
+  liefert die Warteschlange **sequenziell** nach, über genau den bestehenden
+  `submitAnswer()`-Aufruf: keine zweite Wahrheit über den FSRS-Zustand, nur zeitversetzt.
+  Dazu ein ruhiges, sichtbares Signal (§15, kein Alarm). Architektur und die Funde beim
+  Bauen in [ADR 0015](docs/adr/0015-offline-vokabelsessions.md) – u. a., dass `@serwist/next`
+  sich in einen Webpack-Hook hängt, den Turbopack (Next-16-Standard) nicht ausführt, und
+  dass Seiten/Navigationen bewusst **nicht** gecacht werden: `/ueben` ist kindspezifisch
+  gerendert, ein URL-only-Cache würde die Geschwister-Trennung (ADR 0006) umgehen
+
+### Changed
+
+- **V-04: `/ueben` trifft keine Vorentscheidung mehr.** Von den fünf Modi aus §6 M4 wird
+  keiner zu einer neuen Kachel: „Fällig heute" und „Mix" waren längst fertig (V-06 bzw.
+  automatisch seit V-02), Schwachstellen fließen unsichtbar in die Session ein (zu wenige
+  fällige Karten → auffüllen mit den am häufigsten gescheiterten), und der Set-Modus lebt
+  auf der Set-Seite. **Beide Umschalter ziehen mit dorthin um** – Richtung (V-06a) und
+  Antwortart (V-08) sind aus dem Alltagsfluss verschwunden, ihre Logik bleibt vollständig
+  erhalten und ist im Set-Modus weiter wählbar. Auf `/ueben` steht je Fach nur noch der
+  Lernstand und „Loslegen"; Richtung und Frageform entscheidet der Algorithmus. Die beiden
+  „Kommt mit V-04"-Platzhalter sind ersatzlos weg. Prüfungsmodus bleibt zurückgestellt
+  (neues Ticket V-04b, hinter K-01) – ohne Kalender gibt es keine „nächste Arbeit".
+  Abwägung in [ADR 0008](docs/adr/0008-fachbindung-von-lernmaterial.md) (Nachtrag)
+
+### Fixed
+
+- `src/proxy.ts`s Ausnahmeliste leitete `/sw.js` auf `/anmelden` um (fehlte neben
+  `manifest.webmanifest`/`robots.txt`) – eine Weiterleitung statt einer echten Antwort lässt
+  `navigator.serviceWorker.register()` scheitern. Unsichtbar in der Entwicklung
+  (Dev-Actor-Bypass überspringt den Proxy dort ohnehin), gefunden beim Prüfen von F-09a
+  gegen einen echten Produktions-Build
+
 ### Chore
 
 - **F-08: eslint 10, TypeScript 7 und @types/node 26 einzeln geprüft – keins übernommen.**
