@@ -6,6 +6,20 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **Doku: Prüfungsvorbereitung durchgerechnet, Meilenstein 3 geschnitten.** Neues
+  `docs/pruefungsvorbereitung.md`: der Prüfungs-Regelkreis (Termin → Stoff → Plan → Üben →
+  Probe → Arbeit → Nachbereitung → Mastery) als Diagramm, der Abgleich gegen die Lernforschung
+  (Practice Testing und verteiltes Üben als die zwei Mechanismen mit hoher Wirkung; Abstand
+  ≈ 10–20 % der Restzeit nach Cepeda 2008; Übungstests senken Prüfungsangst nur, wenn sie
+  unbenotet und wiederholbar sind) und der Marktvergleich. Ergebnis: Der Kreis ist an beiden
+  Enden offen – vorn kennt `calendar_event` kein Thema, hinten fehlt die Auswertung der
+  zurückgegebenen Arbeit. Daraus in `docs/PLAN.md` **P-00** (Themen/Lernziele anlegen – der
+  Flaschenhals: `topic` steht seit F-04c im Schema, wird aber von keiner Oberfläche befüllt)
+  sowie Meilenstein 3 mit **P-02** bis **P-06** und **T-20**; drei Entscheidungen (Zeitbudget,
+  Probeprüfung unbenotet, Zielnote) unter „Entscheidungen / Offen“ hinterlegt. In
+  `docs/features.md` zusätzlich den Widerspruch zu V-04 bereinigt: Set-Modus, Schwachstellen
+  und Mix sind fertig, offen ist nur der Prüfungsmodus (V-04b).
+
 - **F-06c, F-15, F-16b: Profil bearbeiten, Avatar-Menü, Schuljahr eröffnen.**
   Drei gebündelte Tickets. **F-06c:** Das Kind ändert Vorname/Jahrgang/Klasse selbst
   (`EditProfile` in `/einstellungen`) – neue Policy `student_update_self` erlaubt die ganze

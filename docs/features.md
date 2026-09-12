@@ -1,7 +1,8 @@
 # Feature-Übersicht
 
 **Stand: 12. September 2026** · Bezug: `docs/PLAN.md` (Backlog mit Begründung je Ticket),
-`docs/roadmap.md` (Arbeitsreihenfolge), `docs/konzept.md` (Spezifikation).
+`docs/roadmap.md` (Arbeitsreihenfolge), `docs/konzept.md` (Spezifikation),
+`docs/pruefungsvorbereitung.md` (warum der Prüfungsteil so geschnitten ist).
 
 Diese Tabelle ist der schnelle Blick von oben: wo steht welcher Bereich. Sie wird mit
 **jedem Feature-PR** mitgezogen (steht so in `CLAUDE.md`, Definition of Done). Die
@@ -62,7 +63,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | „Geprüft“-Zustand: akzeptierte Zeilen normal, Ungeprüftes nicht im Üben               | ✅    | V-09    |
 |                          | Fachbindung im Modell (ADR 0008)                                                      | ✅    | V-05    |
 |                          | Vokabeln ohne Set sichtbar/löschbar machen                                            | ✅    | V-03d   |
-|                          | Set-Modus: ein Set gezielt vor der Arbeit üben                                        | 🌑    | V-04    |
+|                          | Set-Modus: ein Set gezielt vor der Arbeit üben (auf der Set-Seite)                    | ✅    | V-04    |
 |                          | Offline-Sessions (Service Worker)                                                     | 🌑    | F-09    |
 | **Üben**                 |                                                                                       | 🌓    |         |
 |                          | Session: drei Stapel, MC + Tippen, Tippfehlertoleranz                                 | ✅    | V-02    |
@@ -71,7 +72,8 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Zahl zeigt Vokabeln statt Karten; Richtung aus `subject.language`                     | ✅    | V-06a   |
 |                          | „Gemischt“ mischt die Richtungen wirklich; EXIF-Drehung beim Foto                     | ✅    | V-07    |
 |                          | Lernstand über den ganzen Wortschatz; Antwortart wählbar (Auswahl/Tippen)             | ✅    | V-08    |
-|                          | Prüfungsmodus, Schwachstellen, Mix                                                    | 🌑    | V-04    |
+|                          | Schwachstellen (füllen zu kleine Sessions auf), Mix der Kartenarten                   | ✅    | V-04    |
+|                          | Prüfungsmodus: Sets der nächsten Arbeit üben                                          | 🌑    | V-04b   |
 | **Heute**                |                                                                                       | 🌓    |         |
 |                          | Echte Zahlen: fällige Vokabeln je Fach, nächster Termin mit Countdown                 | ✅    | H-01    |
 |                          | Kamera-Knopf für die Hausaufgabe (führt in den Hausaufgaben-Tutor)                    | ✅    | H-01    |
@@ -81,6 +83,13 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Themen an einen Termin hängen, Countdown, Prüfungsseite                               | 🌑    | P-01    |
 |                          | Klausurplan per Foto einlesen (Review, Gruppenfilter, Re-Import)                      | ✅    | K-03    |
 |                          | Datei-Import CSV/XLSX (SchulDock) + ICS, kein Modellaufruf                            | ✅    | K-04    |
+| **Stoff & Prüfen**       |                                                                                       | 🌑    |         |
+|                          | Themen und Lernziele je Fach anlegen (Vorbedingung für alles Weitere)                 | 🌑    | P-00    |
+|                          | Mastery je Lernziel: Abdeckung × Sicherheit                                           | 🌑    | P-02    |
+|                          | Lernplan rückwärts vom Termin (Abstände, Blocker, Ballungen)                          | 🌑    | P-03    |
+|                          | Probeprüfung: Generator, Auswertung je Lernziel                                       | 🌑    | P-04    |
+|                          | Arbeit zurück: Note, Fehlerklassifikation, Rückblick                                  | 🌑    | P-05    |
+|                          | Kalibrierung: Selbsteinschätzung vor dem Aufdecken                                    | 🌑    | P-06    |
 | **Tutor & Hausaufgaben** |                                                                                       | 🌓    |         |
 |                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                         | ✅    | T-01a   |
 |                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen“, Streaming                | ✅    | T-02    |
@@ -100,6 +109,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Altersgerechte Ansprache nach Jahrgang                                                | ✅    | T-09    |
 |                          | Kontextpaket, Schichten mit Quellenangabe, Prompt Caching                             | 🌑    | T-01    |
 |                          | „Erklär es anders“, Verständnischeck, Anschlussfragen-Chips                           | 🌑    | T-02c   |
+|                          | Freies Abrufen: aufschreiben, was man weiß, Abgleich gegen Lernziele                  | 🌑    | T-20    |
 |                          | Elternsicht entschieden (ADR 0012: was, nicht wie gut)                                | ✅    | T-01c   |
 |                          | Hausaufgabe: Foto → Aufgabenliste → Hinweisleiter → Lösung, Zweizeiler zum Schluss    | ✅    | T-03    |
 |                          | Aufgabe aussortieren („Gehört nicht dazu“) per Wisch, mit Rückgängig                  | ✅    | T-17    |
