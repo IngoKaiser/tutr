@@ -79,6 +79,18 @@ export const schoolYear = pgTable(
     label: text("label").notNull(),
     gradeLevel: integer("grade_level").notNull(),
     className: text("class_name"),
+    /**
+     * Eigene Gruppentokens für den Kalender-Import (K-02a, ADR 0016 D3):
+     * `className` kennt nur eine Klasse, ein Klausurplan aber oft mehrere
+     * eigene Tokens (Fachdifferenzierung, z. B. `["8.5", "8.5 Eng"]`).
+     *
+     * **Kein DB-Default auf `[className]`** – das wäre eine zum
+     * Anlagezeitpunkt eingefrorene Kopie einer anderen, änderlichen Spalte.
+     * Die „Vorgabe `[className]`" aus dem ADR ist eine Leseregel
+     * (`ownGroups ?? (className ? [className] : [])`), die K-02c anwendet;
+     * `NULL` heißt hier „noch nicht eingerichtet", nicht „keine Gruppen".
+     */
+    ownGroups: text("own_groups").array(),
     // Verweise auf F-04d-Referenzdaten (school_profile, curriculum_pack) –
     // bewusst ohne Fremdschlüssel, bis diese Tabellen existieren.
     schoolProfileId: uuid("school_profile_id"),

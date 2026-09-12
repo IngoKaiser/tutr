@@ -117,6 +117,26 @@ describe.skipIf(!testDbAvailable())("RLS + Constraints: calendar_event", () => {
     expect(row?.status).toBe("abgesagt");
   });
 
+  test("groups/source (K-02a, ADR 0016 D8): source defaultet auf 'manuell', groups akzeptiert ein Array", async () => {
+    const [manuell] = await runWithActor(app.db, student(A.studentId), (tx) =>
+      tx.execute<{ id: string; source: string; groups: string[] | null }>(sql`
+        insert into calendar_event (student_id, school_year_id, subject_id, type, title, date)
+        values (${A.studentId}, ${A.schuljahr}, ${A.mathe}, 'klassenarbeit', 'Ohne Import', '2026-10-20')
+        returning id, source, groups`),
+    );
+    expect(manuell?.source).toBe("manuell");
+    expect(manuell?.groups).toBeNull();
+
+    const [importiert] = await runWithActor(app.db, student(A.studentId), (tx) =>
+      tx.execute<{ source: string; groups: string[] }>(sql`
+        insert into calendar_event (student_id, school_year_id, subject_id, type, title, date, groups, source)
+        values (${A.studentId}, ${A.schuljahr}, ${A.mathe}, 'klassenarbeit', 'Aus dem Foto', '2026-10-21', array['8.5', '8.5 Mat'], 'bild')
+        returning source, groups`),
+    );
+    expect(importiert?.source).toBe("bild");
+    expect(importiert?.groups).toEqual(["8.5", "8.5 Mat"]);
+  });
+
   test("Ein Fach mit Terminen lässt sich nicht löschen (restrict)", async () => {
     // `deleteSubject()` fängt das mit einem deutschen Satz ab; die DB-Ebene
     // ist der Riegel dahinter.

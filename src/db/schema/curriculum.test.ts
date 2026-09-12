@@ -109,6 +109,21 @@ describe.skipIf(!testDbAvailable())(
       expect(rows[0]?.n).toBe("2");
     });
 
+    test("own_groups (K-02a, ADR 0016 D3): bleibt NULL ohne eigene Angabe, akzeptiert ein Array", async () => {
+      const [ohneAngabe] = await admin.client<{ own_groups: string[] | null }[]>`
+      select own_groups from school_year where id = ${A.schuljahr}`;
+      expect(ohneAngabe?.own_groups).toBeNull();
+
+      await runWithActor(app.db, student(A.studentId), (tx) =>
+        tx.execute(sql`
+        update school_year set own_groups = array['8.5', '8.5 Eng', '8.5 Mat']
+        where id = ${A.schuljahr}`),
+      );
+      const [gesetzt] = await admin.client<{ own_groups: string[] }[]>`
+      select own_groups from school_year where id = ${A.schuljahr}`;
+      expect(gesetzt?.own_groups).toEqual(["8.5", "8.5 Eng", "8.5 Mat"]);
+    });
+
     test("Elternteil sieht Fächer und Schuljahr, ändert aber kein Thema", async () => {
       const [topicRow] = await admin.client<{ id: string }[]>`
       insert into topic (student_id, subject_id, school_year_id, title, status)

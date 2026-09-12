@@ -6,6 +6,15 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **K-02a: Schema-Grundlage für den Kalender-Import.** `calendar_event` bekommt `groups`
+  (`text[]`, rohe Gruppentokens wie erkannt) und `source` (Enum `manuell`/`bild`/`datei`,
+  Default `manuell` – K-01s bestehende Insert-Pfade bleiben unverändert). `school_year`
+  bekommt `own_groups` (`text[]`) für die Fachdifferenzierung, die eine einzelne
+  `class_name` nicht abbildet (z. B. „8.5 Eng"/„8.5 Mat"), bewusst ohne DB-Default – die
+  Vorgabe `[class_name]` aus [ADR 0016](docs/adr/0016-kalender-import-pipeline.md) ist eine
+  Leseregel, keine gespeicherte Kopie. Additive Migration `0015`, keine neue Policy-Datei
+  nötig. Legt die Basis für das Re-Import-Matching (K-02b) und die Import-Kanäle K-03/K-04
+
 - **F-09a/b/c: Offline-Vokabelsessions.** Ein Service Worker cacht die App-Shell vor
   (`.next/static`-Chunks), und Antworten, die ohne Netz gegeben werden, landen in einer
   IndexedDB-Warteschlange statt zu scheitern – die Rückmeldung kommt trotzdem sofort und
