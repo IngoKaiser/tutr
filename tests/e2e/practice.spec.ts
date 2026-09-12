@@ -38,7 +38,7 @@ test.describe("Übungssession", () => {
     await expect(kindSelect).toHaveValue(miaId!);
   });
 
-  test("zeigt echte Zahlen je Fach statt der Attrappe, und V-04-Blöcke sagen ehrlich, dass sie fehlen", async ({
+  test("zeigt echte Zahlen je Fach statt der Attrappe, ohne Platzhalter-Blöcke (V-04)", async ({
     page,
   }) => {
     await page.goto("/ueben");
@@ -46,7 +46,10 @@ test.describe("Übungssession", () => {
     // die Seed-Daten haben fällige Vokabeln nur in Französisch.
     await expect(page.getByRole("heading", { name: "Französisch" })).toBeVisible();
     await expect(page.getByText(/\d+ fällig/)).toBeVisible();
-    await expect(page.getByText("Kommt mit V-04.")).toHaveCount(2);
+    // Prüfungsmodus/Schwachstellen sind keine eigenen Kacheln mehr (V-04,
+    // ADR 0008 Nachtrag) – Schwachstellen fließen unsichtbar in die Session
+    // ein, Prüfungsmodus bleibt hinter K-01 zurückgestellt.
+    await expect(page.getByText("Kommt mit V-04.")).toHaveCount(0);
   });
 
   test("eine Karte beantworten zeigt eine Rückmeldung, 'Weiter' bringt sichtbar weiter", async ({
@@ -137,6 +140,37 @@ test.describe("Übungssession", () => {
 
     await page.getByRole("button", { name: "Zur Übersicht" }).click();
     await expect(page.getByRole("button", { name: "Loslegen" })).toBeVisible();
+  });
+
+  test("Set-Modus: 'Dieses Set üben' auf der Set-Seite startet direkt in der Übung (V-04)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
+    );
+
+    await page.goto("/heute");
+    const kindButton = page.getByRole("button", { name: "Kind" });
+    await kindButton.click();
+    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
+
+    // Der Einstieg lebt auf der Set-Seite, nicht auf /ueben (ADR 0008
+    // Nachtrag V-04) – über die echte Navigation, nicht per direktem `goto`.
+    await page.goto("/faecher/vokabeln");
+    await page.getByRole("link", { name: /Unité 3/ }).click();
+    await expect(page).toHaveURL(/\/faecher\/vokabeln\/.+/);
+
+    await page.getByRole("link", { name: "Dieses Set üben" }).click();
+    await expect(page).toHaveURL(/\/ueben\?set=/);
+
+    // Set-Modus überspringt die Fach-Übersicht – sofort eine Karte, kein
+    // "Loslegen" dazwischen.
+    await expect(
+      page.locator("button.text-left").first().or(page.locator("input[autocomplete='off']")),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Unité 3.*·.*\d+ von \d+/)).toBeVisible();
   });
 
   test("ein Elternteil sieht die Zahlen, aber keinen Startknopf", async ({ page }) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 
 import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
 import { prepareImageForUpload } from "@/lib/vocab/image";
@@ -54,6 +55,8 @@ export function VocabList({
         </Notice>
       ) : null}
 
+      {canManage && detail.items.length > 0 ? <PracticeEntry setId={detail.id} /> : null}
+
       {canManage ? <AddArea setId={detail.id} photoAvailable={photoAvailable} /> : null}
 
       {detail.items.length === 0 ? (
@@ -83,6 +86,76 @@ type FotoEintrag = {
   fehler: string | null;
   ergebnis: AddSummary | null;
 };
+
+type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
+
+/**
+ * „Dieses Set üben" (V-04, Set-Modus aus §6 M4): unabhängig von der
+ * Fälligkeit, direkt aus diesem Set. Der Einstieg lebt bewusst hier, nicht
+ * auf `/ueben` – wer diese Seite aufruft, hat das Set schon gewählt, das ist
+ * die eine Entscheidung, die zählt. Die Richtungswahl steht deshalb auch nur
+ * noch hier, nicht mehr im Alltagsfluss (ADR 0008 Nachtrag V-04).
+ *
+ * Reiner Link mit Query-Parametern statt Server Action: `/ueben` lädt die
+ * Karten serverseitig und startet die Session direkt – keine doppelte
+ * Übungs-UI, die Session-Maschine (`ActiveCard`, `session.ts`) lebt an
+ * genau einer Stelle.
+ */
+function PracticeEntry({ setId }: { setId: string }) {
+  const [direction, setDirection] = useState<DirectionChoice>("gemischt");
+  const href =
+    direction === "gemischt" ? `/ueben?set=${setId}` : `/ueben?set=${setId}&richtung=${direction}`;
+
+  return (
+    <Block title="Üben">
+      <DirectionPicker value={direction} onChange={setDirection} />
+      <Link
+        href={href}
+        className="bg-koenigsblau text-auf-koenigsblau focus-visible:outline-koenigsblau flex w-full items-center justify-center rounded-[9px] border border-transparent px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        Dieses Set üben
+      </Link>
+    </Block>
+  );
+}
+
+function DirectionPicker({
+  value,
+  onChange,
+}: {
+  value: DirectionChoice;
+  onChange: (value: DirectionChoice) => void;
+}) {
+  const OPTIONS: { value: DirectionChoice; label: string }[] = [
+    { value: "gemischt", label: "Gemischt" },
+    { value: "vorwaerts", label: "FR → DE" },
+    { value: "rueckwaerts", label: "DE → FR" },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Richtung"
+      className="border-linie-stark flex overflow-hidden rounded-md border"
+    >
+      {OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          aria-checked={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={`flex-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            value === option.value
+              ? "bg-koenigsblau text-auf-koenigsblau"
+              : "text-tinte-weich hover:text-tinte bg-transparent"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** Exportiert nur für den Komponententest der Foto-Galerie (V-03c). */
 export function AddArea({ setId, photoAvailable }: { setId: string; photoAvailable: boolean }) {

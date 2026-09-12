@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { Block, Button, Notice, PageHeader, Stack } from "@/components/shell/primitives";
 import { buildMultipleChoiceOptions } from "@/lib/vocab/distractors";
@@ -22,7 +23,13 @@ import {
 } from "./actions";
 
 type Phase = "wahl" | "uebung" | "fertig";
-type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
+
+/** Ein bereits fertig geladener Set-Modus-Einstieg (V-04), von `page.tsx` aus
+ *  `?set=` gelesen – startet die Session direkt, ohne über „wahl" zu laufen. */
+export type InitialSetSession = {
+  label: string;
+  cards: SessionCardContent[];
+};
 
 /**
  * Übungssession (V-02, fachgebunden seit V-06). Ein Client-Baustein statt
@@ -49,21 +56,45 @@ type DirectionChoice = "vorwaerts" | "rueckwaerts" | "gemischt";
  * ohne die Rückmeldung wäre Raten nicht von Wissen zu unterscheiden, und
  * ein automatischer Sprung nach X Sekunden wäre wieder eine unsichtbare Uhr,
  * die zur Eile drängt (§15).
+ *
+ * **Set-Modus** (V-04) kommt über `initialSession` von `page.tsx` fertig
+ * geladen herein (aus `?set=`) – die Übersicht wird dabei übersprungen, es
+ * gibt für diesen Einstieg keinen zweiten Auswahl-Bildschirm. `isSetSession`
+ * merkt sich das nur für den Rückweg: „Zur Übersicht" muss dann `?set=` aus
+ * der URL nehmen, sonst startete ein Neuladen dieselbe Session erneut.
  */
 export function PracticeSession({
   bySubject,
   canStart,
+  initialSession,
+  setLoadFailed = false,
 }: {
   bySubject: DueBySubject[] | null;
   canStart: boolean;
+  initialSession: InitialSetSession | null;
+  /** `?set=` stand in der URL, aber es gab nichts zu laden – siehe `page.tsx`. */
+  setLoadFailed?: boolean;
 }) {
-  const [phase, setPhase] = useState<Phase>("wahl");
-  const [activeSubjectName, setActiveSubjectName] = useState("");
-  const [cards, setCards] = useState<SessionCardContent[]>([]);
-  const [session, setSession] = useState<SessionState | null>(null);
+  const router = useRouter();
+  const [phase, setPhase] = useState<Phase>(initialSession ? "uebung" : "wahl");
+  const [isSetSession, setIsSetSession] = useState(initialSession !== null);
+  const [activeLabel, setActiveLabel] = useState(initialSession?.label ?? "");
+  const [cards, setCards] = useState<SessionCardContent[]>(initialSession?.cards ?? []);
+  const [session, setSession] = useState<SessionState | null>(() =>
+    initialSession
+      ? buildSession(
+          initialSession.cards.map((c) => ({
+            cardId: c.cardId,
+            vocabItemId: c.vocabItemId,
+            direction: c.direction,
+          })),
+        )
+      : null,
+  );
 
   function startSession(subjectName: string, loaded: SessionCardContent[]) {
-    setActiveSubjectName(subjectName);
+    setIsSetSession(false);
+    setActiveLabel(subjectName);
     setCards(loaded);
     setSession(
       buildSession(
@@ -81,10 +112,15 @@ export function PracticeSession({
     setSession(null);
     setCards([]);
     setPhase("wahl");
-    // Erst jetzt auffrischen, nicht nach jeder Antwort (V-02-Nachtrag) –
-    // die Übersicht ist ohnehin schon frisch angefordert, sobald sie wieder
-    // sichtbar wird; die Zahlen müssen nur bis dahin stimmen.
-    void refreshDueOverview();
+    if (isSetSession) {
+      // Sonst startete ein Neuladen der Seite dieselbe Set-Session erneut.
+      router.replace("/ueben");
+    } else {
+      // Erst jetzt auffrischen, nicht nach jeder Antwort (V-02-Nachtrag) –
+      // die Übersicht ist ohnehin schon frisch angefordert, sobald sie wieder
+      // sichtbar wird; die Zahlen müssen nur bis dahin stimmen.
+      void refreshDueOverview();
+    }
   }
 
   if (phase === "fertig") {
@@ -93,8 +129,9 @@ export function PracticeSession({
         <PageHeader title="Üben" trailing="Geschafft" />
         <Block title="Geschafft" emphasized>
           <Notice>
-            Alle fälligen Karten in {activeSubjectName} sind einmal gesessen. Bis zur nächsten
-            Fälligkeit.
+            {isSetSession
+              ? `Alle Karten in ${activeLabel} sind einmal gesessen.`
+              : `Alle fälligen Karten in ${activeLabel} sind einmal gesessen. Bis zur nächsten Fälligkeit.`}
           </Notice>
           <Button onClick={backToOverview}>Zur Übersicht</Button>
         </Block>
@@ -106,7 +143,7 @@ export function PracticeSession({
     const done = session.graduated.size;
     return (
       <>
-        <PageHeader title="Üben" trailing={`${activeSubjectName} · ${done} von ${session.total}`} />
+        <PageHeader title="Üben" trailing={`${activeLabel} · ${done} von ${session.total}`} />
         <ActiveCard
           // Neu gemountet bei jeder Karte statt per Effekt zurückgesetzt –
           // `shownAt` und das Tippfeld starten so garantiert frisch, ohne
@@ -129,6 +166,12 @@ export function PracticeSession({
       <PageHeader title="Üben" />
 
       <div className="flex flex-col gap-3">
+        {setLoadFailed ? (
+          <Notice>
+            Dieses Set ließ sich gerade nicht laden – vielleicht wurde es in der Zwischenzeit
+            gelöscht oder ist leer.
+          </Notice>
+        ) : null}
         {bySubject === null ? (
           <Block title="Fällig heute">
             <Notice>Zahlen sind gerade nicht verfügbar.</Notice>
@@ -152,14 +195,6 @@ export function PracticeSession({
             ))}
           </>
         )}
-
-        <Block title="Prüfungsmodus">
-          <Notice>Kommt mit V-04.</Notice>
-        </Block>
-
-        <Block title="Schwachstellen">
-          <Notice>Kommt mit V-04.</Notice>
-        </Block>
       </div>
     </>
   );
@@ -168,6 +203,10 @@ export function PracticeSession({
 /**
  * Ein Fach, für sich ladend. `subject.total` ist immer > 0 – nur Fächer mit
  * fälligen Karten stehen überhaupt in `bySubject` (siehe `loadDueBySubject()`).
+ *
+ * Keine Richtungswahl mehr hier (V-04, ADR 0008 Nachtrag): „Loslegen" mischt
+ * immer beide Richtungen. Wer gezielt eine Richtung oder ein einzelnes Set
+ * will, geht über die Set-Seite (Set-Modus).
  */
 function SubjectBlock({
   subject,
@@ -178,17 +217,13 @@ function SubjectBlock({
   canStart: boolean;
   onStart: (subjectName: string, cards: SessionCardContent[]) => void;
 }) {
-  const [direction, setDirection] = useState<DirectionChoice>("gemischt");
   const [pending, startTransition] = useTransition();
   const [loadError, setLoadError] = useState(false);
 
   function start() {
     setLoadError(false);
     startTransition(async () => {
-      const loaded = await loadSessionCards(
-        subject.subjectId,
-        direction === "gemischt" ? null : direction,
-      );
+      const loaded = await loadSessionCards(subject.subjectId);
       if (!loaded || loaded.length === 0) {
         setLoadError(true);
         return;
@@ -206,7 +241,6 @@ function SubjectBlock({
       />
       {canStart ? (
         <>
-          <DirectionPicker value={direction} onChange={setDirection} />
           <Button onClick={start} disabled={pending}>
             {pending ? "Einen Moment …" : "Loslegen"}
           </Button>
@@ -218,44 +252,6 @@ function SubjectBlock({
         </>
       ) : null}
     </Block>
-  );
-}
-
-function DirectionPicker({
-  value,
-  onChange,
-}: {
-  value: DirectionChoice;
-  onChange: (value: DirectionChoice) => void;
-}) {
-  const OPTIONS: { value: DirectionChoice; label: string }[] = [
-    { value: "gemischt", label: "Gemischt" },
-    { value: "vorwaerts", label: "FR → DE" },
-    { value: "rueckwaerts", label: "DE → FR" },
-  ];
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Richtung"
-      className="border-linie-stark flex overflow-hidden rounded-md border"
-    >
-      {OPTIONS.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={`flex-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${
-            value === option.value
-              ? "bg-koenigsblau text-auf-koenigsblau"
-              : "text-tinte-weich hover:text-tinte bg-transparent"
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

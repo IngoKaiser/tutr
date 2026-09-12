@@ -6,6 +6,19 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Changed
 
+- **V-04: Modi beim Vokabel-Üben, ohne `/ueben` zu überladen.** Von den fünf Modi aus
+  §6 M4 wurden zwei zu keinem sichtbaren Baustein: „Fällig heute" ist der Alltagsfluss
+  seit V-06, „Mix" (Kartenarten mischen) läuft seit V-02 automatisch über
+  `modeForCardState()`. Schwachstellen bekommen keine eigene Kachel – reicht die fällige
+  Menge eines Fachs nicht (`MIN_SESSION_SIZE = 10`), füllt `loadSessionCards()` mit den
+  Karten mit den meisten `fsrs_state.lapses` auf, auch wenn sie noch nicht fällig sind.
+  Set-Modus (ein Set unabhängig von der Fälligkeit üben) und die Richtungswahl
+  (FR→DE/DE→FR/gemischt) ziehen von `/ueben` auf die Set-Seite
+  (`/faecher/vokabeln/[setId]`, „Dieses Set üben") um – `/ueben` selbst verliert dadurch
+  die Richtungswahl und die beiden „Kommt mit V-04"-Platzhalter, ohne neue Kacheln dafür
+  zu bekommen. Details und die Abwägung in [ADR 0008](docs/adr/0008-fachbindung-von-lernmaterial.md)
+  (Nachtrag). Prüfungsmodus bleibt zurückgestellt (neues Ticket V-04b, hinter K-01) –
+  ohne Kalender gibt es keine „nächste Arbeit"
 - **Ladezeiten der angemeldeten Seiten.** Ein Aufbau von `/faecher/vokabeln` kostete über
   **dreißig Netzwerkrunden** zur Datenbank. Zwei Ursachen, beide behoben:
   `loginStatus()` lief viermal je Seite (Layout, Seite und zwei Loader mit je

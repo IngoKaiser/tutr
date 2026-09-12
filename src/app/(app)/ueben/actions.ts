@@ -123,52 +123,134 @@ export type SessionCardContent = {
   translation: string;
 };
 
+type CardRow = {
+  card_id: string;
+  vocab_item_id: string;
+  direction: Direction;
+  state: CardStateValue;
+  term: string;
+  translation: string;
+};
+
+function toSessionCard(r: CardRow): SessionCardContent {
+  return {
+    cardId: r.card_id,
+    vocabItemId: r.vocab_item_id,
+    direction: r.direction,
+    mode: modeForCardState(r.state),
+    term: r.term,
+    translation: r.translation,
+  };
+}
+
+/**
+ * Mindestgröße einer Fach-Session (V-04) – erste Schätzung, wie die
+ * Zeitschwellen aus V-02. Reichen die fälligen Karten allein nicht, füllt
+ * `loadSessionCards()` mit den Karten mit den meisten Fehlschlägen auf.
+ */
+const MIN_SESSION_SIZE = 10;
+
 /**
  * Fällige Karten für eine Session, inhaltlich angereichert. Läuft immer in
- * genau einem Fach (V-06, ADR 0008 D3) – `subjectId` ist deshalb Pflicht,
- * nicht optional wie `direction`. Der Vorrat ist dadurch von selbst
+ * genau einem Fach (V-06, ADR 0008 D3) – der Vorrat ist dadurch von selbst
  * einsprachig: `buildMultipleChoiceOptions()` zieht die Falschantworten aus
  * genau diesen Karten, eine eigene Fach-Regel dort ist nicht nötig.
  *
- * `direction` filtert zusätzlich nach ADR 0007 D5 – `null` heißt gemischt
- * (die Voreinstellung).
+ * Immer beide Richtungen gemischt – die gezielte Richtungswahl gibt es seit
+ * V-04 nur noch im expliziten Set-Modus (`loadSetSessionCards()`), nicht mehr
+ * im Alltagsfluss (ADR 0008 Nachtrag V-04).
+ *
+ * **Schwachstellen fließen unsichtbar ein** (V-04, „Schwachstellen" aus §6
+ * M4 ohne eigenen Button): Reichen die fälligen Karten nicht bis
+ * `MIN_SESSION_SIZE`, holt die Session zusätzlich Karten desselben Fachs
+ * dazu, die noch nicht fällig sind, aber am häufigsten schon einmal
+ * gescheitert sind (`fsrs_state.lapses`, absteigend, dann die instabilsten
+ * zuerst). FSRS entscheidet weiterhin, *wann* eine Karte reif ist – dies
+ * ist nur eine zusätzliche Quelle für dieselbe Session, keine zweite
+ * Wahrheit über Fälligkeit.
  */
-export async function loadSessionCards(
-  subjectId: string,
-  direction: Direction | null,
-): Promise<SessionCardContent[] | null> {
+export async function loadSessionCards(subjectId: string): Promise<SessionCardContent[] | null> {
   const actor = await requireStudentActor();
   if (!actor) return null;
 
-  type Row = {
-    card_id: string;
-    vocab_item_id: string;
-    direction: Direction;
-    state: CardStateValue;
-    term: string;
-    translation: string;
-  };
+  return withActor(actor, async (tx) => {
+    const due = await tx.execute<CardRow>(
+      sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
+          from card c join vocab_item vi on vi.id = c.vocab_item_id
+          where c.due_at <= now() and vi.subject_id = ${subjectId}
+          order by c.due_at`,
+    );
+
+    const missing = MIN_SESSION_SIZE - due.length;
+    const topUp =
+      missing > 0
+        ? await tx.execute<CardRow>(
+            sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
+                from card c join vocab_item vi on vi.id = c.vocab_item_id
+                where c.due_at > now() and vi.subject_id = ${subjectId}
+                order by (c.fsrs_state ->> 'lapses')::int desc,
+                         (c.fsrs_state ->> 'stability')::float asc
+                limit ${missing}`,
+          )
+        : [];
+
+    return [...due, ...topUp].map(toSessionCard);
+  });
+}
+
+export type SetSessionInfo = {
+  setTitle: string;
+  subjectName: string;
+  cards: SessionCardContent[];
+};
+
+/**
+ * Ein Set gezielt üben, unabhängig von der Fälligkeit (V-04, „Set-Modus" aus
+ * §6 M4). Der Einstieg lebt bewusst auf der Set-Seite
+ * (`/faecher/vokabeln/[setId]`), nicht auf `/ueben` – wer hierher kommt, hat
+ * das Set schon ausgewählt (ADR 0008 Nachtrag V-04). `direction` bleibt hier
+ * wählbar (`null` = gemischt), anders als im Alltagsfluss.
+ *
+ * `null`, wenn das Set nicht (mehr) existiert oder keine Karten in der
+ * gewählten Richtung hat – dieselbe Ehrlichkeit wie bei `loadSessionCards()`.
+ */
+export async function loadSetSessionCards(
+  setId: string,
+  direction: Direction | null,
+): Promise<SetSessionInfo | null> {
+  const actor = await requireStudentActor();
+  if (!actor) return null;
+
+  type SetRow = { title: string; subject_name: string };
 
   return withActor(actor, async (tx) => {
-    const rows = await tx.execute<Row>(
+    const [set] = await tx.execute<SetRow>(
+      sql`select vs.title, s.name as subject_name
+          from vocab_set vs join subject s on s.id = vs.subject_id
+          where vs.id = ${setId}`,
+    );
+    if (!set) return null;
+
+    const rows = await tx.execute<CardRow>(
       direction
         ? sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
-              from card c join vocab_item vi on vi.id = c.vocab_item_id
-              where c.due_at <= now() and c.direction = ${direction} and vi.subject_id = ${subjectId}
-              order by c.due_at`
+              from vocab_set_item vsi
+              join vocab_item vi on vi.id = vsi.vocab_item_id
+              join card c on c.vocab_item_id = vi.id
+              where vsi.vocab_set_id = ${setId} and c.direction = ${direction}`
         : sql`select c.id as card_id, c.vocab_item_id, c.direction, c.state, vi.term, vi.translation
-              from card c join vocab_item vi on vi.id = c.vocab_item_id
-              where c.due_at <= now() and vi.subject_id = ${subjectId}
-              order by c.due_at`,
+              from vocab_set_item vsi
+              join vocab_item vi on vi.id = vsi.vocab_item_id
+              join card c on c.vocab_item_id = vi.id
+              where vsi.vocab_set_id = ${setId}`,
     );
-    return rows.map((r) => ({
-      cardId: r.card_id,
-      vocabItemId: r.vocab_item_id,
-      direction: r.direction,
-      mode: modeForCardState(r.state),
-      term: r.term,
-      translation: r.translation,
-    }));
+    if (rows.length === 0) return null;
+
+    return {
+      setTitle: set.title,
+      subjectName: set.subject_name,
+      cards: rows.map(toSessionCard),
+    };
   });
 }
 
