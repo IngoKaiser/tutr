@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { expandGroupToken, matchesOwnGroups } from "./group-match";
+import { expandGroupToken, matchesOwnGroups, suggestOwnGroups } from "./group-match";
 import fixture from "../../../docs/fixtures/beispiel-import-klausurplan.json";
 
 describe("expandGroupToken", () => {
@@ -64,5 +64,31 @@ describe("matchesOwnGroups", () => {
     // Blocker ohne Gruppenbezug betreffen alle
     const herbstferien = fixture.events.find((e) => e.titel === "Herbstferien")!;
     expect(matchesOwnGroups(herbstferien.gruppen, eigeneGruppen)).toBe(true);
+  });
+});
+
+describe("suggestOwnGroups", () => {
+  test("schlägt Tokens vor, die mit der eigenen Klasse beginnen", () => {
+    const gesehen = ["8.1", "8.2", "8.5", "8.5 Eng", "8.5 Mat", "9.1"];
+    expect(suggestOwnGroups(gesehen, "8.5")).toEqual(["8.5", "8.5 Eng", "8.5 Mat"]);
+  });
+
+  test("verwechselt '8.5' nicht mit '8.51' oder '18.5'", () => {
+    expect(suggestOwnGroups(["8.51", "18.5", "8.5"], "8.5")).toEqual(["8.5"]);
+  });
+
+  test("ohne bekannte Klasse gibt es keine Vorauswahl", () => {
+    expect(suggestOwnGroups(["8.5", "8.5 Eng"], null)).toEqual([]);
+  });
+
+  test("Groß-/Kleinschreibung und Leerraum sind egal, Duplikate fallen weg", () => {
+    expect(suggestOwnGroups(["8.5 ENG", " 8.5 eng ", "8.5"], "8.5")).toEqual(["8.5 ENG", "8.5"]);
+  });
+
+  test("gegen die echte Fixture: findet dieselben Tokens wie quelle.eigeneGruppen", () => {
+    const alleTokens = fixture.events.flatMap((e) => e.gruppen);
+    expect(suggestOwnGroups(alleTokens, "8.5").sort()).toEqual(
+      [...fixture.quelle.eigeneGruppen].sort(),
+    );
   });
 });

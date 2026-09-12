@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives";
+import { Block, Button, LinkButton, Notice, PageHeader } from "@/components/shell/primitives";
 import {
   countdownLabel,
   daysUntil,
@@ -65,7 +65,14 @@ export function CalendarList({
     <div className="flex flex-col gap-3">
       <PageHeader title="Prüfungen" trailing="nächste 4 Wochen" />
 
-      {canManage ? <CreateEventForm subjects={subjects} /> : null}
+      {canManage ? (
+        <div className="flex flex-wrap gap-2">
+          <CreateEventForm subjects={subjects} />
+          <LinkButton href="/pruefungen/einlesen" quiet>
+            Klausurplan einlesen
+          </LinkButton>
+        </div>
+      ) : null}
 
       {events === null ? (
         <Notice>Die Termine sind gerade nicht verfügbar.</Notice>

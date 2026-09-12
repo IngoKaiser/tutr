@@ -6,6 +6,22 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **K-03: Klausurplan per Foto einlesen, mit Review-Screen.** Neue Route
+  `/pruefungen/einlesen`: Fotos sammeln und einlesen wie bei der Hausaufgabe (V-10), dann auf
+  derselben Seite eine Entwurfsliste statt eines zweiten URL-Schritts – es gibt zwischendurch
+  nichts Gespeichertes, an das sich einer hängen könnte (ADR 0016 D2). `extractCalendarFromImage()`
+  liefert je Zeile Fach (geschlossene Auswahl wie überall, „unklar" statt Raten), Typ, Titel, Datum,
+  Gruppentokens und ob überhaupt Lernbezug besteht – **nicht**, ob die Gruppe zum Kind passt: Das
+  weiß das Modell nicht, `matchesOwnGroups()` (K-02b) wendet der Review-Screen getrennt an. Beim
+  ersten Import mit mehreren Gruppentokens fragt eine kurze Einrichtung, welche davon zum Kind
+  gehören (`school_year.own_groups`, mit `suggestOwnGroups()` vorbelegt). Re-Import-Matching
+  (K-02b) zeigt neu/verschoben/unverändert/entfallen; „entfallen" wird nur angezeigt, nie
+  automatisch abgesagt. Blocker (Ferien/Fahrten) werden erkannt, aber bewusst nicht gespeichert –
+  ohne Lernplan-Ticket wäre das ein Feld ohne Abnehmer (ADR 0016 D5). Rate-Limit wie beim
+  Hausaufgaben-Foto (`vision`-Budget, S-03c/d). E2E deckt Einstieg und Galerie-Mechanik ab (kein
+  API-Schlüssel in CI, wie beim Vokabel-Foto); Erkennung, Gruppenfilter und Übernehmen von Hand
+  gegen die echte API geprüft
+
 - **K-02b: Reine Bausteine für den Kalender-Import.** `CalendarImportDraft` – die
   kanalneutrale Form, die Bild- (K-03) und Datei-Import (K-04) künftig beide füllen, statt
   je einen eigenen Review-Screen zu bauen. `matchesOwnGroups()` löst den Gruppenfilter

@@ -4,6 +4,11 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { aiEnv } from "@/lib/env";
 
 import {
+  calendarExtractionSystemPrompt,
+  calendarExtractionUserPrompt,
+  type CalendarExtractionContext,
+} from "./prompts/calendar-extraction";
+import {
   fachZuordnungSystemPrompt,
   fachZuordnungUserPrompt,
   type FachZuordnungContext,
@@ -28,6 +33,7 @@ import {
   vocabExtractionUserPrompt,
   type VocabExtractionContext,
 } from "./prompts/vocab-extraction";
+import { calendarExtractionSchema, type CalendarExtraction } from "./schemas/calendar-extraction";
 import { fachZuordnungSchema, type FachZuordnungErgebnis } from "./schemas/fach-zuordnung";
 import {
   hausaufgabenZusammenfassungSchema,
@@ -171,6 +177,58 @@ export async function extractHomeworkFromImage(
             source: { type: "base64", media_type: image.mediaType, data: image.base64 },
           },
           { type: "text", text: homeworkExtractionUserPrompt() },
+        ],
+      },
+    ],
+  });
+
+  if (!message.parsed_output) {
+    throw new Error("Die Bilderkennung hat keine verwertbare Antwort geliefert.");
+  }
+  return {
+    extraction: message.parsed_output,
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  };
+}
+
+/** Erkannte Kalenderzeilen plus die verbrauchten Token – wie bei `extractHomeworkFromImage()`. */
+export type CalendarExtractionResult = {
+  extraction: CalendarExtraction;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+/**
+ * Ein Foto eines Klausurplans → Kalenderzeilen (K-03, §6 M7, ADR 0016).
+ *
+ * Derselbe Weg wie `extractHomeworkFromImage()`: Structured Output über
+ * `zodOutputFormat()`, Bild nur im Nutzerteil, Bild wird **nicht**
+ * gespeichert. Das Modell liefert **alle** erkannten Zeilen zurück, auch
+ * fremder Klassen – der Gruppenfilter (`matchesOwnGroups()`) läuft getrennt
+ * beim Aufrufer (ADR 0016 D3), damit ein falsch geratener Filter im Modell
+ * nie eine eigene Zeile verschluckt.
+ */
+export async function extractCalendarFromImage(
+  image: InlineImage,
+  context: CalendarExtractionContext,
+): Promise<CalendarExtractionResult> {
+  const message = await anthropic().messages.parse({
+    model: VISION_MODEL,
+    // Großzügig wie bei der Vokabelliste: Ein Halbjahresplan kann 20+ Zeilen
+    // tragen, ein zu knappes Limit schneidet die Liste stumm ab.
+    max_tokens: 6000,
+    system: calendarExtractionSystemPrompt(context),
+    output_config: { format: zodOutputFormat(calendarExtractionSchema(context.faecher)) },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: image.mediaType, data: image.base64 },
+          },
+          { type: "text", text: calendarExtractionUserPrompt() },
         ],
       },
     ],
