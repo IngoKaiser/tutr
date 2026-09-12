@@ -3,11 +3,7 @@
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import {
-  extractTextbookFromImage,
-  suggestTextbookViaWebSearch,
-  type InlineImage,
-} from "@/ai/client";
+import { extractTextbookFromImage, type InlineImage } from "@/ai/client";
 import { withActor, type Actor } from "@/db/actor";
 import { bucheNutzung, ergaenzeTokenzahl, pruefeUndZaehle } from "@/lib/ai/rate-limit";
 import { loginStatus } from "@/lib/auth/actor";
@@ -22,13 +18,13 @@ import { classifyPhotoImportError } from "@/lib/vocab/photo";
  * jetzt auch `school_year_textbook`) – deshalb `requireActor()`, nicht
  * `requireStudentActor()`.
  *
- * Zwei Erfassungswege teilen sich **eine** editierbare Kapitelliste danach
- * (Foto → Vision, Websuche → Structured Output mit dem Websuche-Tool) – das
- * deckt „manuell" mit ab: Wer nichts fotografiert oder sucht, öffnet dieselbe
- * Liste einfach leer. Beide Wege nutzen den Vision-Kostendeckel
- * (`pruefeUndZaehle(tx, "vision")`) wie Foto-Import anderswo im Projekt –
- * die Websuche bucht zusätzlich ihre Suchanfragen (`ergaenzeTokenzahl()`,
- * `lib/ai/rate-limit.ts`).
+ * Die Websuche (L-01) ist mit L-02 wieder raus: eine einzelne Suche kostete
+ * real 0,37–0,51 $, mehr als der gesamte Stundendeckel in einem Aufruf
+ * (`docs/PLAN.md`). Übrig bleibt **ein** Erfassungsweg (Foto → Vision) in die
+ * editierbare Kapitelliste danach – das deckt „manuell" weiterhin mit ab:
+ * Wer nichts fotografiert, öffnet dieselbe Liste einfach leer. Nutzt den
+ * Vision-Kostendeckel (`pruefeUndZaehle(tx, "vision")`) wie Foto-Import
+ * anderswo im Projekt.
  */
 
 async function requireActor(): Promise<Actor | null> {
@@ -231,76 +227,11 @@ export async function leseKapitelAusFoto(
   }
 }
 
-export type SucheErgebnis =
-  | {
-      ok: true;
-      gefunden: boolean;
-      titel: string | null;
-      verlag: string | null;
-      jahrgangsstufe: number | null;
-      kapitel: LehrwerkChapter[];
-      quellen: string[];
-      hinweis: string | null;
-    }
-  | { ok: false; fehler: string };
-
-/** „Claude sucht das Lehrwerk im Internet" – ein ungefährer Titel + Fach rein, ein markierter Vorschlag raus. */
-export async function sucheLehrwerkImInternet(
-  titelHinweis: string,
-  subjectName: string,
-): Promise<SucheErgebnis | null> {
-  const actor = await requireActor();
-  if (!actor) return null;
-
-  if (!anthropicConfigured()) {
-    return { ok: false, fehler: "Die Websuche ist auf diesem Gerät nicht eingerichtet." };
-  }
-  const titel = titelHinweis.trim();
-  if (titel.length < 2) {
-    return { ok: false, fehler: "Bitte einen Titel oder ein Stichwort eingeben." };
-  }
-
-  const vorarbeit = await withActor(actor, async (tx) => {
-    const limit = await pruefeUndZaehle(tx, "vision");
-    if (!limit.erlaubt) return { ok: false as const, fehler: limit.nachricht };
-    const usageId = await bucheNutzung(tx, "vision");
-    return { ok: true as const, usageId };
-  });
-  if (!vorarbeit.ok) return { ok: false, fehler: vorarbeit.fehler };
-
-  try {
-    const result = await suggestTextbookViaWebSearch({ titelHinweis: titel, fach: subjectName });
-    await withActor(actor, (tx) =>
-      ergaenzeTokenzahl(
-        tx,
-        vorarbeit.usageId,
-        result.inputTokens,
-        result.outputTokens,
-        result.searchRequests,
-      ),
-    );
-    return {
-      ok: true,
-      gefunden: result.suggestion.gefunden,
-      titel: result.suggestion.titel,
-      verlag: result.suggestion.verlag,
-      jahrgangsstufe: result.suggestion.jahrgangsstufe,
-      kapitel: result.suggestion.kapitel,
-      quellen: result.suggestion.quellen,
-      hinweis: result.suggestion.hinweis,
-    };
-  } catch (problem) {
-    const { fehler, ursache } = classifyPhotoImportError(problem);
-    console.error(JSON.stringify(`Lehrwerk-Websuche gescheitert: ${ursache}`));
-    return { ok: false, fehler };
-  }
-}
-
 export type NeuesLehrwerkInput = {
   titel: string;
   verlag: string | null;
   jahrgangsstufe: number | null;
-  quelle: "foto" | "claude_vorwissen";
+  quelle: "foto";
   kapitel: LehrwerkChapter[];
 };
 

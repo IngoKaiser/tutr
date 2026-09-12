@@ -95,6 +95,19 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
   dass Seiten/Navigationen bewusst **nicht** gecacht werden: `/ueben` ist kindspezifisch
   gerendert, ein URL-only-Cache würde die Geschwister-Trennung (ADR 0006) umgehen
 
+### Removed
+
+- **L-02: Lehrwerk-Websuche wieder entfernt.** Beim echten Testen ("Spanisch ·
+  Apuntate") kostete eine einzelne Suche 0,37–0,51 $ und dauerte bis zu 189 s –
+  mehr als der gesamte Stundendeckel (`AI_LIMITS.stundeUsd = 0,30`) in einem
+  Aufruf, strukturell, weil Websuche und Lehrwerk-Foto denselben Zähler
+  teilten. Entscheidung: entfernen statt versuchen, günstiger zu machen.
+  `sucheLehrwerkImInternet()`, `suggestTextbookViaWebSearch()`, die
+  Prompt-/Schema-Dateien und `ai_usage.search_requests` (Migration `0017`)
+  sind komplett raus; übrig bleibt der Foto-Weg, der die editierbare
+  Kapitelliste („manuell") weiterhin mitträgt. Die „Kanalwahl"-Zwischenseite
+  entfiel mit – bei einem verbliebenen Weg war sie nur ein zusätzlicher Klick
+
 ### Changed
 
 - **V-04: `/ueben` trifft keine Vorentscheidung mehr.** Von den fünf Modi aus §6 M4 wird
