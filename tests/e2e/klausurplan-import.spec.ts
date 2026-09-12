@@ -34,6 +34,18 @@ test.describe("Klausurplan-Import", () => {
     // trägt einen Rückweg", T-18) – hier reicht die Überschrift als Beleg,
     // dass die richtige Seite geladen hat.
 
+    // Ohne Datenbank (`DATABASE_URL` fehlt, wie im normalen E2E-Job ohne
+    // DB-Secret) zeigt die Seite schon vor der Kanalwahl "nicht
+    // eingerichtet" – dann gibt es gar keine Foto/Datei-Knöpfe zu finden.
+    const dbNichtEingerichtet = await page
+      .getByText(/nicht eingerichtet/)
+      .isVisible()
+      .catch(() => false);
+    test.skip(
+      dbNichtEingerichtet,
+      "Die Datenbank ist in dieser Umgebung nicht gesetzt (wie in CI).",
+    );
+
     // Kanalwahl (K-04): erst Foto/Datei, danach wie gehabt.
     await page.getByRole("button", { name: "Foto" }).click();
 
