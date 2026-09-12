@@ -7,7 +7,10 @@
  * um zwischen „Kann ich" und „Übe ich" zu unterscheiden.
  *
  * Reihenfolge der Prüfung ist die Reihenfolge der Nachsicht: exakt, dann
- * fehlender Artikel, dann ignorierte Akzente, dann Tippfehlertoleranz.
+ * fehlender Artikel, dann ignorierte Akzente, dann Tippfehlertoleranz. Davor
+ * liegt eine Bereinigung um Klammerzusätze und Auslassungspunkte (V-14) –
+ * die ist keine eigene Nachsichtsstufe, sondern Teil der Normalisierung:
+ * alle folgenden Stufen sehen nur noch den bereinigten String.
  */
 
 export type AnswerQuality = "richtig" | "fast" | "falsch";
@@ -36,6 +39,42 @@ const LEADING_ARTICLES = new Set([
 /** Auch für Multiple Choice: dort ist es ein exakter Vergleich der Beschriftung, keine Toleranz. */
 export function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Klammerzusätze (z. B. „(Am.)“, „(Br.)“, „(ugs.)“, Genus-Kürzel) und
+ * Auslassungspunkte zwischen Wortteilen (z. B. „sich freuen … auf“) sind
+ * Lehrwerk-Notation, keine abgefragte Vokabel – Phase6 und Quizlet fragen sie
+ * im Schreibmodus auch nicht ab (V-14, Entscheidung 12.9.2026). Zählt als
+ * `richtig`, nicht als eigene `fast`-Stufe: der Zusatz war nie Teil der
+ * Vokabel, anders als fehlender Artikel/Akzent, die echte Nachsicht sind.
+ *
+ * Zwei weitere Notationen kamen beim Abgleich gegen echte Produktivdaten
+ * dazu (V-14, Nachtrag 13.9.2026), dieselbe Problemklasse wie Klammern, nur
+ * ohne Klammern geschrieben:
+ * - Genus-/Numerus-Suffix per Komma statt Klammer, wörterbuchüblich bei
+ *   spanischen Adjektiven: „gracioso, -a“, „tanto, -os, -a, -as“. Nur am
+ *   Stringende (nach der Klammer-Bereinigung), sonst träfe die Regel auch
+ *   echte Komma-Listen mehrerer vollständiger Übersetzungen wie
+ *   „akzeptabel, hinnehmbar“ – die bleiben bewusst unangetastet, das ist ein
+ *   anderes, hier nicht gelöstes Problem (mehrere vollständig gültige
+ *   Antworten statt einer optionalen Notation).
+ * - Eng geschriebene Schrägstrich-Paare ohne Leerzeichen: „el/la guía“,
+ *   „Amerikaner/in“, „to mess about/around“ – hier gilt dieselbe Grenze wie
+ *   bei Klammern: die erste Form wird zur verlangten, die zweite nicht
+ *   gesondert akzeptiert. Locker geschriebene Alternativen mit Leerzeichen
+ *   („der Reiseführer / die Reiseführerin“) sind wieder das Mehrfach-Antwort-
+ *   Problem von oben und bleiben deshalb unangetastet – das Muster verlangt
+ *   „/“ direkt gefolgt von einem Nicht-Leerzeichen.
+ */
+function stripNotations(value: string): string {
+  return value
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/(,\s*-[^\s,]+)+\s*$/, "")
+    .replace(/\/\S+/g, "")
+    .replace(/\.{2,}|…/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stripAccents(value: string): string {
@@ -74,8 +113,8 @@ function levenshtein(a: string, b: string): number {
 }
 
 export function evaluateAnswer(expected: string, given: string): AnswerQuality {
-  const exp = normalize(expected);
-  const giv = normalize(given);
+  const exp = stripNotations(normalize(expected));
+  const giv = stripNotations(normalize(given));
   if (exp === giv) return "richtig";
   if (giv === "") return "falsch";
 

@@ -67,6 +67,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 | **Üben**                 |                                                                                       | 🌓    |         |
 |                          | Session: drei Stapel, MC + Tippen, Tippfehlertoleranz                                 | ✅    | V-02    |
 |                          | Rückmeldung richtig/fast/falsch, Ausstiegsknopf                                       | ✅    | V-02    |
+|                          | Antwortprüfung ignoriert Klammerzusätze und Auslassungspunkte beim Tippen             | ✅    | V-14    |
 |                          | Fachgebundenes Üben, fällige Karten je Fach                                           | ✅    | V-06    |
 |                          | Zahl zeigt Vokabeln statt Karten; Richtung aus `subject.language`                     | ✅    | V-06a   |
 |                          | „Gemischt“ mischt die Richtungen wirklich; EXIF-Drehung beim Foto                     | ✅    | V-07    |
