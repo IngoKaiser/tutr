@@ -61,6 +61,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Wischen zum Löschen mit Rückgängig-Fenster (Liste + Waisen)                           | ✅    | V-11    |
 |                          | Erklärung des Lernrhythmus für Kinder (aufklappbar, SVG)                              | ✅    | V-13    |
 |                          | Erklärstelle am Hinweisleiter: „Warum nicht sofort die Lösung?“                       | 🌑    | T-21    |
+|                          | Bilder im Chat sichtbar und wieder im Modellkontext                                   | 🌑    | T-22    |
 |                          | „Geprüft“-Zustand: akzeptierte Zeilen normal, Ungeprüftes nicht im Üben               | ✅    | V-09    |
 |                          | Fachbindung im Modell (ADR 0008)                                                      | ✅    | V-05    |
 |                          | Vokabeln ohne Set sichtbar/löschbar machen                                            | ✅    | V-03d   |

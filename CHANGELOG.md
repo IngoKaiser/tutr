@@ -6,6 +6,25 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **Doku: ADR 0018 (Rückmeldung ohne Urteil) und ADR 0019 (Fotos aufbewahren).** Schließt die
+  drei offenen Entscheidungen aus dem Prüfungs-Abgleich. **ADR 0018:** Das Zeitbudget ist ein
+  Deckel für den Planer, nie ein Ziel für sie – Vorgabe 15 Min je Fach, danach der gleitende
+  Median der tatsächlichen Übungszeit, keine Einstellung, keine tägliche Frage, keine
+  Soll-Ist-Anzeige; die eine Zeitfrage aus §15 nur bei Ballung und als Verhandlung mit echten
+  Optionen (beantwortet §14 Frage 3). Die Probeprüfung wird **bewertet, aber nicht benotet**:
+  Punkte, Rubrik und Auswertung je Lernziel bleiben, die Ziffer entfällt, Rückmeldung als Richtung
+  statt Zustand, „Was wäre das als Note?“ hinter einem Ausklapper – wiederholbar ist der
+  eigentliche Hebel (Abweichung von §6 M6). **ADR 0019:** Fotos bleiben künftig, aber nur, wo ihr
+  Informationsgehalt nicht restlos in die Daten übergeht – Tutor, Hausaufgabe, Material und
+  korrigierte Arbeit ja; Vokabeln, Klausurplan und Lehrwerk weiter verwerfen (der Klausurplan hat
+  keinen Restwert, trägt aber die Daten einer ganzen Jahrgangsstufe). Gespeichert wird genau das,
+  was `prepareImageForUpload()` heute schon erzeugt (1568 px, JPEG q0,8, ohne EXIF – rund 250 MB
+  je Kind und Schuljahr), kein Original. Die Elternsicht richtet sich nach der **Herkunft** des
+  Bildes, nicht nach seinem Ablageort. Nachtrag in ADR 0007, dessen D6 damit auf den Vokabelweg
+  eingegrenzt ist. Neu **T-22**: Bilder im Tutor-Verlauf sichtbar machen – und wieder mit ins
+  Modell, denn `tutor_message` hat heute keine Bildspalte und schon die zweite Frage desselben
+  Gesprächs trifft auf ein Modell, das das Foto nicht mehr sieht.
+
 - **Doku: ADR 0017 (Materialtiefe und Kontextpaket), Vorlauf-Tickets.** Beantwortet die
   Inhaltsseite der Prüfungsvorbereitung – wie Stoff jenseits von Vokabeln in die App kommt, ohne
   dass jemand ein Archiv pflegt. **D1** drei Tiefenstufen (Volltext → Lernziele → Karten), jede aus

@@ -170,8 +170,9 @@ Pack-Vorläufern, nicht von Hand.
 
 **Was bewusst offen bleibt:**
 
-- Ob Material im Storage liegt (Fotos) oder nur als OCR-Text. Für Stufe A genügt Text; das Bild
-  aufzubewahren ist eine Speicher- und Datenschutzfrage, die M-01 beantwortet.
+- ~~Ob Material im Storage liegt (Fotos) oder nur als OCR-Text.~~ Entschieden mit
+  [ADR 0019](0019-fotos-aufbewahren.md): Das Bild bleibt, verkleinert, und nur auf den Wegen, auf
+  denen es nach der Durchsicht noch etwas bedeutet.
 - Der genaue Token-Deckel. 30 000 ist ein Richtwert, der an echten Themen zu messen ist.
 - Wie Lernziele über Schuljahre hinweg zusammenfinden (dasselbe Lernziel in Jg. 7 und 8).
 

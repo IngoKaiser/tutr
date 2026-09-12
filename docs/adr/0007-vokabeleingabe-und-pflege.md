@@ -162,3 +162,22 @@ speichert, hat daraufgeschaut — genau das war der Zweck der Markierung.
 - **Bewusst nicht gebaut:** Vokabeln zwischen Sets verschieben, Massen-Bearbeitung
   einzelner Felder, Datei-Import. Alle drei sind nachrüstbar, wenn sich zeigt, dass sie
   fehlen; keiner von ihnen hat heute einen Abnehmer.
+
+## Nachtrag (ADR 0019): D6 gilt weiter – aber nur noch für den Vokabelweg
+
+[ADR 0019](0019-fotos-aufbewahren.md) hebt Fotos in Tutor, Hausaufgabe, Material und
+Nachbereitung künftig auf. D6 oben klingt wie eine Regel für alle Wege; sie war eine für
+diesen.
+
+Der Unterschied ist das Kriterium aus ADR 0019 D1: **Geht der Informationsgehalt des Bildes
+nach der Durchsicht restlos in die Daten über?** Beim Vokabelfoto ja – die Liste tritt
+vollständig an seine Stelle, jede Zeile ist einzeln korrigierbar, und der „geprüft"-Zustand
+aus V-09 hält fest, was durchgesehen wurde. Bei einer Mathe-Aufgabe mit Skizze nein: Was das
+Bild trägt, steht so in keinem Textfeld.
+
+Zwei der drei Begründungen von D6 sind außerdem eingelöst statt widerlegt: Die
+Storage-Abhängigkeit kommt mit M-01 ohnehin, und die Datensparsamkeit gegenüber EXIF-Daten
+erledigt `prepareImageForUpload()` für **alle** Wege, auch die aufbewahrenden – das Canvas
+wirft Aufnahmeort und Gerätekennung weg, bevor irgendetwas hochgeladen wird.
+
+Für Vokabeln ändert sich also nichts: erkennen, durchsehen, verwerfen.
