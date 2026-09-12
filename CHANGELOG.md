@@ -4,6 +4,20 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Chore
+
+- **F-08: eslint 10, TypeScript 7 und @types/node 26 einzeln geprüft – keins übernommen.**
+  Alle drei waren offene Dependabot-PRs (#4–#6). **eslint 10** scheitert an
+  `eslint-plugin-react@7.37.5` (aktuellste Version, in `eslint-config-next` gebündelt):
+  Die Regel `react/display-name` ruft `context.getFilename()` auf, das es in ESLint 10
+  nicht mehr gibt. **TypeScript 7** lässt `tsc --noEmit` glatt durchlaufen, aber
+  `typescript-eslint` verweigert den Dienst hart – „does not support TS 7.0"
+  ([Tracking-Issue](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
+  **@types/node 26** besteht `npm run check` anstandslos, verspricht aber Node-23–26-API,
+  die auf dem produktiv gepinnten Node 22.x (siehe Node-Version-Bereich-Fix) gar nicht
+  existiert – ein Aufruf einer neuen API würde typprüfen und auf Vercel dennoch abstürzen.
+  Alle drei bleiben auf dem bisherigen Stand, bis die jeweilige Gegenseite nachzieht.
+
 ### Security
 
 - **S-03a: Der Browser führt nur noch Skripte aus, die von uns stammen.** Der Tutor zeigt Text
