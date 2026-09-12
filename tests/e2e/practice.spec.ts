@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Übungssession (V-02, §6 M4).
@@ -115,6 +115,58 @@ test.describe("Übungssession", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
+  test("offline beantwortet landet in der Warteschlange, sichtbares Signal, Sync bei Rückkehr ins Netz (F-09b/F-09c)", async ({
+    page,
+    context,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "WebKit: Next-Dev-Server bricht nach dem Rollenwechsel ab.",
+    );
+
+    await page.goto("/heute");
+    const kindButton = page.getByRole("button", { name: "Kind" });
+    await kindButton.click();
+    await expect(kindButton).toHaveAttribute("aria-pressed", "true");
+
+    await page.goto("/ueben");
+    const nichtsFaellig = await page
+      .getByText("Nichts fällig. Schau später wieder vorbei.")
+      .count();
+    test.skip(nichtsFaellig > 0, "Keine fälligen Karten – npm run db:seed erneut ausführen.");
+
+    await page.getByRole("button", { name: "Loslegen" }).click();
+    const options = page.locator("button.text-left");
+    await expect(options.first()).toBeVisible({ timeout: 10_000 });
+
+    // Offline, bevor überhaupt geantwortet wird – `submitAnswer()` darf gar
+    // nicht erst versucht werden (kein Warten auf einen Timeout), sondern
+    // muss sofort in die Warteschlange gehen.
+    await context.setOffline(true);
+    await options.first().click();
+
+    // Die Rückmeldung kommt trotzdem sofort und ist keine Notlösung –
+    // dieselbe Klassifikation, die der Server nutzen würde (`previewOutcome()`).
+    const weiter = page.getByRole("button", { name: "Weiter" });
+    await expect(weiter).toBeVisible({ timeout: 10_000 });
+
+    // In der Warteschlange gelandet, nicht stillschweigend verloren – und
+    // sichtbar als ruhiges Signal, nicht nur intern in IndexedDB (F-09c).
+    expect(await countPendingAnswers(page)).toBe(1);
+    await expect(page.getByText("Wird synchronisiert, sobald wieder Netz da ist.")).toBeVisible();
+    await expect(page.getByText("1 Antwort wartet auf Synchronisierung.")).toBeVisible();
+
+    await weiter.click();
+    await context.setOffline(false);
+
+    // Der `online`-Event-Listener liefert nach – abwarten, bis die
+    // Warteschlange leer ist, statt eine feste Zeit zu raten. Das Signal
+    // verschwindet mit ihr.
+    await expect.poll(() => countPendingAnswers(page), { timeout: 10_000 }).toBe(0);
+    await expect(page.getByText(/Antwort(en)? wartet? auf Synchronisierung/)).toHaveCount(0);
+  });
+
   test("aus einer laufenden Übung kommt man zurück zur Übersicht", async ({
     page,
     browserName,
@@ -181,3 +233,35 @@ test.describe("Übungssession", () => {
     await expect(page.getByText(/hier siehst du nur den Stand/)).toBeVisible();
   });
 });
+
+/**
+ * Zählt die Einträge in der Offline-Warteschlange direkt in IndexedDB
+ * (F-09b) – Name und Objektspeicher wie in `src/lib/vocab/answer-queue.ts`.
+ * Dieselbe `onupgradeneeded`-Fallback-Erstellung wie dort: Läuft der Test,
+ * bevor die App die Datenbank selbst angelegt hat, entsteht sie hier leer
+ * statt den Test mit einer fehlenden Datenbank scheitern zu lassen.
+ */
+async function countPendingAnswers(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open("tutr-offline", 1);
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore("pending-answers", { keyPath: "id" });
+        };
+        request.onsuccess = () => {
+          const db = request.result;
+          const countRequest = db
+            .transaction("pending-answers", "readonly")
+            .objectStore("pending-answers")
+            .count();
+          countRequest.onsuccess = () => {
+            db.close();
+            resolve(countRequest.result);
+          };
+          countRequest.onerror = () => reject(countRequest.error);
+        };
+        request.onerror = () => reject(request.error);
+      }),
+  );
+}

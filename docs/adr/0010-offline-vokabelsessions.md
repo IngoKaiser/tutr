@@ -188,3 +188,72 @@ Registrierung in Chromium über Playwright geprüft – Service Worker aktiviert
 vorgecachten Chunk-URL liefert 200 aus dem Cache; ein Abruf von `/ueben` (nicht vorgecacht)
 scheitert korrekt mit einem Netzwerkfehler – der Service Worker beantwortet also wirklich
 nur, was er vorgecacht hat, nichts darüber hinaus.
+
+## Nachtrag beim Bauen (F-09b)
+
+**Keine `applyReview()`/FSRS-Vorschau nötig, entgegen der Annahme oben in Entscheidung 2.**
+Beim Bauen zeigte sich: `session.ts`s `advance()` – die reine Warteschlange, die die laufende
+Übung steuert – konsumiert ausschließlich den `Outcome` (richtig/fast/falsch) einer Antwort,
+nie den FSRS-Zustand selbst. FSRS ist eine rein serverseitige Angelegenheit, die die laufende
+Session nicht berührt. Die Offline-Vorschau (`previewOutcome()` in
+`src/lib/vocab/answer-queue.ts`) braucht deshalb nur `classifyMultipleChoice()`/
+`classifyTyped()`, nicht `applyReview()` – eine Funktion weniger zu duplizieren, und
+`applyReview()` bleibt exklusiv dem echten `submitAnswer()`-Aufruf vorbehalten, der den
+frischen `fsrs_state` erst beim Sync aus der Datenbank liest.
+
+**Die Reihenfolge-Invarianz wird beim Senden erzwungen, nicht nur beim Nachliefern.** Steht
+schon eine Antwort in der Warteschlange, geht jede weitere Antwort ebenfalls hinein – auch
+wenn `navigator.onLine` in der Zwischenzeit wieder `true` ist. Ohne diese Regel könnte eine
+frische Online-Antwort eine ältere, noch nicht zugestellte Antwort auf dieselbe Karte
+überholen und den FSRS-Zustand serverseitig durcheinanderbringen (ts-fsrs ist
+zustandsbehaftet). Ausgelöst wird der Sync-Versuch dreifach: beim Laden von `/ueben`, bei
+jedem `online`-Ereignis, und direkt nach jedem neuen Eintrag in die Warteschlange – kein
+Warten auf den nächsten Seitenaufruf.
+
+**Kein neuer Speicher-Fake als Testabhängigkeit.** `flushAnswerQueue()` und
+`previewOutcome()` sind rein und unit-getestet wie `session.ts`, mit einem
+In-Memory-`AnswerQueueStore` statt `indexedDB` – jsdom (die Testumgebung dieses Projekts)
+kennt kein IndexedDB, und ein Fake dafür (`fake-indexeddb`) hätte eine neue Abhängigkeit
+gebraucht, die niemand angefragt hatte. Der echte `createIndexedDbAnswerQueue()`-Adapter ist
+stattdessen per E2E gegen einen echten Chromium verifiziert (`page.context().setOffline()`,
+IndexedDB-Zählung direkt in der Seite) – derselbe Weg wie beim Service Worker in F-09a.
+
+**Bewusst weiterhin nicht gelöst** (siehe „Bewusst außerhalb dieses Tickets" oben, jetzt
+konkret benannt): Zwei Tabs oder Geräte, die gleichzeitig ihre je eigene Warteschlange
+leeren, oder ein Sync, der zwischen dem Schreiben in die Datenbank und dem Entfernen aus der
+Warteschlange abbricht (dann würde die nächste Zustellung dieselbe Antwort doppelt senden –
+`submitAnswer()` legt bei jedem Aufruf eine neue `review`-Zeile an, ohne Idempotenz-Schlüssel).
+Beides bleibt F-09c, wie hier ursprünglich vorgesehen. Ebenfalls keine sichtbare Rückmeldung,
+dass eine Antwort noch in der Warteschlange steht – die gezeigte Klassifikation ist ehrlich
+(dieselbe Funktion wie der Server), nur ihre Persistenz ist verzögert; ein Hinweis dazu ist
+§15-verträglich, aber F-09cs Aufgabe.
+
+## Nachtrag beim Bauen (F-09c)
+
+**Doppelte Zustellung bleibt bewusst ungelöst.** Vor dem Bauen noch einmal geprüft: Das
+Zeitfenster für eine doppelte Zustellung ist ein Tab-Absturz zwischen dem erfolgreichen
+Schreiben in die Datenbank und dem `remove()` aus der IndexedDB-Warteschlange – ein
+Millisekunden-Fenster. Eine echte Lösung (eine Idempotenz-Spalte an `review`, geprüft von
+`submitAnswer()` vor dem Anwenden) bräuchte eine Migration und eine RLS-Nachprüfung – eine
+neue Tabellen-Spalte ist immer eine Entscheidung, kein Nebeneffekt. Für dieses seltene
+Risiko unverhältnismäßig; bleibt hier benannt, keine stillschweigende Lücke.
+
+**„Fehlerfälle beim Reconnect" bedeutete konkret: ein Rückgabewert, der zwei Dinge
+verschluckte.** `submitAnswer()` gab bis hierhin `null` sowohl zurück, wenn keine Kind-Rolle
+aktiv war (vorübergehend – kann sich ändern) als auch, wenn die Karte nicht mehr existierte
+(endgültig – wird sich nie ändern). `flushAnswerQueue()` konnte beides nicht unterscheiden
+und brach in beiden Fällen ab, um die Reihenfolge zu wahren – mit der Folge, dass eine
+einzige inzwischen gelöschte Karte (z. B. weil das Set währenddessen gelöscht wurde) die
+gesamte Warteschlange **für immer** blockiert hätte, nicht nur bis zum nächsten Sync-Versuch.
+`AnswerResult` ist jetzt eine Vereinigung aus drei Zuständen (`ok`/`not_authorized`/
+`not_found`), `flushAnswerQueue()` bekommt einen dritten `DeliveryResult`
+(`"ok"`/`"retry"`/`"discard"`) statt eines bloßen Wahrheitswerts: `"retry"` bricht ab wie
+bisher, `"discard"` entfernt den Eintrag und macht mit dem Rest weiter.
+
+**Das sichtbare Signal lebt in `PracticeSession`, nicht in `ActiveCard`.** Die Warteschlange
+betrifft das ganze Fenster, nicht nur die Karte, die einen Eintrag ausgelöst hat – „1 Antwort
+wartet" soll auch auf der Übersicht stehen, wenn jemand zwischendurch „Zur Übersicht"
+angetippt hat. `ActiveCard` bekommt stattdessen eine punktuelle, kontextuelle Ergänzung:
+Direkt unter einer Rückmeldung, die über die Warteschlange ging, steht „Wird synchronisiert,
+sobald wieder Netz da ist." – ruhig, keine Farbe, kein Alarm (§15), und nur dort, wo sie
+gerade zutrifft.

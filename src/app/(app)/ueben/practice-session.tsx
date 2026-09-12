@@ -1,9 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Block, Button, Notice, PageHeader, Stack } from "@/components/shell/primitives";
+import {
+  createIndexedDbAnswerQueue,
+  flushAnswerQueue,
+  previewOutcome,
+  type DeliveryResult,
+  type QueuedAnswer,
+} from "@/lib/vocab/answer-queue";
 import { buildMultipleChoiceOptions } from "@/lib/vocab/distractors";
 import {
   advance,
@@ -23,6 +30,42 @@ import {
 } from "./actions";
 
 type Phase = "wahl" | "uebung" | "fertig";
+
+/**
+ * Eine Warteschlange fürs ganze Browser-Fenster, nicht je Komponente – sie
+ * überlebt einen Neu-Mount von `PracticeSession` (z. B. nach „Zur
+ * Übersicht") und sogar einen Neuladen der Seite, weil sie in IndexedDB
+ * liegt (F-09b, ADR 0010). Das Erzeugen selbst rührt `indexedDB` noch nicht
+ * an – das passiert erst in `openDb()`, beim ersten echten Aufruf.
+ */
+const answerQueueStore = createIndexedDbAnswerQueue();
+
+/**
+ * Eine wartende Antwort nachliefern – derselbe `submitAnswer()`-Aufruf wie
+ * im Online-Fall, kein zweiter Schreibweg (ADR 0010 Entscheidung 2).
+ * Übersetzt dessen drei Ausgänge (F-09c) in einen `DeliveryResult`:
+ * `not_authorized` ist vorübergehend (`"retry"`, ADR 0010 – die
+ * Reihenfolge muss stehen bleiben), `not_found` ist endgültig (`"discard"`
+ * – eine gelöschte Karte kommt nicht zurück, egal wie oft man es versucht).
+ * `navigator.onLine === false` scheitert ohne Versuch, statt auf einen
+ * Netzwerk-Timeout zu warten.
+ */
+async function submitQueuedAnswer(answer: QueuedAnswer): Promise<DeliveryResult> {
+  if (!navigator.onLine) return "retry";
+  try {
+    const result = await submitAnswer({
+      cardId: answer.cardId,
+      mode: answer.mode,
+      given: answer.given,
+      responseMs: answer.responseMs,
+    });
+    if (result.status === "ok") return "ok";
+    if (result.status === "not_found") return "discard";
+    return "retry";
+  } catch {
+    return "retry";
+  }
+}
 
 /** Ein bereits fertig geladener Set-Modus-Einstieg (V-04), von `page.tsx` aus
  *  `?set=` gelesen – startet die Session direkt, ohne über „wahl" zu laufen. */
@@ -62,6 +105,20 @@ export type InitialSetSession = {
  * gibt für diesen Einstieg keinen zweiten Auswahl-Bildschirm. `isSetSession`
  * merkt sich das nur für den Rückweg: „Zur Übersicht" muss dann `?set=` aus
  * der URL nehmen, sonst startete ein Neuladen dieselbe Session erneut.
+ *
+ * **Offline** (F-09b, ADR 0010): Bricht `submitAnswer()` ab (kein Netz, ein
+ * Fangportal), landet die Antwort in `@/lib/vocab/answer-queue`s
+ * IndexedDB-Warteschlange, die Rückmeldung kommt trotzdem echt – dieselbe
+ * Klassifikation, die der Server nutzen würde, nur noch nicht persistiert.
+ * Bei Rückkehr ins Netz (oder beim nächsten Laden dieser Seite) liefert
+ * `flushAnswerQueue()` die Warteschlange sequenziell nach, über genau
+ * denselben `submitAnswer()`-Aufruf – keine zweite Wahrheit über den
+ * FSRS-Zustand, nur zeitversetzt.
+ *
+ * `pendingCount`/`discardedCount` (F-09c) leben hier, nicht in `ActiveCard`:
+ * Die Warteschlange ist sitzungsübergreifend, die Anzeige soll es auch sein
+ * – „1 Antwort wartet" darf auch auf der Übersicht stehen, nicht nur
+ * während der Karte, die sie ausgelöst hat.
  */
 export function PracticeSession({
   bySubject,
@@ -91,6 +148,32 @@ export function PracticeSession({
         )
       : null,
   );
+  const [pendingCount, setPendingCount] = useState(0);
+  const [discardedCount, setDiscardedCount] = useState(0);
+
+  const refreshPendingCount = useCallback(() => {
+    void answerQueueStore.list().then((rows) => setPendingCount(rows.length));
+  }, []);
+
+  /**
+   * Wartende Antworten nachliefern und die Anzeige danach auffrischen.
+   * Ausgelöst dreifach (F-09c): einmal hier fürs Laden der Seite, beim
+   * `online`-Ereignis, und direkt nach jedem neuen Eintrag (siehe
+   * `ActiveCard`s `onQueued`-Prop) – kein Warten auf den nächsten der drei.
+   */
+  const trySync = useCallback(() => {
+    void flushAnswerQueue(answerQueueStore, submitQueuedAnswer).then((result) => {
+      if (result.discarded > 0) setDiscardedCount((n) => n + result.discarded);
+      refreshPendingCount();
+    });
+  }, [refreshPendingCount]);
+
+  useEffect(() => {
+    refreshPendingCount();
+    trySync();
+    window.addEventListener("online", trySync);
+    return () => window.removeEventListener("online", trySync);
+  }, [trySync, refreshPendingCount]);
 
   function startSession(subjectName: string, loaded: SessionCardContent[]) {
     setIsSetSession(false);
@@ -127,6 +210,7 @@ export function PracticeSession({
     return (
       <>
         <PageHeader title="Üben" trailing="Geschafft" />
+        <PendingAnswersNotice pendingCount={pendingCount} discardedCount={discardedCount} />
         <Block title="Geschafft" emphasized>
           <Notice>
             {isSetSession
@@ -144,6 +228,7 @@ export function PracticeSession({
     return (
       <>
         <PageHeader title="Üben" trailing={`${activeLabel} · ${done} von ${session.total}`} />
+        <PendingAnswersNotice pendingCount={pendingCount} discardedCount={discardedCount} />
         <ActiveCard
           // Neu gemountet bei jeder Karte statt per Effekt zurückgesetzt –
           // `shownAt` und das Tippfeld starten so garantiert frisch, ohne
@@ -156,6 +241,7 @@ export function PracticeSession({
             if (isSessionComplete(next)) setPhase("fertig");
           }}
           onExit={backToOverview}
+          onQueued={trySync}
         />
       </>
     );
@@ -166,6 +252,7 @@ export function PracticeSession({
       <PageHeader title="Üben" />
 
       <div className="flex flex-col gap-3">
+        <PendingAnswersNotice pendingCount={pendingCount} discardedCount={discardedCount} />
         {setLoadFailed ? (
           <Notice>
             Dieses Set ließ sich gerade nicht laden – vielleicht wurde es in der Zwischenzeit
@@ -196,6 +283,40 @@ export function PracticeSession({
           </>
         )}
       </div>
+    </>
+  );
+}
+
+/**
+ * Ruhiges Signal statt Alarm (F-09c, §15): kein Rot, keine Uhr, nur ein
+ * `Notice` wie jede andere Statuszeile auf dieser Seite. Erscheint auf allen
+ * drei Bildschirmen (Übersicht, Übung, Geschafft), weil die Warteschlange
+ * das ganze Fenster betrifft, nicht nur die Karte, die sie ausgelöst hat.
+ */
+function PendingAnswersNotice({
+  pendingCount,
+  discardedCount,
+}: {
+  pendingCount: number;
+  discardedCount: number;
+}) {
+  if (pendingCount === 0 && discardedCount === 0) return null;
+  return (
+    <>
+      {pendingCount > 0 ? (
+        <Notice>
+          {pendingCount === 1
+            ? "1 Antwort wartet auf Synchronisierung."
+            : `${pendingCount} Antworten warten auf Synchronisierung.`}
+        </Notice>
+      ) : null}
+      {discardedCount > 0 ? (
+        <Notice>
+          {discardedCount === 1
+            ? "1 frühere Antwort ließ sich nicht mehr zuordnen – vermutlich wurde die Karte inzwischen gelöscht."
+            : `${discardedCount} frühere Antworten ließen sich nicht mehr zuordnen – vermutlich wurden die Karten inzwischen gelöscht.`}
+        </Notice>
+      ) : null}
     </>
   );
 }
@@ -278,18 +399,29 @@ const OUTCOME_STYLE: Record<Outcome, { border: string; bg: string; text: string;
     },
   };
 
-type Reveal = { outcome: Outcome; given: string; mode: "mc" | "tippen" };
+type Reveal = {
+  outcome: Outcome;
+  given: string;
+  mode: "mc" | "tippen";
+  /** Über die Warteschlange gegangen, noch nicht bestätigt (F-09c). */
+  pending: boolean;
+};
 
 function ActiveCard({
   cards,
   session,
   onResult,
   onExit,
+  onQueued,
 }: {
   cards: SessionCardContent[];
   session: SessionState;
   onResult: (next: SessionState) => void;
   onExit: () => void;
+  /** Ruft nach jedem neuen Warteschlangen-Eintrag `PracticeSession`s
+   *  `trySync()` – ein sofortiger Zustellversuch statt Warten auf das
+   *  nächste `online`-Ereignis, plus Auffrischen der Anzeige. */
+  onQueued: () => void;
 }) {
   const current = currentCard(session);
   const content = cards.find((c) => c.cardId === current?.cardId) ?? null;
@@ -314,17 +446,55 @@ function ActiveCard({
 
   const expected = content.direction === "vorwaerts" ? content.translation : content.term;
 
+  /**
+   * Online zuerst, Warteschlange als Rückfall (F-09b, ADR 0010). Eine schon
+   * wartende Warteschlange erzwingt den Rückfall auch dann, wenn `navigator.
+   * onLine` gerade wieder `true` ist: `ts-fsrs` ist zustandsbehaftet, eine
+   * neue Antwort dürfte eine ältere, noch nicht zugestellte, nie überholen.
+   */
   function submit(given: string) {
     if (!content) return;
+
     startTransition(async () => {
-      const result = await submitAnswer({
+      const responseMs = Date.now() - shownAt;
+      const alreadyQueued = (await answerQueueStore.list()).length > 0;
+
+      if (!alreadyQueued && navigator.onLine) {
+        try {
+          const result = await submitAnswer({
+            cardId: content.cardId,
+            mode: content.mode,
+            given,
+            responseMs,
+          });
+          // Keine Kind-Rolle (mehr) aktiv oder keine DB – kein Offline-Fall,
+          // nicht in die Warteschlange nehmen (F-09c: `not_found` bräuchte
+          // hier ohnehin keine Sonderbehandlung, die Karte stünde gar nicht
+          // erst zur Auswahl, wäre sie schon gelöscht).
+          if (result.status !== "ok") return;
+          setReveal({ outcome: result.outcome, given, mode: content.mode, pending: false });
+          return;
+        } catch {
+          // Netzwerkfehler trotz `navigator.onLine === true` (z. B. ein
+          // Fangportal) – unten wie offline behandeln.
+        }
+      }
+
+      await answerQueueStore.enqueue({
+        id: crypto.randomUUID(),
         cardId: content.cardId,
         mode: content.mode,
         given,
-        responseMs: Date.now() - shownAt,
+        responseMs,
+        queuedAt: Date.now(),
       });
-      if (!result) return;
-      setReveal({ outcome: result.outcome, given, mode: content.mode });
+      onQueued();
+      setReveal({
+        outcome: previewOutcome(content.mode, given, expected, responseMs),
+        given,
+        mode: content.mode,
+        pending: true,
+      });
     });
   }
 
@@ -380,6 +550,12 @@ function ActiveCard({
             ) : null}
           </div>
         )}
+
+        {reveal.pending ? (
+          <p className="text-tinte-leise text-xs">
+            Wird synchronisiert, sobald wieder Netz da ist.
+          </p>
+        ) : null}
 
         <Button onClick={() => onResult(advance(session, reveal.outcome))}>Weiter</Button>
       </Block>

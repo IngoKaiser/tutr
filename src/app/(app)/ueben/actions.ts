@@ -254,7 +254,21 @@ export async function loadSetSessionCards(
   });
 }
 
-export type AnswerResult = { outcome: Outcome };
+/**
+ * Drei Ausgänge statt eines bloßen `null` (F-09c) – `null` verschluckte bis
+ * hierhin zwei ganz verschiedene Fälle: „im Moment nicht möglich, später
+ * vielleicht wieder" und „wird nie mehr möglich sein". Die Offline-
+ * Warteschlange (`flushAnswerQueue()`) muss beide unterscheiden können:
+ * Ersteres bricht den weiteren Sync ab (Reihenfolge wahren), Zweiteres darf
+ * den Eintrag verwerfen und mit dem Rest weitermachen – sonst blockiert eine
+ * einzige inzwischen gelöschte Karte die gesamte Warteschlange für immer.
+ */
+export type AnswerResult =
+  | { status: "ok"; outcome: Outcome }
+  /** Keine Kind-Rolle (mehr) aktiv, oder keine Datenbank – kann sich ändern. */
+  | { status: "not_authorized" }
+  /** Karte oder Vokabel existiert nicht mehr – wird sich nicht mehr ändern. */
+  | { status: "not_found" };
 
 /**
  * Eine Antwort einreichen. `given` ist die getippte oder angeklickte
@@ -270,23 +284,23 @@ export async function submitAnswer(input: {
   mode: "mc" | "tippen";
   given: string;
   responseMs: number;
-}): Promise<AnswerResult | null> {
+}): Promise<AnswerResult> {
   const actor = await requireStudentActor();
-  if (!actor || actor.role !== "student") return null;
+  if (!actor || actor.role !== "student") return { status: "not_authorized" };
 
   type CardRow = { fsrs_state: unknown; direction: Direction; vocab_item_id: string };
   type VocabRow = { term: string; translation: string };
 
-  const result = await withActor(actor, async (tx) => {
+  return withActor(actor, async (tx): Promise<AnswerResult> => {
     const [card] = await tx.execute<CardRow>(
       sql`select fsrs_state, direction, vocab_item_id from card where id = ${input.cardId}`,
     );
-    if (!card) return null;
+    if (!card) return { status: "not_found" };
 
     const [vocab] = await tx.execute<VocabRow>(
       sql`select term, translation from vocab_item where id = ${card.vocab_item_id}`,
     );
-    if (!vocab) return null;
+    if (!vocab) return { status: "not_found" };
 
     // Karte zeigt term→translation oder translation→term, je nach Richtung.
     const expected = card.direction === "vorwaerts" ? vocab.translation : vocab.term;
@@ -312,10 +326,8 @@ export async function submitAnswer(input: {
           values (${actor.studentId}, ${input.cardId}, ${applied.rating}, ${input.responseMs})`,
     );
 
-    return { outcome };
+    return { status: "ok", outcome };
   });
-
-  return result;
 }
 
 /**

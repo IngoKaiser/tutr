@@ -6,6 +6,33 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **F-09c: Sync sichtbar, Warteschlange blockiert nicht mehr an einer gelöschten Karte.**
+  `submitAnswer()` gab bisher `null` sowohl bei fehlender Kind-Rolle (vorübergehend) als auch bei
+  einer inzwischen gelöschten Karte (endgültig) zurück – ununterscheidbar für die Offline-
+  Warteschlange, die deshalb bei **jedem** dieser Fälle abbrach. Eine einzige gelöschte Karte
+  (z. B. weil ihr Set währenddessen verschwand) hätte die ganze Warteschlange für immer
+  blockiert, nicht nur bis zum nächsten Versuch. `AnswerResult` unterscheidet jetzt `ok`/
+  `not_authorized`/`not_found`; `flushAnswerQueue()` verwirft einen `not_found`-Eintrag und macht
+  mit dem Rest weiter, statt dort steckenzubleiben. Dazu ein ruhiges, sichtbares Signal (§15,
+  kein Alarm): „N Antworten warten auf Synchronisierung" auf allen drei Übungs-Bildschirmen,
+  plus „Wird synchronisiert, sobald wieder Netz da ist." direkt unter einer Rückmeldung, die über
+  die Warteschlange ging. Details in [ADR 0010](docs/adr/0010-offline-vokabelsessions.md)
+  (Nachtrag). Bewusst weiterhin offen: doppelte Zustellung bei einem Absturz im
+  Millisekundenfenster zwischen Datenbankschreiben und Entfernen aus der Warteschlange – eine
+  echte Lösung bräuchte eine Idempotenz-Spalte samt Migration, unverhältnismäßig für dieses
+  seltene Risiko
+- **F-09b: Offline-Antwortwarteschlange fürs Üben.** Bricht `submitAnswer()` ab (kein Netz, ein
+  Fangportal) oder ist `navigator.onLine` schon `false`, landet die Antwort in einer
+  IndexedDB-Warteschlange (`src/lib/vocab/answer-queue.ts`) statt zu scheitern – die Rückmeldung
+  kommt trotzdem sofort und ehrlich, über dieselbe Klassifikation (`classifyMultipleChoice`/
+  `classifyTyped`), die der Server nutzen würde. Bei Rückkehr ins Netz (oder beim nächsten Laden
+  von `/ueben`) liefert `flushAnswerQueue()` die Warteschlange sequenziell nach, über genau den
+  bestehenden `submitAnswer()`-Aufruf – keine zweite Wahrheit über den FSRS-Zustand, nur
+  zeitversetzt. Steht schon eine Antwort in der Warteschlange, geht jede weitere ebenfalls
+  hinein, selbst wenn das Netz zwischenzeitlich zurück ist: `ts-fsrs` ist zustandsbehaftet, eine
+  neue Antwort darf eine ältere, noch nicht zugestellte, nie überholen. Details in
+  [ADR 0010](docs/adr/0010-offline-vokabelsessions.md) (Nachtrag). Noch offen (F-09c): sichtbares
+  Sync-Signal, doppelte Zustellung bei einem Abbruch mitten im Sync
 - **F-09a: Service Worker fürs App-Shell-Precaching, entkoppelt von Turbopack.** `@serwist/next`
   hängt sich in `next.config.js`s `webpack()`-Hook, den Turbopack (Next-16-Standard für `dev`
   **und** `build`) nicht ausführt – siehe [ADR 0010](docs/adr/0010-offline-vokabelsessions.md).
