@@ -6,6 +6,18 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **Doku: Standard-Notenschlüssel, drei ADR-Nachträge, drei fehlende Tickets.** Aufräumrunde
+  nach ADR 0017–0019. **K-05** wird zum kuratierten Schulprofil und bringt neben Ferien und
+  Halbjahresgrenze den **Notenschlüssel** mit: Vorbelegung 92/81/67/50/30 % (IHK-Schlüssel),
+  editierbar wie §7 es verlangt – Schulnoten in der Sek I sind nicht einheitlich, deshalb
+  Vorschlag statt Maß, und der Ausklapper aus ADR 0018 D5 sagt das dazu. Neu **P-07**
+  (Erinnerungen 7/2/1 Tage vorher, immer mit Vorschlag statt schrumpfender Zahl) und **K-06**
+  (Halbjahresansicht als Streifen über der Terminliste, zeigt Last statt Termine). Nachträge:
+  **ADR 0012** – `material` ist die erste Tabelle, deren Elternsicht zeilenweise aus der Herkunft
+  folgt statt aus der Tabelle; **ADR 0016** – D5 ist abgelöst, die Blocker werden mit P-03 jetzt
+  gebraucht, `themen` mit P-01, `start`/`ende` weiterhin von niemandem; **ADR 0018** – der
+  Notenschlüssel ist entschieden statt offen.
+
 - **Doku: ADR 0018 (Rückmeldung ohne Urteil) und ADR 0019 (Fotos aufbewahren).** Schließt die
   drei offenen Entscheidungen aus dem Prüfungs-Abgleich. **ADR 0018:** Das Zeitbudget ist ein
   Deckel für den Planer, nie ein Ziel für sie – Vorgabe 15 Min je Fach, danach der gleitende

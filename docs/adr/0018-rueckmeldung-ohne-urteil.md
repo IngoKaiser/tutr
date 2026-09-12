@@ -104,8 +104,14 @@ zurückgegebenen Arbeit (P-05).
 - **P-04** gibt Punkte und Lernziel-Auswertung aus, keine Note; „Was wäre das als Note?" ist
   ausklappbar; Wiederholung erzeugt neue Aufgaben zu denselben Lernzielen; Timer optional.
 - §14 Frage 3 ist damit beantwortet und wird im Backlog gestrichen.
-- Offen bleibt der Notenschlüssel selbst: `school_profile.grading_scale` liegt als JSONB ohne
-  Inhalt im Schema. D5 braucht ihn – ohne ihn entfällt der Ausklapper, ohne dass sonst etwas fehlt.
+- **Der Notenschlüssel kommt als kuratierter Vorschlag** (K-05, zusammen mit den Ferien):
+  `school_profile.grading_scale` wird mit den verbreiteten Schwellen 92 / 81 / 67 / 50 / 30 %
+  vorbelegt (der sogenannte IHK-Schlüssel, der auch an Schulen weit verbreitet ist) und ist
+  editierbar, wie §7 es verlangt. Wichtig für D5: Schulnoten in der Sek I sind **nicht**
+  bundesweit einheitlich – jede Schule, oft jede Lehrkraft, rechnet etwas anders. Der Ausklapper
+  muss das sagen („nach dem hinterlegten Schlüssel – deine Schule rechnet vielleicht anders"),
+  sonst behauptet eine Umrechnung eine Genauigkeit, die es nicht gibt. Ohne hinterlegten
+  Schlüssel entfällt der Ausklapper, ohne dass sonst etwas fehlt.
 
 ## Abgelehnte Alternativen
 

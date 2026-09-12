@@ -94,7 +94,9 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Kalibrierung: Selbsteinschätzung vor dem Aufdecken                                    | 🌑    | P-06    |
 |                          | Stoffsammler „Was kommt dran?“ (bestätigt / erwartet / selbst eintragen)              | 🌑    | P-01    |
 |                          | Lernstreifen: drei Wochen Vorlauf, Fixpunkte, „Heute keine Zeit“                      | 🌑    | P-03    |
-|                          | Ferien und Halbjahresgrenze (Seed je Bundesland)                                      | 🌑    | K-05    |
+|                          | Kuratiertes Schulprofil: Ferien, Halbjahr, Standard-Notenschlüssel                    | 🌑    | K-05    |
+|                          | Erinnerungen 7/2/1 Tage vorher, mit Vorschlag statt Countdown                         | 🌑    | P-07    |
+|                          | Halbjahresansicht: Streifen über der Terminliste                                      | 🌑    | K-06    |
 | **Tutor & Hausaufgaben** |                                                                                       | 🌓    |         |
 |                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                         | ✅    | T-01a   |
 |                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen“, Streaming                | ✅    | T-02    |

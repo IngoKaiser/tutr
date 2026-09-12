@@ -179,3 +179,19 @@ Verständnis.
 (`parent_student.consent_at`, ADR 0005). Daraus folgt aber kein Anspruch, alles zu lesen:
 Einwilligung in eine Verarbeitung ist etwas anderes als Zugriff auf ihr Ergebnis. Der
 Rechtsgrund trägt die Verarbeitung, nicht die Einsicht.
+
+## Nachtrag (ADR 0019): Bilder erben die Sicht ihrer Herkunft
+
+Die Liste oben nennt Tabellen. Mit [ADR 0019](0019-fotos-aufbewahren.md) kommt etwas hinzu,
+das sich nicht über die Tabelle einordnen lässt: `material` (M-01) nimmt Bilder aus
+**beiden** Welten auf. Ein Foto, das sie bewusst zu einem Thema ablegt, ist Stoffplan und
+damit nach D2 für Eltern lesbar. Ein Foto aus einer Hausaufgaben- oder Tutorsitzung ist
+Protokoll und fällt unter D3 – Eltern sehen es nie.
+
+Die Zeile allein sagt das nicht, denn beide hängen am selben Thema. Deshalb trägt jedes Bild
+ein Herkunftsfeld (`tutor` · `hausaufgabe` · `material` · `arbeit`), und **die Policy
+entscheidet danach, nicht nach dem Ablageort** (ADR 0019 D4). Im Zweifel gilt die engere
+Sicht.
+
+Damit steht `material` nicht pauschal auf einer der beiden Listen – es ist die erste Tabelle,
+deren Sichtbarkeit zeilenweise aus der Herkunft folgt.

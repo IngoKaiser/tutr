@@ -226,3 +226,21 @@ K-03/K-04 bleiben bestehen, geschärft um die Bausteine, die sie jetzt konsumier
 | K-02c | Review-Screen (kanalneutral): Entwurfsliste, Gruppen-Einrichtung beim ersten Mal, Re-Import-Ansicht, Übernehmen      | §6 M7, §15 |
 | K-03  | Bild-Import (bestehend, geschärft): Vision-Schema liefert `CalendarImportDraft[]`, nutzt K-02b/c                     | §6 M7      |
 | K-04  | Datei-Import (bestehend, geschärft): CSV/XLSX/ICS-Parser liefern `CalendarImportDraft[]`, nutzt K-02b/c              | §6 M7      |
+
+## Nachtrag (P-03): Die Blocker werden jetzt gebraucht
+
+D5 hält fest, dass Ferien, Fahrten und Projektwochen zwar erkannt, aber nicht gespeichert
+werden – „der einzige Abnehmer für Blocker ist der Lernplan (M7), und der hat noch kein
+Ticket", und: „Diese Entscheidung fällt neu, sobald ein Lernplan-Ticket geschnitten wird."
+
+Das ist am 12. 9. 2026 geschehen: **P-03** rechnet den Lernplan rückwärts vom Termin und muss
+Tage überspringen, an denen nicht gelernt wird. Ein Plan, der in die Herbstferien hinein
+verteilt, ist falsch, und zwar sichtbar falsch. Damit gilt D5 nicht mehr: Blocker werden
+gespeichert, sobald P-03 gebaut wird. Die Ferien selbst kommen nicht aus dem Import, sondern
+als kuratierte Seed-Daten je Bundesland (**K-05**) – der Import liefert die
+schulspezifischen Blocker, die in keinem Ferienkalender stehen (Projektwoche, Fahrt,
+beweglicher Ferientag).
+
+Unverändert bleiben die beiden anderen Teile von D5: Der **Themen-Hinweis** wird mit P-01
+gebraucht (der Stoffsammler „Was kommt dran?" liest ihn als Kandidat), **`start`/`ende`**
+weiterhin von niemandem – der Lernstreifen aus P-03 zeigt Tage, keine Uhrzeiten.
