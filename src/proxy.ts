@@ -88,7 +88,13 @@ export const config = {
   // Weiterleitung statt der Datei – die Anweisung, ihn auszusperren, käme
   // nie an. Beim Entwickeln unsichtbar, weil der Dev-Actor-Bypass oben den
   // Proxy überspringt; erst der echte Deploy hat es gezeigt.
+  // `sw.js` aus demselben Grund (F-09a): Eine Weiterleitung statt der Datei
+  // lässt `navigator.serviceWorker.register()` scheitern – ein Service
+  // Worker muss mit einer echten JS-Antwort von genau der Skript-URL
+  // antworten, keine Weiterleitung. Gefunden gegen einen echten
+  // `next start`, nicht in der Entwicklung sichtbar (derselbe Dev-Actor-
+  // Bypass wie bei robots.txt).
   matcher: [
-    "/((?!anmelden|registrieren|wiederherstellen|konto-geloescht|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest|robots.txt).*)",
+    "/((?!anmelden|registrieren|wiederherstellen|konto-geloescht|auth|_next/static|_next/image|favicon.ico|icon-.*\\.png|manifest.webmanifest|robots.txt|sw.js).*)",
   ],
 };

@@ -4,6 +4,29 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ## [Unreleased]
 
+### Added
+
+- **F-09a: Service Worker fürs App-Shell-Precaching, entkoppelt von Turbopack.** `@serwist/next`
+  hängt sich in `next.config.js`s `webpack()`-Hook, den Turbopack (Next-16-Standard für `dev`
+  **und** `build`) nicht ausführt – siehe [ADR 0010](docs/adr/0010-offline-vokabelsessions.md).
+  Statt `@serwist/next`/`serwist` (aus `package.json` entfernt, waren ungenutzt) baut ein
+  handgeschriebenes `src/sw.ts` (keine npm-Importe, per `tsc` kompiliert) mit `@serwist/build`
+  als `postbuild`-Schritt eine `public/sw.js`, die `.next/static`s Chunks vorcacht – 19 Dateien,
+  716 KB bei diesem Stand. `next dev`/`next build` bleiben unangetastet auf Turbopack.
+  Registrierung nur in Produktion (`RegisterServiceWorker`), räumt in jeder anderen Umgebung
+  aktiv eine bestehende Registrierung ab. Bewusst **kein** Caching von Seiten/Navigationen: `/ueben`
+  ist kindspezifisch gerendert, ein URL-only-Cache würde die Geschwister-Trennung (ADR 0006) am
+  Service Worker vorbei umgehen – ein Neuladen von `/ueben` offline funktioniert deshalb weiterhin
+  nicht, das ist Aufgabe von F-09b. Gegen einen echten `next build && next start` verifiziert,
+  nicht nur angenommen (Chromium/Playwright, Offline-Simulation)
+
+### Fixed
+
+- `src/proxy.ts`s Ausnahmeliste leitete `/sw.js` auf `/anmelden` um (fehlte neben
+  `manifest.webmanifest`/`robots.txt`) – eine Weiterleitung statt einer echten Antwort lässt
+  `navigator.serviceWorker.register()` scheitern. Unsichtbar in der Entwicklung (Dev-Actor-Bypass
+  überspringt den Proxy dort ohnehin), gefunden beim Prüfen von F-09a gegen einen echten Build
+
 ### Changed
 
 - **V-04: Modi beim Vokabel-Üben, ohne `/ueben` zu überladen.** Von den fünf Modi aus

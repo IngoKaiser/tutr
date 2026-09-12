@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/build-sw.mts",
     "start": "next start",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
@@ -28,7 +29,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
-    "@serwist/next": "^9.5.12",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.1",
     "@supabase/ssr": "^0.12.6",
@@ -40,12 +40,12 @@
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "serwist": "^9.5.12",
     "ts-fsrs": "^5.4.2",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@serwist/build": "^9.5.12",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

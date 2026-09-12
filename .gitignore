@@ -21,6 +21,11 @@
 /.next/
 /out/
 
+# Service Worker (F-09a): generiert bei jedem `next build` aus src/sw.ts,
+# nie von Hand bearbeitet – ein committeter Stand wäre sofort veraltet.
+/public/sw.js
+/public/sw.js.map
+
 # production
 /build
 
