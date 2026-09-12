@@ -11,7 +11,6 @@ import {
   leseKapitelAusFoto,
   ordneVorhandenesLehrwerkZu,
   speichereNeuesLehrwerk,
-  sucheLehrwerkImInternet,
   type LehrwerkChapter,
   type LehrwerkKontext,
   type NeuesLehrwerkInput,
@@ -25,7 +24,7 @@ const MINI_BUTTON =
 const NICHT_EINGERICHTET =
   "Auf diesem Gerät nicht eingerichtet. Ein vorhandenes Lehrwerk zuordnen funktioniert weiter.";
 
-type Sicht = "uebersicht" | "kandidaten" | "kanalwahl" | "foto" | "suche" | "review";
+type Sicht = "uebersicht" | "kandidaten" | "foto" | "review";
 
 type FotoStatus = "wartet" | "verkleinert" | "liest" | "fertig" | "fehler";
 
@@ -46,22 +45,18 @@ type Entwurf = {
   verlag: string;
   jahrgangsstufe: string;
   kapitel: EntwurfKapitel[];
-  quelle: "foto" | "claude_vorwissen";
-  quellen: string[];
-  hinweis: string | null;
+  quelle: "foto";
   /** Gesetzt, wenn ein **eigenes** Lehrwerk bearbeitet statt neu angelegt wird. */
   bearbeitetTextbookId: string | null;
 };
 
-function leererEntwurf(quelle: Entwurf["quelle"]): Entwurf {
+function leererEntwurf(): Entwurf {
   return {
     titel: "",
     verlag: "",
     jahrgangsstufe: "",
     kapitel: [],
-    quelle,
-    quellen: [],
-    hinweis: null,
+    quelle: "foto",
     bearbeitetTextbookId: null,
   };
 }
@@ -73,10 +68,12 @@ function kapitelZeile(k: LehrwerkChapter): EntwurfKapitel {
 /**
  * Lehrwerk pro Fach erfassen (L-01, §7/§10, ADR 0009 Nachtrag 12.9.2026).
  *
- * Zwei Erfassungswege (Foto/Websuche) münden in **eine** editierbare
- * Kapitelliste (`sicht === "review"`) – das deckt „manuell" mit ab, ohne
- * einen dritten Weg zu bauen: Wer nichts fotografiert oder sucht, öffnet
- * dieselbe Liste leer und trägt Kapitel von Hand ein.
+ * Die Websuche ist mit L-02 wieder raus (eine Suche kostete real 0,37–0,51 $,
+ * mehr als der gesamte Stundendeckel – `docs/PLAN.md`). Übrig bleibt **ein**
+ * Erfassungsweg (Foto) in **eine** editierbare Kapitelliste
+ * (`sicht === "review"`) – das deckt „manuell" weiterhin mit ab, ohne einen
+ * eigenen Weg zu bauen: Wer nichts fotografiert, öffnet dieselbe Liste leer
+ * und trägt Kapitel von Hand ein.
  */
 export function LehrwerkVerwalten({
   kontext,
@@ -101,9 +98,6 @@ export function LehrwerkVerwalten({
     };
   }, []);
 
-  const [titelHinweis, setTitelHinweis] = useState("");
-  const [sucheLaeuft, setSucheLaeuft] = useState(false);
-  const [sucheFehler, setSucheFehler] = useState<string | null>(null);
   const galerieRef = useRef<HTMLInputElement>(null);
   const kameraRef = useRef<HTMLInputElement>(null);
 
@@ -175,7 +169,7 @@ export function LehrwerkVerwalten({
       }
       aktualisiereFoto(eintrag.id, { status: "fertig", erkannt: result.kapitel.length });
       setEntwurf((prev) => {
-        const basis = prev ?? leererEntwurf("foto");
+        const basis = prev ?? leererEntwurf();
         return {
           ...basis,
           titel: basis.titel || result.titel || "",
@@ -198,34 +192,6 @@ export function LehrwerkVerwalten({
     }
   }
 
-  async function suchen() {
-    setSucheFehler(null);
-    setSucheLaeuft(true);
-    const result = await sucheLehrwerkImInternet(titelHinweis, kontext.subjectName);
-    setSucheLaeuft(false);
-    if (!result) return setSucheFehler("Dafür fehlt die Berechtigung.");
-    if (!result.ok) return setSucheFehler(result.fehler);
-    if (!result.gefunden) {
-      setSucheFehler(
-        result.hinweis ?? "Kein eindeutiges Lehrwerk gefunden. Trag Titel und Kapitel selbst ein.",
-      );
-      setEntwurf({ ...leererEntwurf("claude_vorwissen"), titel: titelHinweis.trim() });
-      setSicht("review");
-      return;
-    }
-    setEntwurf({
-      titel: result.titel ?? titelHinweis.trim(),
-      verlag: result.verlag ?? "",
-      jahrgangsstufe: result.jahrgangsstufe?.toString() ?? "",
-      kapitel: result.kapitel.map(kapitelZeile),
-      quelle: "claude_vorwissen",
-      quellen: result.quellen,
-      hinweis: result.hinweis,
-      bearbeitetTextbookId: null,
-    });
-    setSicht("review");
-  }
-
   function bearbeiten() {
     if (!kontext.zugewiesen) return;
     setEntwurf({
@@ -234,8 +200,6 @@ export function LehrwerkVerwalten({
       jahrgangsstufe: kontext.zugewiesen.jahrgangsstufe?.toString() ?? "",
       kapitel: kontext.zugewiesen.kapitel.map(kapitelZeile),
       quelle: "foto",
-      quellen: [],
-      hinweis: null,
       bearbeitetTextbookId: kontext.zugewiesen.textbookId,
     });
     setSicht("review");
@@ -243,7 +207,7 @@ export function LehrwerkVerwalten({
 
   function weiterZurKapitelliste() {
     for (const f of fotosRef.current) URL.revokeObjectURL(f.vorschauUrl);
-    setEntwurf((prev) => prev ?? leererEntwurf("foto"));
+    setEntwurf((prev) => prev ?? leererEntwurf());
     setSicht("review");
   }
 
@@ -275,7 +239,7 @@ export function LehrwerkVerwalten({
 
   function kapitelHinzufuegen() {
     setEntwurf((prev) => {
-      const basis = prev ?? leererEntwurf("foto");
+      const basis = prev ?? leererEntwurf();
       return {
         ...basis,
         kapitel: [...basis.kapitel, { id: crypto.randomUUID(), titel: "", seiten: "" }],
@@ -306,7 +270,6 @@ export function LehrwerkVerwalten({
     if (!result.ok) return setAktionFehler(result.fehler);
     setEntwurf(null);
     setFotos([]);
-    setTitelHinweis("");
     setSicht("uebersicht");
   }
 
@@ -332,7 +295,7 @@ export function LehrwerkVerwalten({
             <div className="flex flex-wrap gap-2">
               <Button
                 quiet
-                onClick={() => setSicht(kontext.kandidaten.length > 0 ? "kandidaten" : "kanalwahl")}
+                onClick={() => setSicht(kontext.kandidaten.length > 0 ? "kandidaten" : "foto")}
               >
                 Ändern
               </Button>
@@ -357,9 +320,7 @@ export function LehrwerkVerwalten({
               Ohne Lehrwerk läuft {kontext.subjectName} über eigene Themen weiter – ein Lehrwerk
               liefert nur die Kapitel-Reihenfolge und, bei Sprachen, die Vokabel-Units.
             </Notice>
-            <Button
-              onClick={() => setSicht(kontext.kandidaten.length > 0 ? "kandidaten" : "kanalwahl")}
-            >
+            <Button onClick={() => setSicht(kontext.kandidaten.length > 0 ? "kandidaten" : "foto")}>
               Lehrwerk erfassen
             </Button>
           </Block>
@@ -404,32 +365,11 @@ export function LehrwerkVerwalten({
           </ul>
           {aktionFehler ? <Notice>{aktionFehler}</Notice> : null}
           <div className="flex flex-wrap gap-2">
-            <Button quiet onClick={() => setSicht("kanalwahl")}>
+            <Button quiet onClick={() => setSicht("foto")}>
               Neues Lehrwerk erfassen
             </Button>
             <Button quiet onClick={() => setSicht("uebersicht")}>
               Zurück
-            </Button>
-          </div>
-        </Block>
-      </div>
-    );
-  }
-
-  // --- Kanalwahl: Foto oder Websuche ----------------------------------------
-  if (sicht === "kanalwahl") {
-    return (
-      <div className="flex flex-col gap-3">
-        <PageHeader title={`Lehrwerk · ${kontext.subjectName}`} back={back} />
-        <Block title="Wie soll tutr das Lehrwerk finden?">
-          <Notice>
-            Beides liefert einen Entwurf der Kapitelliste, den du davor noch änderst – gespeichert
-            wird erst nach deiner Bestätigung.
-          </Notice>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setSicht("foto")}>Foto vom Inhaltsverzeichnis</Button>
-            <Button quiet onClick={() => setSicht("suche")}>
-              Claude im Internet suchen lassen
             </Button>
           </div>
         </Block>
@@ -570,57 +510,12 @@ export function LehrwerkVerwalten({
     );
   }
 
-  // --- Websuche ----------------------------------------------------------
-  if (sicht === "suche") {
-    if (!fotoVerfuegbar) {
-      return (
-        <div className="flex flex-col gap-3">
-          <PageHeader title={`Lehrwerk · ${kontext.subjectName}`} back={back} />
-          <Notice>{NICHT_EINGERICHTET}</Notice>
-        </div>
-      );
-    }
-    return (
-      <div className="flex flex-col gap-3">
-        <PageHeader title={`Lehrwerk · ${kontext.subjectName}`} back={back} />
-        <Block title="Claude im Internet suchen lassen">
-          <Notice>
-            Titel oder ein Stichwort reicht (z. B. „Découvertes 4&ldquo; oder „das Klett-Mathebuch
-            8&ldquo;). Das Ergebnis ist ein Vorschlag – ungeprüft, mit Quellenangabe, änderbar vor
-            dem Speichern.
-          </Notice>
-          <input
-            value={titelHinweis}
-            onChange={(e) => setTitelHinweis(e.target.value)}
-            placeholder="Titel oder Stichwort"
-            className={FIELD}
-            autoFocus
-          />
-          {sucheFehler ? <Notice>{sucheFehler}</Notice> : null}
-          <Button
-            onClick={() => void suchen()}
-            disabled={sucheLaeuft || titelHinweis.trim().length < 2}
-          >
-            {sucheLaeuft ? "Sucht …" : "Suchen"}
-          </Button>
-        </Block>
-      </div>
-    );
-  }
-
   // --- Review: gemeinsame editierbare Kapitelliste --------------------------
   if (sicht === "review" && entwurf) {
     return (
       <div className="flex flex-col gap-3">
         <PageHeader title={`Lehrwerk · ${kontext.subjectName}`} back={back} />
         <Block title="Angaben prüfen">
-          {entwurf.quelle === "claude_vorwissen" ? (
-            <Notice>
-              Vorschlag von Claude – ungeprüft.{" "}
-              {entwurf.quellen.length > 0 ? `Quellen: ${entwurf.quellen.join(", ")}` : ""}
-              {entwurf.hinweis ? ` ${entwurf.hinweis}` : ""}
-            </Notice>
-          ) : null}
           <label className="flex flex-col gap-1.5">
             <span className="text-[0.8125rem] font-medium">Titel</span>
             <input

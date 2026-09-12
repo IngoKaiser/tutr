@@ -12,14 +12,12 @@ const {
   ordneVorhandenesLehrwerkZu,
   entferneZuordnung,
   leseKapitelAusFoto,
-  sucheLehrwerkImInternet,
   speichereNeuesLehrwerk,
   aktualisiereEigenesLehrwerk,
 } = vi.hoisted(() => ({
   ordneVorhandenesLehrwerkZu: vi.fn(async () => ({ ok: true as const })),
   entferneZuordnung: vi.fn(async () => true),
   leseKapitelAusFoto: vi.fn(),
-  sucheLehrwerkImInternet: vi.fn(),
   speichereNeuesLehrwerk: vi.fn(async () => ({ ok: true as const })),
   aktualisiereEigenesLehrwerk: vi.fn(async () => ({ ok: true as const })),
 }));
@@ -28,7 +26,6 @@ vi.mock("./actions", () => ({
   ordneVorhandenesLehrwerkZu,
   entferneZuordnung,
   leseKapitelAusFoto,
-  sucheLehrwerkImInternet,
   speichereNeuesLehrwerk,
   aktualisiereEigenesLehrwerk,
 }));
@@ -83,12 +80,12 @@ describe("LehrwerkVerwalten", () => {
     vi.clearAllMocks();
   });
 
-  it("ohne Kandidaten geht „Lehrwerk erfassen“ direkt zur Kanalwahl", () => {
+  it("ohne Kandidaten geht „Lehrwerk erfassen“ direkt zum Foto-Schritt (L-02: keine Kanalwahl mehr)", () => {
     render(<LehrwerkVerwalten kontext={OHNE_LEHRWERK} fotoVerfuegbar={true} />);
     expect(screen.getByText("Kein Lehrwerk hinterlegt")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Lehrwerk erfassen" }));
-    expect(screen.getByText("Wie soll tutr das Lehrwerk finden?")).toBeInTheDocument();
+    expect(screen.getByText("Inhaltsverzeichnis abfotografieren")).toBeInTheDocument();
   });
 
   it("mit Kandidaten führt „Lehrwerk erfassen“ erst zur Zuordnungsliste, ohne KI", async () => {
@@ -115,7 +112,6 @@ describe("LehrwerkVerwalten", () => {
       <LehrwerkVerwalten kontext={OHNE_LEHRWERK} fotoVerfuegbar={true} />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Lehrwerk erfassen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Foto vom Inhaltsverzeichnis" }));
 
     waehleFotos(container, [new File(["a"], "seite-1.jpg", { type: "image/jpeg" })]);
     fireEvent.click(screen.getByRole("button", { name: /^Einlesen/ }));

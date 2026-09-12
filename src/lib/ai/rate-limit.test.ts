@@ -24,16 +24,6 @@ describe("kostenUsd", () => {
   it("0 Tokens kosten 0 $", () => {
     expect(kostenUsd(0, 0)).toBe(0);
   });
-
-  it("eine Websuche kostet 0,01 $, zusätzlich zu den Tokens (L-01)", () => {
-    expect(kostenUsd(0, 0, 1)).toBeCloseTo(0.01, 10);
-    expect(kostenUsd(0, 0, 3)).toBeCloseTo(0.03, 10);
-    expect(kostenUsd(1_000_000, 0, 1)).toBeCloseTo(2.01, 10);
-  });
-
-  it("ohne dritten Parameter bleibt die Websuche 0 $ – bestehende Aufrufe ohne Websuche-Tool", () => {
-    expect(kostenUsd(1_000_000, 1_000_000)).toBeCloseTo(kostenUsd(1_000_000, 1_000_000, 0), 10);
-  });
 });
 
 describe("pruefeLimit", () => {

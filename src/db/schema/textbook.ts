@@ -24,17 +24,18 @@ import { student } from "./student";
  * Die Unterscheidung ist nicht kosmetisch: `claude_vorwissen` muss in der UI
  * als Vorschlag markiert werden.
  *
- * `claude_vorwissen` grundet seit L-01 auf einer echten Websuche
- * (`suggestTextbookViaWebSearch()`), nicht mehr nur auf reinem
- * Trainingswissen wie in §10 skizziert – am Enum-Namen und an der Pflicht zur
- * Markierung ändert das nichts: Es bleibt Claudes Vorschlag, keine
- * abgelesene Tatsache, und wird erst nach Bestätigung gespeichert.
+ * `claude_vorwissen` gründete zwischen L-01 und L-02 kurz auf einer echten
+ * Websuche (`suggestTextbookViaWebSearch()`) statt auf reinem Trainingswissen
+ * – eine einzelne Suche kostete dort real 0,37–0,51 $, mehr als der gesamte
+ * Stundendeckel, deshalb mit L-02 wieder entfernt (`docs/PLAN.md`). Der Wert
+ * bleibt am Enum, weil ältere Zeilen ihn noch tragen können; aus der UI
+ * heraus entsteht er seither nicht mehr.
  *
  * `manuell` hat seit L-01 **keinen** eigenen Erfassungsweg in der App mehr
- * (Foto/Websuche decken das ab, die editierbare Kapitelliste danach ersetzt
- * die reine Handeingabe) – der Wert bleibt für kuratierte, per Migration
- * eingepflegte Lehrwerke (z. B. `seed.ts`) und für `verlags_pdf` als noch
- * ungebauten dritten Weg (§10) stehen.
+ * (Foto deckt das ab, die editierbare Kapitelliste danach ersetzt die reine
+ * Handeingabe) – der Wert bleibt für kuratierte, per Migration eingepflegte
+ * Lehrwerke (z. B. `seed.ts`) und für `verlags_pdf` als noch ungebauten
+ * dritten Weg (§10) stehen.
  */
 export const textbookSource = pgEnum("textbook_source", [
   "foto",
