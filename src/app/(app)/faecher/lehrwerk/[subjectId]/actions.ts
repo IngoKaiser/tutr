@@ -176,7 +176,7 @@ export async function entferneZuordnung(subjectId: string): Promise<boolean> {
   return true;
 }
 
-export type TextbookFotoErgebnis =
+export type FotoErgebnis =
   | {
       ok: true;
       titel: string | null;
@@ -193,7 +193,7 @@ export type TextbookFotoErgebnis =
 export async function leseKapitelAusFoto(
   image: InlineImage,
   subjectName: string,
-): Promise<TextbookFotoErgebnis | null> {
+): Promise<FotoErgebnis | null> {
   const actor = await requireActor();
   if (!actor) return null;
 
@@ -231,7 +231,7 @@ export async function leseKapitelAusFoto(
   }
 }
 
-export type TextbookSucheErgebnis =
+export type SucheErgebnis =
   | {
       ok: true;
       gefunden: boolean;
@@ -248,7 +248,7 @@ export type TextbookSucheErgebnis =
 export async function sucheLehrwerkImInternet(
   titelHinweis: string,
   subjectName: string,
-): Promise<TextbookSucheErgebnis | null> {
+): Promise<SucheErgebnis | null> {
   const actor = await requireActor();
   if (!actor) return null;
 
