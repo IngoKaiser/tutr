@@ -69,13 +69,17 @@ export function icsToDrafts(text: string, subjectNames: readonly string[]): IcsI
 
   const drafts: CalendarImportDraft[] = [];
   const fehler: string[] = [];
-  let aktuell: Record<string, string> | null = null;
+  // `Map`, nicht `Record<string, string>`: `feld.name` kommt unverändert aus
+  // der hochgeladenen Datei – ein Objekt-Property-Zugriff mit ungefiltertem
+  // Fremdtext ("`__proto__`" o. Ä.) wäre eine Prototype-Pollution-Angriffsfläche
+  // (CodeQL js/remote-property-injection). Eine `Map` kennt keine Prototype-Kette.
+  let aktuell: Map<string, string> | null = null;
   let index = 0;
 
   for (const zeile of zeilen) {
     const getrimmt = zeile.trim();
     if (getrimmt.toUpperCase() === "BEGIN:VEVENT") {
-      aktuell = {};
+      aktuell = new Map();
       continue;
     }
     if (getrimmt.toUpperCase() === "END:VEVENT") {
@@ -93,23 +97,27 @@ export function icsToDrafts(text: string, subjectNames: readonly string[]): IcsI
     }
     if (!aktuell) continue;
     const feld = parseZeile(getrimmt);
-    if (feld) aktuell[feld.name] = feld.value;
+    if (feld) aktuell.set(feld.name, feld.value);
   }
 
   return { drafts, fehler };
 }
 
 function eventZuDraft(
-  event: Record<string, string>,
+  event: Map<string, string>,
   subjectNames: readonly string[],
 ): CalendarImportDraft | null {
-  const date = event.DTSTART ? parseIcsDatum(event.DTSTART) : null;
-  const summary = event.SUMMARY ? entschaerfe(event.SUMMARY) : null;
+  const dtstart = event.get("DTSTART");
+  const rawSummary = event.get("SUMMARY");
+  const date = dtstart ? parseIcsDatum(dtstart) : null;
+  const summary = rawSummary ? entschaerfe(rawSummary) : null;
   if (!date || !summary) return null;
 
   const type = classifyEventType(summary);
   const subjectGuess = type === "blocker" ? null : resolveSubjectGuess(summary, subjectNames);
-  const categories = event.CATEGORIES ? entschaerfe(event.CATEGORIES) : null;
+  const rawCategories = event.get("CATEGORIES");
+  const categories = rawCategories ? entschaerfe(rawCategories) : null;
+  const rawDescription = event.get("DESCRIPTION");
 
   return {
     type,
@@ -120,6 +128,6 @@ function eventZuDraft(
     groups: splitGroupsText(categories),
     relevant: type !== "sonstiges",
     confidence: "hoch",
-    note: event.DESCRIPTION ? entschaerfe(event.DESCRIPTION) : null,
+    note: rawDescription ? entschaerfe(rawDescription) : null,
   };
 }
