@@ -14,6 +14,7 @@ import {
   ladeReviewKontext,
   speichereEigeneGruppen,
   uebernehmen,
+  type ImportQuelle,
   type ReviewKontext,
 } from "./actions";
 
@@ -43,10 +44,18 @@ type EingeordneteZeile = {
  * D2/D3/D7/D8). Kein Schreiben ohne „Übernehmen" – bis dahin lebt alles hier
  * in React-State.
  */
-export function ReviewListe({ drafts }: { drafts: CalendarImportDraft[] }) {
+export function ReviewListe({
+  drafts,
+  quelle,
+}: {
+  drafts: CalendarImportDraft[];
+  quelle: ImportQuelle;
+}) {
   const [kontext, setKontext] = useState<ReviewKontext | null | "laedt">("laedt");
   const [ownGroupsEntwurf, setOwnGroupsEntwurf] = useState<Record<string, boolean>>({});
   const [ownGroupsBestaetigt, setOwnGroupsBestaetigt] = useState<string[] | null>(null);
+  const [gruppenSpeichertLaeuft, setGruppenSpeichertLaeuft] = useState(false);
+  const [gruppenFehler, setGruppenFehler] = useState<string | null>(null);
   const [ausgewaehlt, setAusgewaehlt] = useState<Record<number, boolean>>({});
   const [fachUeberschreibung, setFachUeberschreibung] = useState<Record<number, string>>({});
   const [entfalleneStatus, setEntfalleneStatus] = useState<Record<string, "abgesagt">>({});
@@ -141,10 +150,29 @@ export function ReviewListe({ drafts }: { drafts: CalendarImportDraft[] }) {
     return suggestOwnGroups(alleTokens, kontext.className).includes(token);
   }
 
+  /**
+   * **Fund 12.9.2026:** Vorher lief das ungefangen – scheiterte
+   * `speichereEigeneGruppen()` (z. B. an der Datenbank), reagierte „Weiter"
+   * scheinbar gar nicht, weil die Ablehnung nirgends ankam. Jetzt sichtbar
+   * (Fehlermeldung) und mit Ladezustand, statt eines Knopfs, der nichts zu
+   * tun scheint.
+   */
   async function gruppenEinrichtungSpeichern() {
     const gewaehlt = alleTokens.filter((t) => ownGroupsEntwurf[t] ?? vorausgewaehlt(t));
-    await speichereEigeneGruppen(gewaehlt);
-    setOwnGroupsBestaetigt(gewaehlt);
+    setGruppenFehler(null);
+    setGruppenSpeichertLaeuft(true);
+    try {
+      const ok = await speichereEigeneGruppen(gewaehlt);
+      if (!ok) {
+        setGruppenFehler("Dafür fehlt die Berechtigung.");
+        return;
+      }
+      setOwnGroupsBestaetigt(gewaehlt);
+    } catch {
+      setGruppenFehler("Die Auswahl ließ sich nicht speichern. Versuch es noch einmal.");
+    } finally {
+      setGruppenSpeichertLaeuft(false);
+    }
   }
 
   async function absagen(eventId: string) {
@@ -168,7 +196,7 @@ export function ReviewListe({ drafts }: { drafts: CalendarImportDraft[] }) {
       .filter((z) => z.bucket === "verschoben" && (ausgewaehlt[z.index] ?? z.zeigenProminent))
       .map((z) => ({ eventId: z.matchedId!, date: z.draft.date }));
 
-    const result = await uebernehmen({ neu, verschoben });
+    const result = await uebernehmen({ quelle, neu, verschoben });
     setWirdUebernommen(false);
     if (!result) {
       setFehler("Dafür fehlt die Berechtigung.");
@@ -241,7 +269,13 @@ export function ReviewListe({ drafts }: { drafts: CalendarImportDraft[] }) {
               </li>
             ))}
           </ul>
-          <Button onClick={() => void gruppenEinrichtungSpeichern()}>Weiter</Button>
+          {gruppenFehler ? <Notice>{gruppenFehler}</Notice> : null}
+          <Button
+            onClick={() => void gruppenEinrichtungSpeichern()}
+            disabled={gruppenSpeichertLaeuft}
+          >
+            {gruppenSpeichertLaeuft ? "Speichert …" : "Weiter"}
+          </Button>
         </Block>
       </div>
     );

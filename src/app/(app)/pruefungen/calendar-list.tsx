@@ -290,16 +290,22 @@ function CreateEventForm({ subjects }: { subjects: CalendarSubject[] | null }) {
   }
 
   return (
-    <Block title="Neuer Termin">
-      <EventForm
-        subjects={subjects}
-        initial={{ subjectId: subjects[0]!.id, type: "klassenarbeit", title: "", date: "" }}
-        submitLabel="Eintragen"
-        action={(input) => createEvent(input)}
-        onDone={() => setOpen(false)}
-        onCancel={() => setOpen(false)}
-      />
-    </Block>
+    // `w-full`: Diese Karte steht in derselben `flex flex-wrap`-Zeile wie der
+    // „Klausurplan einlesen"-Link (für zwei schmale Knöpfe gedacht) – ohne
+    // volle Breite bleibt das aufgeklappte Formular so schmal wie sein
+    // Inhalt, statt die Seitenbreite zu nutzen (Fund 12.9.2026).
+    <div className="w-full">
+      <Block title="Neuer Termin">
+        <EventForm
+          subjects={subjects}
+          initial={{ subjectId: subjects[0]!.id, type: "klassenarbeit", title: "", date: "" }}
+          submitLabel="Eintragen"
+          action={(input) => createEvent(input)}
+          onDone={() => setOpen(false)}
+          onCancel={() => setOpen(false)}
+        />
+      </Block>
+    </div>
   );
 }
 

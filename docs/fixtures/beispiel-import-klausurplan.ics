@@ -1,0 +1,32 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//tutr//Klausurplan-Fixture//DE
+BEGIN:VEVENT
+UID:frz-arbeit-1@fixture.tutr
+DTSTART;VALUE=DATE:20260925
+SUMMARY:Klassenarbeit Französisch: Jg. 8 Frz. Arbeit
+DESCRIPTION:Jahrgangsarbeit
+END:VEVENT
+BEGIN:VEVENT
+UID:eng-arbeit-1@fixture.tutr
+DTSTART;VALUE=DATE:20260930
+SUMMARY:Klassenarbeit Eng: Englischarbeit Nr.1
+END:VEVENT
+BEGIN:VEVENT
+UID:projektwoche@fixture.tutr
+DTSTART;VALUE=DATE:20261012
+SUMMARY:Projektwoche
+END:VEVENT
+BEGIN:VEVENT
+UID:herbstferien@fixture.tutr
+DTSTART;VALUE=DATE:20261019
+SUMMARY:Herbstferien
+DESCRIPTION:Enddatum fehlt in der Quelle – nachtragen
+END:VEVENT
+BEGIN:VEVENT
+UID:tag-der-offenen-tuer@fixture.tutr
+DTSTART;VALUE=DATE:20270121
+SUMMARY:Tag der offenen Tür CvO
+DESCRIPTION:Schulveranstaltung\, kein Lernbezug
+END:VEVENT
+END:VCALENDAR

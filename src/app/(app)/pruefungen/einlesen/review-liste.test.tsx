@@ -59,7 +59,7 @@ describe("ReviewListe", () => {
 
   it("zeigt eine erkannte Zeile mit aufgelöstem Fach und übernimmt sie", async () => {
     ladeReviewKontext.mockResolvedValue(KONTEXT_OHNE_EINRICHTUNG);
-    render(<ReviewListe drafts={[draft({})]} />);
+    render(<ReviewListe drafts={[draft({})]} quelle="bild" />);
 
     await screen.findByText("Mathearbeit 8.5");
     expect(screen.getByRole("combobox")).toHaveValue(MATHEMATIK);
@@ -68,6 +68,7 @@ describe("ReviewListe", () => {
 
     await screen.findByText(/1 Termin angelegt/);
     expect(uebernehmen).toHaveBeenCalledWith({
+      quelle: "bild",
       neu: [
         {
           subjectId: MATHEMATIK,
@@ -83,7 +84,7 @@ describe("ReviewListe", () => {
 
   it("Gruppen-Einrichtung beim ersten Mal: schlägt eigene Tokens vor, speichert die Auswahl", async () => {
     ladeReviewKontext.mockResolvedValue({ ...KONTEXT_OHNE_EINRICHTUNG, ownGroups: null });
-    render(<ReviewListe drafts={[draft({ groups: ["8.1", "8.2", "8.5"] })]} />);
+    render(<ReviewListe drafts={[draft({ groups: ["8.1", "8.2", "8.5"] })]} quelle="bild" />);
 
     await screen.findByText("Welche Zeilen betreffen dich?");
     // "8.5" beginnt mit der eigenen Klasse und ist deshalb vorangehakt, die anderen nicht.
@@ -116,7 +117,7 @@ describe("ReviewListe", () => {
         },
       ],
     });
-    render(<ReviewListe drafts={[draft({})]} />);
+    render(<ReviewListe drafts={[draft({})]} quelle="bild" />);
 
     await screen.findByText(/06\.10\.2026 → 09\.10\.2026/);
     await screen.findByText("Frz. Arbeit (25.09.2026)");

@@ -6,11 +6,15 @@ import { Block, Button, Notice, PageHeader } from "@/components/shell/primitives
 import type { CalendarImportDraft } from "@/lib/calendar/import-draft";
 import { prepareImageForUpload } from "@/lib/image";
 
-import { fotoZuKlausurplan } from "./actions";
+import { dateiZuKlausurplan, fotoZuKlausurplan, type ImportQuelle } from "./actions";
 import { ReviewListe } from "./review-liste";
 
-const NICHT_EINGERICHTET =
+const DB_NICHT_EINGERICHTET =
   "Der Klausurplan-Import ist auf diesem Gerät nicht eingerichtet. Termine von Hand eintragen funktioniert weiter.";
+
+/** Nur der Foto-Kanal braucht Claude Vision – Datei-Import (K-04, ADR 0016 D4) nicht. */
+const BILD_NICHT_EINGERICHTET =
+  "Die Bilderkennung ist auf diesem Gerät nicht eingerichtet. Termine von Hand eintragen oder aus einer Datei einlesen funktioniert weiter.";
 
 /** Zustand eines einzelnen Fotos – dieselbe Idee wie bei der Hausaufgabe (`foto-aufnahme.tsx`, V-10). */
 type FotoStatus = "wartet" | "verkleinert" | "liest" | "fertig" | "fehler";
@@ -25,19 +29,47 @@ type FotoEintrag = {
   rotation: number;
 };
 
+/** ArrayBuffer → Base64, ohne die ganze Datei in einem `String.fromCharCode(...)`-Aufruf zu entpacken (Stack-Limit). */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binaer = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binaer += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binaer);
+}
+
 /**
- * Bild-Import Klausurplan (K-03, §6 M7, ADR 0016) – zwei Phasen auf **einer**
- * Seite statt zwei Routen: Fotos sammeln/einlesen (wie `foto-aufnahme.tsx`),
- * dann die Review-Liste. Kein zweiter URL-Schritt, weil es dazwischen nichts
- * Gespeichertes gibt, an das sich einer hängen könnte – die Entwürfe sind
- * laut ADR 0016 D2 bewusst ungespeichert, bis „Übernehmen" geklickt wird.
+ * Bild- **und** Datei-Import Klausurplan (K-03/K-04, §6 M7, ADR 0016). Eine
+ * Kanalwahl vor den bisherigen Phasen, danach wie gehabt: sammeln/einlesen,
+ * dann die kanalneutrale Review-Liste (K-02c) – kein zweiter URL-Schritt,
+ * weil es dazwischen nichts Gespeichertes gibt, an das sich einer hängen
+ * könnte (Entwürfe leben laut ADR 0016 D2 bewusst nur in React-State).
+ *
+ * `dbVerfuegbar`/`bildVerfuegbar` getrennt (K-04): Ohne `ANTHROPIC_API_KEY`
+ * geht nur der Foto-Kanal nicht – der Datei-Kanal braucht keinen
+ * Modellaufruf (ADR 0016 D4) und bleibt nutzbar.
  */
-export function KlausurplanEinlesen({ available }: { available: boolean }) {
-  const [phase, setPhase] = useState<"fotos" | "review">("fotos");
+export function KlausurplanEinlesen({
+  dbVerfuegbar,
+  bildVerfuegbar,
+}: {
+  dbVerfuegbar: boolean;
+  bildVerfuegbar: boolean;
+}) {
+  const [phase, setPhase] = useState<"wahl" | "fotos" | "datei" | "review">("wahl");
   const [fotos, setFotos] = useState<FotoEintrag[]>([]);
   const [drafts, setDrafts] = useState<CalendarImportDraft[]>([]);
+  const [quelle, setQuelle] = useState<ImportQuelle>("bild");
   const galerieRef = useRef<HTMLInputElement>(null);
   const kameraRef = useRef<HTMLInputElement>(null);
+  const dateiRef = useRef<HTMLInputElement>(null);
+
+  const [dateiName, setDateiName] = useState<string | null>(null);
+  const [dateiStatus, setDateiStatus] = useState<"liest" | "fertig" | "fehler" | null>(null);
+  const [dateiFehler, setDateiFehler] = useState<string[]>([]);
+  const [dateiErkannt, setDateiErkannt] = useState(0);
 
   const fotosRef = useRef(fotos);
   useEffect(() => {
@@ -116,20 +148,149 @@ export function KlausurplanEinlesen({ available }: { available: boolean }) {
     setPhase("review");
   }
 
-  if (!available) {
+  /** Eine Datei einlesen (K-04): CSV/ICS als Text, XLSX als Base64 (Binärformat). */
+  async function dateiVerarbeiten(file: File) {
+    setDateiName(file.name);
+    setDateiStatus("liest");
+    setDateiFehler([]);
+    setDateiErkannt(0);
+    try {
+      const istXlsx = file.name.toLowerCase().endsWith(".xlsx");
+      const input = istXlsx
+        ? { name: file.name, base64: arrayBufferToBase64(await file.arrayBuffer()) }
+        : { name: file.name, text: await file.text() };
+
+      const result = await dateiZuKlausurplan(input);
+      if (!result) {
+        setDateiStatus("fehler");
+        setDateiFehler(["Dafür fehlt die Berechtigung."]);
+        return;
+      }
+      if (!result.ok) {
+        setDateiStatus("fehler");
+        setDateiFehler([result.fehler]);
+        return;
+      }
+      setDateiStatus("fertig");
+      setDateiFehler(result.fehler);
+      setDateiErkannt(result.drafts.length);
+      setDrafts(result.drafts);
+    } catch {
+      setDateiStatus("fehler");
+      setDateiFehler(["Die Datei ließ sich nicht lesen. Versuch es noch einmal."]);
+    }
+  }
+
+  if (!dbVerfuegbar) {
     return (
       <div className="flex flex-col gap-3">
         <PageHeader
           title="Klausurplan einlesen"
           back={{ href: "/pruefungen", label: "Prüfungen" }}
         />
-        <Notice>{NICHT_EINGERICHTET}</Notice>
+        <Notice>{DB_NICHT_EINGERICHTET}</Notice>
       </div>
     );
   }
 
   if (phase === "review") {
-    return <ReviewListe drafts={drafts} />;
+    return <ReviewListe drafts={drafts} quelle={quelle} />;
+  }
+
+  if (phase === "wahl") {
+    return (
+      <div className="flex flex-col gap-3">
+        <PageHeader
+          title="Klausurplan einlesen"
+          back={{ href: "/pruefungen", label: "Prüfungen" }}
+        />
+        <Block title="Woher kommt der Plan?">
+          <Notice>
+            Aus einem Foto (Aushang, Schulportal-Ausdruck) oder aus einer Datei (Export aus
+            SchulDock o.&nbsp;Ä. als CSV, Excel oder Kalenderdatei). Beides landet danach in
+            derselben Übersicht – nichts wird gespeichert, bevor du es dort bestätigst.
+          </Notice>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => {
+                setQuelle("bild");
+                setPhase("fotos");
+              }}
+            >
+              Foto
+            </Button>
+            <Button
+              quiet
+              onClick={() => {
+                setQuelle("datei");
+                setPhase("datei");
+              }}
+            >
+              Datei
+            </Button>
+          </div>
+        </Block>
+      </div>
+    );
+  }
+
+  if (phase === "datei") {
+    const laeuft = dateiStatus === "liest";
+    return (
+      <div className="flex flex-col gap-3">
+        <PageHeader
+          title="Klausurplan einlesen"
+          back={{ href: "/pruefungen", label: "Prüfungen" }}
+        />
+        <Block title="Datei auswählen">
+          <Notice>
+            CSV, Excel (.xlsx) oder eine Kalenderdatei (.ics) – z.&nbsp;B. der SchulDock-Export.
+          </Notice>
+          <input
+            ref={dateiRef}
+            type="file"
+            accept=".csv,.xlsx,.ics,.ical"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void dateiVerarbeiten(file);
+            }}
+          />
+          <Button quiet onClick={() => dateiRef.current?.click()} disabled={laeuft}>
+            {laeuft ? "Liest …" : "Datei wählen"}
+          </Button>
+          {dateiName ? (
+            <Notice>
+              {dateiName}
+              {dateiStatus === "fertig"
+                ? ` – ${dateiErkannt} ${dateiErkannt === 1 ? "Zeile" : "Zeilen"} erkannt`
+                : ""}
+            </Notice>
+          ) : null}
+          {dateiFehler.map((f, i) => (
+            <Notice key={i}>{f}</Notice>
+          ))}
+          {dateiStatus === "fertig" && dateiErkannt > 0 ? (
+            <Button onClick={() => setPhase("review")}>Zur Übersicht</Button>
+          ) : null}
+        </Block>
+      </div>
+    );
+  }
+
+  // phase === "fotos": eigenes Gate, nicht das ganze Bauteil (K-04) – der
+  // Datei-Kanal braucht `ANTHROPIC_API_KEY` nicht.
+  if (!bildVerfuegbar) {
+    return (
+      <div className="flex flex-col gap-3">
+        <PageHeader
+          title="Klausurplan einlesen"
+          back={{ href: "/pruefungen", label: "Prüfungen" }}
+        />
+        <Notice>{BILD_NICHT_EINGERICHTET}</Notice>
+      </div>
+    );
   }
 
   const verarbeitungLaeuft = fotos.some((f) => f.status === "verkleinert" || f.status === "liest");

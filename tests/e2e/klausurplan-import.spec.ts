@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Bild-Import Klausurplan (K-03, §6 M7, ADR 0016) – Einstieg und
- * Galerie-Mechanik.
+ * Bild-Import Klausurplan (K-03, §6 M7, ADR 0016) – Einstieg (Kanalwahl,
+ * K-04) und Galerie-Mechanik.
  *
  * Der Vision-Aufruf selbst läuft hier **nicht**: In CI fehlt der
  * `ANTHROPIC_API_KEY` absichtlich (wie beim Foto-Import der Vokabeln, V-03b),
@@ -33,6 +33,21 @@ test.describe("Klausurplan-Import", () => {
     // Der Rückweg ist schon durch `shell.spec.ts` abgedeckt („jede Unterseite
     // trägt einen Rückweg", T-18) – hier reicht die Überschrift als Beleg,
     // dass die richtige Seite geladen hat.
+
+    // Ohne Datenbank (`DATABASE_URL` fehlt, wie im normalen E2E-Job ohne
+    // DB-Secret) zeigt die Seite schon vor der Kanalwahl "nicht
+    // eingerichtet" – dann gibt es gar keine Foto/Datei-Knöpfe zu finden.
+    const dbNichtEingerichtet = await page
+      .getByText(/nicht eingerichtet/)
+      .isVisible()
+      .catch(() => false);
+    test.skip(
+      dbNichtEingerichtet,
+      "Die Datenbank ist in dieser Umgebung nicht gesetzt (wie in CI).",
+    );
+
+    // Kanalwahl (K-04): erst Foto/Datei, danach wie gehabt.
+    await page.getByRole("button", { name: "Foto" }).click();
 
     const nichtEingerichtet = await page
       .getByText(/nicht eingerichtet/)
