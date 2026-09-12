@@ -6,6 +6,16 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **K-02b: Reine Bausteine für den Kalender-Import.** `CalendarImportDraft` – die
+  kanalneutrale Form, die Bild- (K-03) und Datei-Import (K-04) künftig beide füllen, statt
+  je einen eigenen Review-Screen zu bauen. `matchesOwnGroups()` löst den Gruppenfilter
+  (Bereichs-/Listen-Notation wie „8.1–8.5"/„8.1, 8.3" wird ausgeschrieben, leere Gruppen
+  heißen „betrifft alle" statt „betrifft niemanden" – wichtig für Blocker).
+  `matchReimport()` bildet §6 M7s Re-Import-Regel `(fach, gruppe, datum±7, titel)` als reine
+  Funktion ab: unverändert/verschoben/neu/entfallen, andere Gruppe zählt als anderer Termin
+  (ADR 0016 D7), nicht als Update. Beide Testdateien lesen die reale
+  `docs/fixtures/beispiel-import-klausurplan.json` statt sie nachzubauen
+
 - **K-02a: Schema-Grundlage für den Kalender-Import.** `calendar_event` bekommt `groups`
   (`text[]`, rohe Gruppentokens wie erkannt) und `source` (Enum `manuell`/`bild`/`datei`,
   Default `manuell` – K-01s bestehende Insert-Pfade bleiben unverändert). `school_year`
