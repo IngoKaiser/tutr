@@ -151,20 +151,28 @@ function SubjectRowItem({ subject, canManage }: { subject: SubjectRow; canManage
 
   if (!open) {
     return (
-      <li>
+      <li className="border-linie bg-papier flex items-center gap-3 rounded-[9px] border px-3 py-2.5">
         <button
           type="button"
           onClick={() => canManage && setOpen(true)}
           disabled={!canManage}
-          className="border-linie bg-papier hover:bg-papier-tief flex w-full items-center justify-between gap-3 rounded-[9px] border px-3 py-2.5 text-left disabled:cursor-default"
+          className="hover:text-koenigsblau min-w-0 flex-1 text-left disabled:cursor-default"
         >
           <span className="text-tinte text-[0.8125rem] font-medium">{subject.name}</span>
+        </button>
+        <div className="flex shrink-0 items-center gap-2.5">
           {subject.language ? (
-            <span className="text-tinte-leise shrink-0 text-[0.6875rem] font-semibold tracking-wide uppercase">
+            <span className="text-tinte-leise text-[0.6875rem] font-semibold tracking-wide uppercase">
               {languageLabel(subject.language)}
             </span>
           ) : null}
-        </button>
+          <Link
+            href={`/faecher/lehrwerk/${subject.id}`}
+            className="text-koenigsblau text-[0.75rem] font-medium underline underline-offset-2"
+          >
+            Lehrwerk
+          </Link>
+        </div>
       </li>
     );
   }

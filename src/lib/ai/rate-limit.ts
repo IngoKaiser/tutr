@@ -41,11 +41,24 @@ const USD_JE_INPUT_TOKEN = 2 / 1_000_000;
 const USD_JE_OUTPUT_TOKEN = 10 / 1_000_000;
 
 /**
- * Kosten eines oder mehrerer Aufrufe in US-$. Rein und ungerundet – eine
- * Schätzung für einen Deckel, keine Abrechnung auf den Cent.
+ * Websuche-Tool der Claude API (L-01, „Claude sucht das Lehrwerk"): 0,01 $ je
+ * Suche, **zusätzlich** zu den Tokens der Antwort – Anthropics eigene Angabe
+ * ist 10 $ je 1000 Suchen. Ohne diesen Posten würde `ai_usage` echte Kosten
+ * stumm unterzählen, sobald ein Aufruf das Tool nutzt.
  */
-export function kostenUsd(inputTokens: number, outputTokens: number): number {
-  return inputTokens * USD_JE_INPUT_TOKEN + outputTokens * USD_JE_OUTPUT_TOKEN;
+const USD_JE_SUCHANFRAGE = 10 / 1000;
+
+/**
+ * Kosten eines oder mehrerer Aufrufe in US-$. Rein und ungerundet – eine
+ * Schätzung für einen Deckel, keine Abrechnung auf den Cent. `searchRequests`
+ * ist 0 für alle Endpunkte ohne Websuche-Tool (Standardwert).
+ */
+export function kostenUsd(inputTokens: number, outputTokens: number, searchRequests = 0): number {
+  return (
+    inputTokens * USD_JE_INPUT_TOKEN +
+    outputTokens * USD_JE_OUTPUT_TOKEN +
+    searchRequests * USD_JE_SUCHANFRAGE
+  );
 }
 
 /**
@@ -134,25 +147,43 @@ async function leseKosten(tx: Transaction, endpoint: "tutor" | "vision"): Promis
   const [row] = await tx.execute<{
     eingabe_stunde: string;
     ausgabe_stunde: string;
+    suche_stunde: string;
     eingabe_tag: string;
     ausgabe_tag: string;
+    suche_tag: string;
     eingabe_woche: string;
     ausgabe_woche: string;
+    suche_woche: string;
   }>(sql`
     select
-      coalesce(sum(input_tokens)  filter (where created_at > now() - interval '1 hour'), 0)::text as eingabe_stunde,
-      coalesce(sum(output_tokens) filter (where created_at > now() - interval '1 hour'), 0)::text as ausgabe_stunde,
-      coalesce(sum(input_tokens)  filter (where created_at > now() - interval '1 day'), 0)::text  as eingabe_tag,
-      coalesce(sum(output_tokens) filter (where created_at > now() - interval '1 day'), 0)::text  as ausgabe_tag,
-      coalesce(sum(input_tokens)  filter (where created_at > now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})), 0)::text as eingabe_woche,
-      coalesce(sum(output_tokens) filter (where created_at > now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})), 0)::text as ausgabe_woche
+      coalesce(sum(input_tokens)    filter (where created_at > now() - interval '1 hour'), 0)::text as eingabe_stunde,
+      coalesce(sum(output_tokens)   filter (where created_at > now() - interval '1 hour'), 0)::text as ausgabe_stunde,
+      coalesce(sum(search_requests) filter (where created_at > now() - interval '1 hour'), 0)::text as suche_stunde,
+      coalesce(sum(input_tokens)    filter (where created_at > now() - interval '1 day'), 0)::text  as eingabe_tag,
+      coalesce(sum(output_tokens)   filter (where created_at > now() - interval '1 day'), 0)::text  as ausgabe_tag,
+      coalesce(sum(search_requests) filter (where created_at > now() - interval '1 day'), 0)::text  as suche_tag,
+      coalesce(sum(input_tokens)    filter (where created_at > now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})), 0)::text as eingabe_woche,
+      coalesce(sum(output_tokens)   filter (where created_at > now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})), 0)::text as ausgabe_woche,
+      coalesce(sum(search_requests) filter (where created_at > now() - make_interval(days => ${AUFBEWAHRUNG_TAGE})), 0)::text as suche_woche
     from ai_usage
     where student_id = app.student_id() and endpoint = ${endpoint}`);
 
   return {
-    stundeUsd: kostenUsd(Number(row?.eingabe_stunde ?? 0), Number(row?.ausgabe_stunde ?? 0)),
-    tagUsd: kostenUsd(Number(row?.eingabe_tag ?? 0), Number(row?.ausgabe_tag ?? 0)),
-    wocheUsd: kostenUsd(Number(row?.eingabe_woche ?? 0), Number(row?.ausgabe_woche ?? 0)),
+    stundeUsd: kostenUsd(
+      Number(row?.eingabe_stunde ?? 0),
+      Number(row?.ausgabe_stunde ?? 0),
+      Number(row?.suche_stunde ?? 0),
+    ),
+    tagUsd: kostenUsd(
+      Number(row?.eingabe_tag ?? 0),
+      Number(row?.ausgabe_tag ?? 0),
+      Number(row?.suche_tag ?? 0),
+    ),
+    wocheUsd: kostenUsd(
+      Number(row?.eingabe_woche ?? 0),
+      Number(row?.ausgabe_woche ?? 0),
+      Number(row?.suche_woche ?? 0),
+    ),
   };
 }
 
@@ -179,15 +210,23 @@ export async function bucheNutzung(tx: Transaction, endpoint: "tutor" | "vision"
   return row!.id;
 }
 
-/** Trägt Ein- und Ausgabe-Tokens nach, sobald der Aufruf fertig ist. */
+/**
+ * Trägt Ein- und Ausgabe-Tokens nach, sobald der Aufruf fertig ist.
+ * `searchRequests` (Standard 0) ist nur bei einem Aufruf mit Websuche-Tool
+ * ungleich null (L-01, „Claude sucht das Lehrwerk") – für alle anderen
+ * Endpunkte bleibt die Spalte auf ihrem Default.
+ */
 export async function ergaenzeTokenzahl(
   tx: Transaction,
   usageId: string,
   inputTokens: number,
   outputTokens: number,
+  searchRequests = 0,
 ): Promise<void> {
   await tx.execute(
-    sql`update ai_usage set input_tokens = ${inputTokens}, output_tokens = ${outputTokens}
+    sql`update ai_usage
+        set input_tokens = ${inputTokens}, output_tokens = ${outputTokens},
+            search_requests = ${searchRequests}
         where id = ${usageId}`,
   );
 }

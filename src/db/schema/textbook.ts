@@ -20,9 +20,21 @@ import { student } from "./student";
 
 /**
  * Woher die Kapitelstruktur stammt (§10: „Inhaltsverzeichnis-Foto
- * (zuverlässig) → Claudes Vorwissen (markiert) → Verlags-PDFs (manuell)",
- * dazu manuelle Eingabe aus L-01). Die Unterscheidung ist nicht kosmetisch:
- * `claude_vorwissen` muss in der UI als Vorschlag markiert werden.
+ * (zuverlässig) → Claudes Vorwissen (markiert) → Verlags-PDFs (manuell)").
+ * Die Unterscheidung ist nicht kosmetisch: `claude_vorwissen` muss in der UI
+ * als Vorschlag markiert werden.
+ *
+ * `claude_vorwissen` grundet seit L-01 auf einer echten Websuche
+ * (`suggestTextbookViaWebSearch()`), nicht mehr nur auf reinem
+ * Trainingswissen wie in §10 skizziert – am Enum-Namen und an der Pflicht zur
+ * Markierung ändert das nichts: Es bleibt Claudes Vorschlag, keine
+ * abgelesene Tatsache, und wird erst nach Bestätigung gespeichert.
+ *
+ * `manuell` hat seit L-01 **keinen** eigenen Erfassungsweg in der App mehr
+ * (Foto/Websuche decken das ab, die editierbare Kapitelliste danach ersetzt
+ * die reine Handeingabe) – der Wert bleibt für kuratierte, per Migration
+ * eingepflegte Lehrwerke (z. B. `seed.ts`) und für `verlags_pdf` als noch
+ * ungebauten dritten Weg (§10) stehen.
  */
 export const textbookSource = pgEnum("textbook_source", [
   "foto",

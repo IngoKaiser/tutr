@@ -28,19 +28,18 @@ security`.
    Mandant sieht nichts, und die Schreibrechte stimmen.
 5. **Zeile in der RLS-Matrix** in ADR 0004 D4.
 
-## Die vier Muster
+## Die drei Muster
 
 **Eigene Daten, beide schreiben** (`school_year`, `subject`,
-`school_year_subject`, ADR 0009 D1): beide Rollen `for all`, unterschieden
-nur durch `app.actor_role()`. Ein Kind ohne Elternkonto (ADR 0006 D1: „funktioniert
-ohne") muss ein Fach und ein Schuljahr selbst anlegen können – bei
-`for select` fürs Kind käme es dazu nie. Ursprünglich „Eltern schreiben,
-Kind liest" (siehe ADR 0004 D4); `school_year_textbook` blieb bei diesem
-älteren Muster.
-
-**Eigene Daten, Eltern schreiben** (`school_year_textbook`): Eltern
-`for all`, Kind `for select` – beide über dieselbe Bedingung, unterschieden
-nur durch `app.actor_role()`.
+`school_year_subject`, ADR 0009 D1; `school_year_textbook`, L-01, Nachtrag zu
+ADR 0009): beide Rollen `for all`, unterschieden nur durch
+`app.actor_role()`. Ein Kind ohne Elternkonto (ADR 0006 D1: „funktioniert
+ohne") muss ein Fach, ein Schuljahr und – seit L-01 – auch sein Lehrwerk
+selbst anlegen/zuordnen können – bei `for select` fürs Kind käme es dazu nie.
+Ursprünglich „Eltern schreiben, Kind liest" (siehe ADR 0004 D4); für
+`school_year` und `subject` mit ADR 0009 D1 korrigiert, für
+`school_year_textbook` erst später mit L-01 (die Tabelle kam nach ADR 0009
+dazu und wurde beim Schreiben von ADR 0009 übersehen).
 
 **Eigene Daten, Kind schreibt** (`topic`, `learning_objective`, `vocab_*`):
 umgekehrt – Kind `for all`, Eltern `for select`.

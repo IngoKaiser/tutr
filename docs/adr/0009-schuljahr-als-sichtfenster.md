@@ -192,6 +192,25 @@ protokollierten Weg wie das Fach „Englisch" selbst.
 Löschriegel (`deleteSubject()`) und die Fächerverwaltung insgesamt liefen beim Testen wie
 entworfen – keine Abweichung von D1–D4.
 
+## Nachtrag (L-01, 12.9.2026): `school_year_textbook` zieht nach
+
+D1 hatte bewusst nur `school_year` und `subject` umgedreht – `school_year_textbook` gab es
+noch nicht (kam mit F-04d, ADR 0004 D7), und ADR 0004s Kopfnotiz hielt fest: „bleibt
+unverändert bei Eltern lesen + schreiben, Kind liest". Beim Bauen von L-01 (Lehrwerk pro
+Fach erfassen) hat sich das als derselbe Rest erwiesen, den D1 schon einmal korrigiert hat:
+Ein Kind ohne Elternkonto (ADR 0006 D1) fotografiert sein Buch selbst, kann die Zuordnung
+zum Fach aber nicht speichern – exakt die Situation, die D1 für `subject` behoben hat, nur
+an einer Tabelle, die zum damaligen Zeitpunkt noch nicht existierte.
+
+**Entscheidung:** `school_year_textbook_student` wechselt von `for select` auf `for all`,
+mit `with check (student_id = app.student_id() and app.actor_role() = 'student')` – wortgleich
+zu `school_year_subject_student`. Die Elternpolicy bleibt unverändert; es kommt ein Recht
+dazu, keins entfällt. `textbook`/`chapter` selbst durften ohnehin schon beide Rollen
+beschreiben (ADR 0004 D7, kuratiert-oder-eigen) – nur die Zuordnungstabelle hinkte hinterher.
+
+Kein Widerspruch zu ADR 0012: Eltern verlieren keinen Einblick, der Stoffplan (worunter das
+Lehrwerk fällt) bleibt für sie sichtbar und schreibbar.
+
 ## Abgelehnte Alternative: `subject.school_year_id`
 
 Der direkte Weg — jedes Jahr eigene Fachzeilen — scheitert an `vocab_item.subject_id`

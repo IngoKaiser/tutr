@@ -1,6 +1,6 @@
 # Feature-Übersicht
 
-**Stand: 11. September 2026** · Bezug: `docs/PLAN.md` (Backlog mit Begründung je Ticket),
+**Stand: 12. September 2026** · Bezug: `docs/PLAN.md` (Backlog mit Begründung je Ticket),
 `docs/roadmap.md` (Arbeitsreihenfolge), `docs/konzept.md` (Spezifikation).
 
 Diese Tabelle ist der schnelle Blick von oben: wo steht welcher Bereich. Sie wird mit
@@ -48,7 +48,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Fach umbenennen, löschen mit Riegel                                                | ✅    | F-16a   |
 |                          | `subject.language` – Grundlage für Sprachrichtung                                  | ✅    | F-16a   |
 |                          | Schuljahr umschalten, Historie, Sommer-Rollover                                    | 🌑    | F-16b   |
-|                          | Lehrwerk pro Fach erfassen                                                         | 🌑    | L-01    |
+|                          | Lehrwerk pro Fach erfassen (Foto/Websuche → editierbare Kapitelliste)              | ✅    | L-01    |
 | **Vokabeln**             |                                                                                    | 🌓    |         |
 |                          | Schema: Set, Item (beide Richtungen), FSRS-Karten                                  | ✅    | V-01    |
 |                          | Sets + Vokabelverwaltung, Bearbeiten an Ort und Stelle                             | ✅    | V-03a   |

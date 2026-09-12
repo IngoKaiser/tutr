@@ -1,0 +1,1 @@
+ALTER TABLE "ai_usage" ADD COLUMN "search_requests" integer DEFAULT 0 NOT NULL;
