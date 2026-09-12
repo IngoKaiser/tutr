@@ -150,7 +150,7 @@ Siehe docs/konzept.md §12. Tickets werden nach Meilenstein 3 geschnitten.
 
 ## Entscheidungen / Offen
 
-- Pilotfach: Französisch oder Englisch? (Elternabend 15. 9.: Lehrwerke erfragen → Eingabe über L-01, nicht per Hand in die DB)
+- ~~Pilotfach: Französisch oder Englisch?~~ — **entschieden am 12. 9. 2026: Englisch.** Damit wird das Fach, an dem die Tiefe erprobt wird (P-00 Themen/Lernziele, M-01/M-02 Material, P-01 Prüfungsseite), Englisch – nicht Französisch. Die Französischarbeit am 25. 9. läuft unverändert über den fertigen Vokabelweg (V-01 bis V-06), der dafür nichts Zusätzliches braucht. Beantwortet §14 Frage 1; Lehrwerke kommen über L-01, nicht per Hand in die DB
 - ~~**Zeitbudget pro Tag für Lernplan**~~ — entschieden mit [ADR 0018](adr/0018-rueckmeldung-ohne-urteil.md) D1–D3: Deckel statt Ziel, gemessen statt erfragt (Vorgabe 15 Min je Fach), gefragt nur bei Ballung. Beantwortet §14 Frage 3
 - ~~**Probeprüfung benotet oder nicht?**~~ — entschieden mit [ADR 0018](adr/0018-rueckmeldung-ohne-urteil.md) D4–D6: bewertet, aber ohne Ziffer; die Note auf Abruf hinter einem Ausklapper; wiederholbar ist der eigentliche Hebel. Weicht von §6 M6 ab, dort dokumentiert
 - **Zielnote (§15): speichern ja, anzeigen wo?** Als von ihr gewähltes Ziel unkritisch – als täglicher Balken auf „Heute“ erzeugt sie Druck ohne Handlung (Befund zur Autonomie, siehe `docs/pruefungsvorbereitung.md` §4). Vorschlag: nur auf der Prüfungsseite, nie im Kopfbereich
