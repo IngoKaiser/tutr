@@ -6,6 +6,24 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **Doku: ADR 0017 (Materialtiefe und Kontextpaket), Vorlauf-Tickets.** Beantwortet die
+  Inhaltsseite der Prüfungsvorbereitung – wie Stoff jenseits von Vokabeln in die App kommt, ohne
+  dass jemand ein Archiv pflegt. **D1** drei Tiefenstufen (Volltext → Lernziele → Karten), jede aus
+  einem Anlass statt aus Aufforderung; **D2** Material entsteht aus dem, was ohnehin durchläuft
+  (`homework_task.prompt` trägt heute schon den Wortlaut jeder gerechneten Aufgabe),
+  `material.topic_id` nullable, Priorität entfällt; **D3** das Lehrwerk ist Zeiger, nie Inhalt;
+  **D4** Relevanz („kommt dran“) ist eine eigene Achse neben der Schicht („wer hat recht“), gespeist
+  vor allem aus der Ansage der Lehrkraft; **D5/D6** ein Kontextpaket je Thema mit Token-Deckel und
+  Prompt Caching statt RAG, Quellenmarker vom Server gesetzt und per Test geprüft wie beim
+  Sprachwächter; **D7** der Wissensgraph läuft über `objective_prerequisite`, nicht über Dokumente.
+  Daraus umgeschnitten: M-01 („aufheben statt erfassen“), M-02 (Lernziele vorschlagen), T-05
+  („Niveau-Anker je Lernziel“), T-01 (Blockbau + Markertest), P-00 (Relevanz-Feld), P-01
+  (Stoffsammler „Was kommt dran?“). Neu **P-03** mit den drei Horizonten und dem Lernstreifen –
+  heute+morgen inhaltlich fest, diese Woche nur die Tage, bis zur Arbeit nur Dichte; kein
+  Monatsraster, kein Kalenderimport. Neu **K-05** (Ferien + Halbjahresgrenze; `school_profile.holidays`
+  liegt seit F-04d leer im Schema) und **T-21** (Erklärstelle am Hinweisleiter nach dem V-13-Muster,
+  eigenes Ticket weil T-03 fertig ist).
+
 - **Doku: Prüfungsvorbereitung durchgerechnet, Meilenstein 3 geschnitten.** Neues
   `docs/pruefungsvorbereitung.md`: der Prüfungs-Regelkreis (Termin → Stoff → Plan → Üben →
   Probe → Arbeit → Nachbereitung → Mastery) als Diagramm, der Abgleich gegen die Lernforschung

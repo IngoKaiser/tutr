@@ -60,6 +60,7 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Foto-Import: erst sammeln dann „Einlesen“, drehen, einzeln entfernen                  | ✅    | V-10    |
 |                          | Wischen zum Löschen mit Rückgängig-Fenster (Liste + Waisen)                           | ✅    | V-11    |
 |                          | Erklärung des Lernrhythmus für Kinder (aufklappbar, SVG)                              | ✅    | V-13    |
+|                          | Erklärstelle am Hinweisleiter: „Warum nicht sofort die Lösung?“                       | 🌑    | T-21    |
 |                          | „Geprüft“-Zustand: akzeptierte Zeilen normal, Ungeprüftes nicht im Üben               | ✅    | V-09    |
 |                          | Fachbindung im Modell (ADR 0008)                                                      | ✅    | V-05    |
 |                          | Vokabeln ohne Set sichtbar/löschbar machen                                            | ✅    | V-03d   |
@@ -90,6 +91,9 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Probeprüfung: Generator, Auswertung je Lernziel                                       | 🌑    | P-04    |
 |                          | Arbeit zurück: Note, Fehlerklassifikation, Rückblick                                  | 🌑    | P-05    |
 |                          | Kalibrierung: Selbsteinschätzung vor dem Aufdecken                                    | 🌑    | P-06    |
+|                          | Stoffsammler „Was kommt dran?“ (bestätigt / erwartet / selbst eintragen)              | 🌑    | P-01    |
+|                          | Lernstreifen: drei Wochen Vorlauf, Fixpunkte, „Heute keine Zeit“                      | 🌑    | P-03    |
+|                          | Ferien und Halbjahresgrenze (Seed je Bundesland)                                      | 🌑    | K-05    |
 | **Tutor & Hausaufgaben** |                                                                                       | 🌓    |         |
 |                          | Architektur entschieden (ADR 0010: Streaming, Schema, Deckel)                         | ✅    | T-01a   |
 |                          | Chatfenster, Kontext-Chip (Fach), freie Frage + „Verstehen“, Streaming                | ✅    | T-02    |
@@ -120,8 +124,8 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Antwort vorlesen (`speechSynthesis`), abschaltbar                                     | ✅    | T-02d   |
 |                          | Echtzeit-Sprachdialog (zweiter Anbieter, an Bedingungen geknüpft)                     | 🌑    | T-06    |
 | **Material & Karten**    |                                                                                       | 🌑    |         |
-|                          | Material-Upload zu Thema (Foto/PDF/Link/Notiz)                                        | 🌑    | M-01    |
-|                          | Vision-Extraktion + Lernziel-Zuordnung                                                | 🌑    | M-02    |
+|                          | Material aufheben statt erfassen (Hausaufgabe, Tutor-Foto → Volltext am Thema)        | 🌑    | M-01    |
+|                          | Lernziele vorschlagen (Stufe B), bestätigt auf der Prüfungsseite                      | 🌑    | M-02    |
 |                          | Generisches Karten-Schema + FSRS-Session                                              | 🌑    | M-03    |
 |                          | Karten aus Material erzeugen                                                          | 🌑    | M-04    |
 | **Kurrikulum**           |                                                                                       | 🌑    |         |

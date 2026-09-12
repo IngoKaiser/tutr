@@ -1,8 +1,11 @@
 # Prüfungsvorbereitung: der Regelkreis, der Forschungsstand und die Lücken
 
 Stand: 12. September 2026 · Bezug: `docs/konzept.md` §3, §4 (Einstiege 5 und 6), §6 M4–M7, §8, §15 ·
-Tickets in `docs/PLAN.md` (P-00 bis P-06, T-20, V-04b) · Diagramme:
-[Artefakt „Der Prüfungs-Regelkreis"](https://claude.ai/code/artifact/72baf76c-7c10-461f-99fe-0d750f3d5631)
+Tickets in `docs/PLAN.md` (P-00 bis P-06, K-05, T-20, T-21, V-04b) · Inhaltsseite:
+[ADR 0017](adr/0017-materialtiefe-und-kontextpaket.md) · Diagramme:
+[„Der Prüfungs-Regelkreis"](https://claude.ai/code/artifact/72baf76c-7c10-461f-99fe-0d750f3d5631) ·
+[„Woher der Stoff kommt"](https://claude.ai/code/artifact/17152fa9-f19f-4b30-8440-c6e3a1f63aba) ·
+[„Der Lernstreifen"](https://claude.ai/code/artifact/544d4550-e22b-4bb5-b6f4-198d93dc644f)
 
 Dieses Dokument beantwortet drei Fragen, die beim Durchsehen des Konzepts offen blieben:
 Wie hängt die Prüfungsvorbereitung eigentlich zusammen? Was sagt die Lernforschung dazu?
@@ -136,16 +139,18 @@ an das tatsächliche Heft und an die tatsächliche Note. Der Vorsprung liegt als
 
 ## 6. Die Lücken, sortiert nach Abhängigkeit
 
-| #   | Lücke                                                                                                                            | Ticket            |
-| --- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| 1   | **Kein Weg zu einem Thema.** `topic`/`learning_objective` ohne Oberfläche – blockiert alles Weitere                              | **P-00**          |
-| 2   | **Mastery ist eine Idee, keine Tabelle.** Ohne sie kein „Sicherheit vs. Zielnote", keine Priorität im Plan, kein Fördern/Fordern | **P-02**          |
-| 3   | **Der Lernplan hat keine Rechenregel** – und die Blocker werden im Import verworfen                                              | **P-03**          |
-| 4   | **Die Probeprüfung fehlt** – der am besten belegte Mechanismus ist der am weitesten entfernte                                    | **P-04**          |
-| 5   | **Die zurückgegebene Arbeit fällt aus dem System.** Kein `result`, keine `target_grade`, kein Ticket                             | **P-05**          |
-| 6   | **„Mix" mischt das Falsche.** Heute Kartenarten (V-04), gemeint waren Themen                                                     | in **P-04**/V-04b |
-| 7   | **Niemand misst, ob sie sich richtig einschätzt.** `review` ohne `self_assessment`, T-04 offen                                   | **P-06**          |
-| 8   | **Freies Abrufen kommt nicht vor.** Karten prüfen Einzelfakten, nicht Zusammenhänge                                              | **T-20**          |
+| #   | Lücke                                                                                                                                         | Ticket            |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 1   | **Kein Weg zu einem Thema.** `topic`/`learning_objective` ohne Oberfläche – blockiert alles Weitere                                           | **P-00**          |
+| 2   | **Mastery ist eine Idee, keine Tabelle.** Ohne sie kein „Sicherheit vs. Zielnote", keine Priorität im Plan, kein Fördern/Fordern              | **P-02**          |
+| 3   | **Der Lernplan hat keine Rechenregel** – und die Blocker werden im Import verworfen                                                           | **P-03**          |
+| 4   | **Die Probeprüfung fehlt** – der am besten belegte Mechanismus ist der am weitesten entfernte                                                 | **P-04**          |
+| 5   | **Die zurückgegebene Arbeit fällt aus dem System.** Kein `result`, keine `target_grade`, kein Ticket                                          | **P-05**          |
+| 6   | **„Mix" mischt das Falsche.** Heute Kartenarten (V-04), gemeint waren Themen                                                                  | in **P-04**/V-04b |
+| 7   | **Niemand misst, ob sie sich richtig einschätzt.** `review` ohne `self_assessment`, T-04 offen                                                | **P-06**          |
+| 8   | **Freies Abrufen kommt nicht vor.** Karten prüfen Einzelfakten, nicht Zusammenhänge                                                           | **T-20**          |
+| 9   | **Der Vorlauf ist nirgends sichtbar.** „Heute“ ist Agenda, die Terminliste zeigt keine Lernzeit                                               | **P-03**          |
+| 10  | **Ferien und Halbjahr fehlen.** `school_profile.holidays` ist leeres JSONB ohne Leser – ein Plan ohne Ferien verplant Tage, die es nicht gibt | **K-05**          |
 
 ## 7. Entscheidungen, die anstehen
 
@@ -160,7 +165,20 @@ Diese drei gehören dem Menschen, nicht dem nächsten Ticket:
    täglicher Balken „so weit liegst du zurück" erzeugt sie Druck ohne Handlung. Vorschlag: Zielnote
    speichern, aber nur auf der Prüfungsseite zeigen, nie auf „Heute".
 
-## 8. Quellen
+## 8. Was daraus weiterführt
+
+Zwei Fragen, die beim Durchsprechen aufkamen und eigene Antworten bekommen haben:
+
+- **Wie kommt der Stoff überhaupt hinein, jenseits von Vokabeln?** → drei Tiefenstufen (Volltext →
+  Lernziele → Karten), Material aus dem, was ohnehin durchläuft, und ein Kontextpaket statt eines
+  Retrievers. Entschieden in [ADR 0017](adr/0017-materialtiefe-und-kontextpaket.md), Bilder in
+  [„Woher der Stoff kommt"](https://claude.ai/code/artifact/17152fa9-f19f-4b30-8440-c6e3a1f63aba).
+- **Wie zeigt man den Vorlauf, ohne etwas zu versprechen, das morgen anders aussieht?** → drei
+  Horizonte mit abnehmender Verbindlichkeit und ein Drei-Wochen-Streifen statt eines Monatskalenders.
+  Hängt an P-03 und K-05, Bilder in
+  [„Der Lernstreifen"](https://claude.ai/code/artifact/544d4550-e22b-4bb5-b6f4-198d93dc644f).
+
+## 9. Quellen
 
 - Dunlosky, Rawson, Marsh, Nathan & Willingham (2013): _Improving Students' Learning With Effective
   Learning Techniques_, Psychological Science in the Public Interest 14(1)
