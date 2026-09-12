@@ -138,6 +138,10 @@ export async function loadDueBySubject(): Promise<DueBySubject[] | null> {
             count(*) filter (where kpv.ganz_fest)::text as sitzt
           from karte_pro_vokabel kpv
           join subject s on s.id = kpv.subj_id
+          -- Nur Fächer des aktiven Schuljahres (ADR 0009 D3, Nachtrag F-16b):
+          -- ein Fach, das dieses Jahr nicht läuft, bleibt beim Üben still.
+          join school_year_subject sys on sys.subject_id = s.id
+          join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
           group by s.id, s.name, s.language
           having count(*) filter (where kpv.faellig) > 0`,
     );
@@ -236,12 +240,19 @@ export async function loadSessionCards(subjectId: string): Promise<SessionCardCo
   if (!actor) return null;
 
   return withActor(actor, async (tx) => {
+    // Nur Fächer des aktiven Schuljahres (ADR 0009 D3, Nachtrag F-16b) – bei
+    // beiden Quellen (fällig und Auffüllen) dieselbe Bedingung, sonst könnte
+    // ein Fach, das dieses Jahr nicht läuft, über den Aufüller trotzdem
+    // Karten in die Session schmuggeln.
     const due = await tx.execute<CardRow>(
       sql`select card_id, vocab_item_id, direction, state, term, translation from (
             select distinct on (c.vocab_item_id)
               c.id as card_id, c.vocab_item_id, c.direction, c.state,
               vi.term, vi.translation, c.due_at
-            from card c join vocab_item vi on vi.id = c.vocab_item_id
+            from card c
+            join vocab_item vi on vi.id = c.vocab_item_id
+            join school_year_subject sys on sys.subject_id = vi.subject_id
+            join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
             where c.due_at <= now() and vi.subject_id = ${subjectId}
               and ${practiceReadySql}
             order by c.vocab_item_id, random()
@@ -259,7 +270,10 @@ export async function loadSessionCards(subjectId: string): Promise<SessionCardCo
                     vi.term, vi.translation,
                     (c.fsrs_state ->> 'lapses')::int as lapses,
                     (c.fsrs_state ->> 'stability')::float as stability
-                  from card c join vocab_item vi on vi.id = c.vocab_item_id
+                  from card c
+                  join vocab_item vi on vi.id = c.vocab_item_id
+                  join school_year_subject sys on sys.subject_id = vi.subject_id
+                  join school_year sy on sy.id = sys.school_year_id and sy.status = 'aktiv'
                   where c.due_at > now() and vi.subject_id = ${subjectId}
                     and ${practiceReadySql}
                   order by c.vocab_item_id, random()

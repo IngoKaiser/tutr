@@ -129,6 +129,34 @@ describe.skipIf(!testDbAvailable())("RLS: Kind, Elternkonto, Verknüpfung", () =
     expect(errorChain(error)).toMatch(/row-level security/i);
   });
 
+  // --- Profilpflege durch das Kind selbst (F-06c) ---------------------------
+
+  test("ein Kind ändert Vorname, Jahrgang und Klasse seines eigenen Profils", async () => {
+    await runWithActor(app.db, student(S.ben), (tx) =>
+      tx.execute(
+        sql`update student set first_name = 'Benedikt', grade_level = 6, class_name = '6a'
+            where id = ${S.ben}`,
+      ),
+    );
+    const [row] = await admin.client<
+      { first_name: string; grade_level: number; class_name: string }[]
+    >`
+      select first_name, grade_level, class_name from student where id = ${S.ben}`;
+    expect(row).toMatchObject({ first_name: "Benedikt", grade_level: 6, class_name: "6a" });
+
+    // Zurücksetzen, damit spätere Tests (u. a. „Ben“ in der Kindliste) stimmen.
+    await admin.client`update student set first_name = 'Ben', grade_level = 5, class_name = null where id = ${S.ben}`;
+  });
+
+  test("ein Kind ändert nicht das Profil eines Geschwisters", async () => {
+    await runWithActor(app.db, student(S.ben), (tx) =>
+      tx.execute(sql`update student set first_name = 'Gehackt' where id = ${S.mia}`),
+    );
+    const [row] = await admin.client<{ first_name: string }[]>`
+      select first_name from student where id = ${S.mia}`;
+    expect(row.first_name).toBe("Mia");
+  });
+
   // --- Sichtbarkeit --------------------------------------------------------
 
   test("ein Kind sieht nur sich selbst – Geschwister nicht", async () => {

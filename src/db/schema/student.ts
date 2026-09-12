@@ -44,8 +44,9 @@ export const student = pgTable(
      * einmalig: Ein neuer überschreibt den alten, Einlösen löscht beide.
      * Gespeichert wird nur der Hash, wie bei `student_session.token_hash`.
      * Verbraucht wird er ausschließlich über `app.redeem_recovery_token()`
-     * (security definer) – das Kind selbst hat keine UPDATE-Policy auf diese
-     * Zeile, das bliebe sonst eine Hintertür zu F-06c (Profil bearbeiten).
+     * (security definer), nie über einen gewöhnlichen UPDATE-Pfad – auch
+     * nicht über `student_update_self` (F-06c): Diese Spalte taucht in
+     * `updateOwnProfile()` schlicht nie im `SET` auf.
      */
     recoveryTokenHash: text("recovery_token_hash"),
     recoveryExpiresAt: timestamp("recovery_expires_at", { withTimezone: true }),

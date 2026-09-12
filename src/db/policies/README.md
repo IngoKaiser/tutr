@@ -86,6 +86,27 @@ Boden: So entsteht nach ADR 0005 die Kind-Registrierung. Die ID erzeugt der
 Server unmittelbar davor, wählbar ist sie von außen nicht, und ein zweiter
 Versuch läuft in den Primärschlüssel.
 
+## Spaltenweite Enge lebt in der Server Action, nicht in der Policy
+
+`student_update_self` (F-06c) erlaubt dem Kind, seine eigene Zeile per `update`
+zu ändern – die **ganze** Zeile, nicht nur Vorname/Jahrgang/Klasse. Das ist
+Absicht: Postgres kennt keine spaltenweise Sichtbarkeit innerhalb einer
+Policy (siehe unten), eine engere Fassung bräuchte entweder einen Trigger
+(gibt es in diesem Projekt bewusst nirgends, vgl. ADR 0004 „`updated_at` …
+keine Trigger") oder eine zweite Tabelle nur für die sensiblen Spalten
+(`recovery_token_hash`, `recovery_expires_at`). Beides wäre für drei Felder
+unverhältnismäßig gewesen.
+
+Die tatsächliche Enge liegt deshalb in `updateOwnProfile()`
+(`src/app/(app)/einstellungen/actions.ts`): Nur diese drei Felder erscheinen
+je im `SET`. Das funktioniert, weil Mutationen ausschließlich über
+Server Actions mit einem festen, handgeschriebenen Eingabetyp laufen
+(CLAUDE.md) – ein Browser kann kein beliebiges SQL nachschieben. Wer eine
+Tabelle mit einer echten spaltenweisen Bedrohung baut (ein anderer
+_Actor-Kontext_ derselben DB-Rolle soll dieselbe Zeile nur teilweise ändern
+dürfen), braucht die Tabellen-Trennung aus „Eltern sehen nie Tutor-Verläufe"
+unten, nicht dieses Muster.
+
 ## Rekursion zwischen Policies
 
 Liest die Policy von A die Tabelle B, und B liest wieder A, bricht Postgres

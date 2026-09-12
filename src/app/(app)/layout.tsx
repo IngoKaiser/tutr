@@ -1,14 +1,21 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { loadOwnFirstName } from "@/app/(app)/einstellungen/actions";
 import { logout } from "@/app/anmelden/actions";
 import { ActorSwitch } from "@/components/dev/actor-switch";
+import { AccountMenu } from "@/components/shell/account-menu";
 import { BottomNav } from "@/components/shell/bottom-nav";
 import { StudentSwitch } from "@/components/shell/student-switch";
 import { loginStatus } from "@/lib/auth/actor";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { actor, email, switcher, view, parentWithoutStudent, login } = await loginStatus();
+
+  // Nur für die Kind-Sicht: Der Avatar braucht den Vornamen, der Actor allein
+  // trägt nur die studentId. `login` (Kindliste) gibt es hier nicht – das ist
+  // die Eltern-Sicht.
+  const ownFirstName =
+    view === "student" && actor?.role === "student" ? await loadOwnFirstName() : null;
 
   async function logoutAndRedirect() {
     "use server";
@@ -54,49 +61,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="text-koenigsblau text-lg font-bold tracking-tight">tutr</span>
 
           <div className="flex items-center gap-3">
-            {view === "parent" && login && actor?.role === "parent" ? (
-              <>
-                <StudentSwitch students={login.students} current={actor.studentId} />
-                <Link
-                  href="/einstellungen"
-                  className="text-tinte-leise hover:text-tinte text-xs font-medium"
-                >
-                  Einstellungen
-                </Link>
-              </>
-            ) : null}
-            {view === "student" && actor?.role === "student" ? (
-              // Schmal (F-06e): Für die Kind-Rolle zeigt /einstellungen nur
-              // „Konto löschen" – keine Kindliste, keine Geräteverwaltung.
-              <Link
-                href="/einstellungen"
-                className="text-tinte-leise hover:text-tinte text-xs font-medium"
-              >
-                Einstellungen
-              </Link>
+            {view === "parent" && login && actor.role === "parent" ? (
+              <StudentSwitch students={login.students} current={actor.studentId} />
             ) : null}
             {switcher ? <ActorSwitch current={view} /> : null}
-            {email ? (
-              <span className="text-tinte-leise max-w-[10rem] truncate text-xs" title={email}>
-                {email}
-              </span>
-            ) : null}
-            {/* Unabhängig von `email`, nicht daran gekoppelt: `email` bleibt
-                für die Kind-Rolle immer leer (nur Eltern melden sich über
-                Supabase an), ein Kind hatte deshalb hier gar keinen Weg,
-                sich abzumelden – nur „Konto löschen" unter /einstellungen,
-                das ist unwiderruflich und kein Ersatz. Gefunden beim
-                Testen auf mytutr.de. */}
-            {actor ? (
-              <form action={logoutAndRedirect}>
-                <button
-                  type="submit"
-                  className="border-linie-stark bg-flaeche text-tinte-weich hover:text-tinte focus-visible:outline-koenigsblau rounded-md border px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1"
-                >
-                  Abmelden
-                </button>
-              </form>
-            ) : null}
+            {/* Bündelt „Einstellungen", E-Mail-Adresse und „Abmelden" hinter
+                einem Avatar (F-15) – vorher drei einzelne Elemente, auf dem
+                Handy schmal und mit jedem weiteren Eintrag enger. Für die
+                Kind-Rolle bleibt `email` immer leer (nur Eltern melden sich
+                über Supabase an) – „Abmelden" fehlt im Menü dann trotzdem
+                nicht, es hängt nicht an `email`, sondern läuft unabhängig
+                davon über denselben `logout`. */}
+            <AccountMenu
+              label={view === "student" ? (ownFirstName ?? "?") : (email ?? "?")}
+              email={view === "parent" ? email : null}
+              logout={logoutAndRedirect}
+            />
           </div>
         </div>
       </header>

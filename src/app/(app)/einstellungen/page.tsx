@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Auslastungsbalken, Block, Notice, PageHeader } from "@/components/shell/primitives";
@@ -8,14 +9,17 @@ import {
   deleteChild,
   deleteMyAccount,
   deleteMyParentAccount,
-  loadActiveSchoolYearLabel,
+  loadActiveSchoolYear,
   loadAuslastung,
   loadDevices,
-  loadOwnFirstName,
+  loadOwnProfile,
+  loadSchoolYearHistory,
 } from "./actions";
 import { DeleteChild } from "./delete-child";
 import { DeleteParentAccount } from "./delete-parent-account";
 import { DeviceRow } from "./device-row";
+import { EditProfile } from "./edit-profile";
+import { OpenSchoolYear } from "./open-school-year";
 import { RecoveryLink } from "./recovery-link";
 
 export const metadata = { title: "Einstellungen · tutr" };
@@ -53,9 +57,10 @@ export default async function SettingsPage() {
 
   if (!login) redirect("/heute");
 
-  const [devices, schoolYearLabel] = await Promise.all([
+  const [devices, schoolYear, schoolYearHistory] = await Promise.all([
     loadDevices(),
-    loadActiveSchoolYearLabel(),
+    loadActiveSchoolYear(),
+    loadSchoolYearHistory(),
   ]);
   const currentStudent = login.students.find((s) => s.id === actor.studentId);
 
@@ -72,12 +77,22 @@ export default async function SettingsPage() {
           </Notice>
         </Block>
 
-        {schoolYearLabel ? (
-          <Block title="Schuljahr" trailing={schoolYearLabel}>
+        {schoolYear ? (
+          <Block title="Schuljahr" trailing={schoolYear.label}>
             <Notice>
               {currentStudent?.firstName ?? "Ihr Kind"} legt Fächer selbst unter „Fächer&quot; an.
-              Umschalten auf ein anderes Schuljahr kommt, sobald eins ansteht.
             </Notice>
+            <div className="flex flex-wrap items-center gap-3">
+              <OpenSchoolYear current={schoolYear} />
+              {schoolYearHistory && schoolYearHistory.length > 1 ? (
+                <Link
+                  href="/einstellungen/schuljahre"
+                  className="text-tinte-leise hover:text-tinte text-xs font-medium underline decoration-dotted underline-offset-2"
+                >
+                  Meine Schuljahre ansehen
+                </Link>
+              ) : null}
+            </div>
           </Block>
         ) : null}
 
@@ -166,18 +181,35 @@ export default async function SettingsPage() {
  * Kind sieht `ai_usage`, dieselbe Richtung wie beim Tutor selbst.
  */
 async function StudentSettings() {
-  const [firstName, schoolYearLabel, auslastung] = await Promise.all([
-    loadOwnFirstName(),
-    loadActiveSchoolYearLabel(),
+  const [profile, schoolYear, schoolYearHistory, auslastung] = await Promise.all([
+    loadOwnProfile(),
+    loadActiveSchoolYear(),
+    loadSchoolYearHistory(),
     loadAuslastung(),
   ]);
 
   return (
     <>
-      <PageHeader title="Einstellungen" trailing={firstName ?? undefined} back={HEUTE} />
-      {schoolYearLabel ? (
-        <Block title="Schuljahr" trailing={schoolYearLabel}>
+      <PageHeader title="Einstellungen" trailing={profile?.firstName} back={HEUTE} />
+      {profile ? (
+        <Block title="Profil">
+          <EditProfile profile={profile} />
+        </Block>
+      ) : null}
+      {schoolYear ? (
+        <Block title="Schuljahr" trailing={schoolYear.label}>
           <Notice>Deine Fächer legst du unter „Fächer&quot; an.</Notice>
+          <div className="flex flex-wrap items-center gap-3">
+            <OpenSchoolYear current={schoolYear} />
+            {schoolYearHistory && schoolYearHistory.length > 1 ? (
+              <Link
+                href="/einstellungen/schuljahre"
+                className="text-tinte-leise hover:text-tinte text-xs font-medium underline decoration-dotted underline-offset-2"
+              >
+                Meine Schuljahre ansehen
+              </Link>
+            ) : null}
+          </div>
         </Block>
       ) : null}
       {auslastung ? (
@@ -198,7 +230,7 @@ async function StudentSettings() {
       ) : null}
       <Block title="Konto löschen">
         <DeleteChild
-          firstName={firstName ?? ""}
+          firstName={profile?.firstName ?? ""}
           buttonLabel="Konto löschen"
           warning="Dein Konto wird unwiderruflich gelöscht – Lernstand, Karten, Vokabeln, Gespräche mit dem Tutor. Das lässt sich nicht rückgängig machen. Ist ein Elternteil mit deinem Konto verknüpft, bekommt es eine Nachricht darüber."
           action={deleteMyAccount}

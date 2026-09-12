@@ -6,6 +6,23 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionier
 
 ### Added
 
+- **F-06c, F-15, F-16b: Profil bearbeiten, Avatar-Menü, Schuljahr eröffnen.**
+  Drei gebündelte Tickets. **F-06c:** Das Kind ändert Vorname/Jahrgang/Klasse selbst
+  (`EditProfile` in `/einstellungen`) – neue Policy `student_update_self` erlaubt die ganze
+  Zeile (Postgres kennt keine spaltenweise Sichtbarkeit), die Enge auf drei Felder liegt in
+  der Server Action `updateOwnProfile()`. **F-15:** Kontomenü hinter einem Avatar
+  (Initiale auf Königsblau, `initialsFromLabel()`) statt „Einstellungen“/E-Mail/„Abmelden“
+  einzeln im Kopfbereich – `AccountMenu` (`components/shell/`), Foto-Avatar entfiel wegen
+  der Pseudonymität des Kind-Profils. **F-16b (enger geschnitten als der Ticket-Titel,
+  Rückfrage vor dem Bauen):** `startNewSchoolYear()` archiviert das aktive Schuljahr und
+  eröffnet in derselben Transaktion ein neues (Vorschlag Jahrgang+1 aus
+  `lib/school-year/rollover.ts`), Fächer werden bewusst nicht mitkopiert (ADR 0009 D2).
+  `/einstellungen/schuljahre` zeigt die Historie rein lesend (Konzept §9). Dabei eine
+  D3-Lücke aus ADR 0009 geschlossen, die F-16b zugeschrieben, aber vergessen war:
+  `/ueben` zählt jetzt nur noch Fächer des aktiven Jahres als fällig. Der automatische
+  Zeitpunkt-Hinweis nahe Schuljahresende und der geführte Fächer-Abgleich sind als
+  **F-16c** ausgelagert – lassen sich vor Sommer 2027 nicht gegen echte Nutzung prüfen.
+
 - **L-01: Lehrwerk pro Fach erfassen.** Neue Route `/faecher/lehrwerk/[subjectId]`
   (Einstiegspunkt von `/faecher` aus, kein neuer Einstellungen-Zwischenschritt): ein
   vorhandenes (kuratiertes oder eigenes) Lehrwerk ohne KI zuordnen, oder neu erfassen über

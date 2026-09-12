@@ -41,13 +41,14 @@ Begründung, warum etwas so geschnitten ist, steht in `docs/PLAN.md` – hier nu
 |                          | Wiederherstellung über die Kindliste                                               | ✅    | F-06d   |
 |                          | Kontolöschung (Kind, Kind durch Eltern, Elternkonto)                               | ✅    | F-06e   |
 |                          | Wiederherstellung vom Anmeldebildschirm aus                                        | 🌑    | F-06f   |
-|                          | Kind bearbeitet sein Profil (Einstellungen)                                        | 🌑    | F-06c   |
-|                          | Kontomenü hinter einem Avatar                                                      | 🌑    | F-15    |
+|                          | Kind bearbeitet sein Profil (Einstellungen)                                        | ✅    | F-06c   |
+|                          | Kontomenü hinter einem Avatar                                                      | ✅    | F-15    |
 | **Fächer & Schuljahr**   |                                                                                    | 🌓    |         |
 |                          | Kind legt Fach + Schuljahr selbst an (ADR 0009)                                    | ✅    | F-16a   |
 |                          | Fach umbenennen, löschen mit Riegel                                                | ✅    | F-16a   |
 |                          | `subject.language` – Grundlage für Sprachrichtung                                  | ✅    | F-16a   |
-|                          | Schuljahr umschalten, Historie, Sommer-Rollover                                    | 🌑    | F-16b   |
+|                          | Schuljahr eröffnen (manuell), Historie ansehen                                     | ✅    | F-16b   |
+|                          | Automatischer Sommer-Assistent (Zeitpunkt-Hinweis, Fächer-Abgleich)                | 🌑    | F-16c   |
 |                          | Lehrwerk pro Fach erfassen (Foto/Websuche → editierbare Kapitelliste)              | ✅    | L-01    |
 | **Vokabeln**             |                                                                                    | 🌓    |         |
 |                          | Schema: Set, Item (beide Richtungen), FSRS-Karten                                  | ✅    | V-01    |
